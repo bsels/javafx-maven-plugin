@@ -129,6 +129,51 @@ It is used to reduce runtime dependencies because the JavaFX FXML loader is not 
   dependencies; otherwise class loading will fail.
 - **Incremental builds:** The plugin does not currently check timestamps, so it regenerates all files on each run.
   Consider cleaning the generated folder only when necessary.
+- **Use generics:** Generics needs to be explicitly declared in the FXML file, otherwise the plugin will fail.
+  This is done by XML comment: `<!-- generic <index>: <full.qualified.type> -->`, e.g.
+  `<!-- generic 0: java.lang.Integer -->`.
+
+### Example FXML File
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Spinner?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.RowConstraints?>
+<GridPane hgap="4.0" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity"
+          prefWidth="600.0" vgap="2.0" xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/17.0.12">
+    <columnConstraints>
+        <ColumnConstraints hgrow="NEVER"/>
+        <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0"/>
+    </columnConstraints>
+    <rowConstraints>
+        <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES"/>
+        <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES"/>
+        <RowConstraints minHeight="10.0" prefHeight="30.0" vgrow="SOMETIMES"/>
+    </rowConstraints>
+    <children>
+        <Label text="Integer spinner:"/>
+        <Label text="Double spinner:" GridPane.rowIndex="1"/>
+        <Label text="Enum spinner:" GridPane.rowIndex="2"/>
+        <Spinner fx:id="spinnerInteger" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1">
+            <!-- generic 0: java.lang.Integer -->
+        </Spinner>
+        <Spinner fx:id="spinnerDouble" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="1">
+            <!-- generic 0: java.lang.Double -->
+        </Spinner>
+        <Spinner fx:id="spinnerEnum" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.rowIndex="2">
+            <!-- generic 0: java.time.DayOfWeek -->
+        </Spinner>
+    </children>
+    <padding>
+        <Insets bottom="8.0" left="8.0" right="8.0" top="8.0"/>
+    </padding>
+</GridPane>
+```
 
 ---
 
@@ -391,6 +436,7 @@ mvn javafx:run
 ```
 
 The console will display the exact command that is executed by the plugin, for example:
+
 ```shell
 java -Djava.util.logging.SimpleFormatter.format=%1$tF %1$tT %4$s %2$s - %5$s%6$s%n \
      -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:*6006 \
