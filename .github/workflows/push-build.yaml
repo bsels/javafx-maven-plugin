@@ -29,7 +29,7 @@ jobs:
       - name: Get current project version
         id: projectVersion
         run: |
-          echo "version=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_ENV
+          echo "version=$(./mvnw help:evaluate --no-transfer-progress -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
       - name: Bump version
         id: bumpVersion
         uses: actions/github-script@v8
@@ -53,13 +53,13 @@ jobs:
       - name: Set new project version
         if: ${{ steps.bumpVersion.outputs.result != steps.projectVersion.outputs.version }}
         run: |
-          ./mvnw versions:set -DnewVersion=${{ steps.bumpVersion.outputs.result }}
+          ./mvnw versions:set --no-transfer-progress -DnewVersion=${{ steps.bumpVersion.outputs.result }}
       - name: Build and deploy with Maven
         if: ${{ steps.bumpVersion.outputs.result != steps.projectVersion.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./mvnw --batch-mode clean deploy
+          ./mvnw --batch-mode --no-transfer-progress clean deploy
       - name: Commit changes
         if: ${{ steps.bumpVersion.outputs.result != steps.projectVersion.outputs.version }}
         run: |
