@@ -65,7 +65,8 @@ jobs:
         run: |
           git commit -am "Released ${{ steps.bumpVersion.outputs.result }} [skip ci]"
           git tag "v${{ steps.bumpVersion.outputs.result }}"
-          git push --follow-tags
+          git push
+          git push origin tag "v${{ steps.bumpVersion.outputs.result }}"
       - name: Create release
         if: ${{ steps.bumpVersion.outputs.result != steps.projectVersion.outputs.version }}
         uses: actions/github-script@v8
@@ -77,4 +78,4 @@ jobs:
               tag_name: "v${{ steps.bumpVersion.outputs.result }}",
               name: "v${{ steps.bumpVersion.outputs.result }}",
               generate_release_notes: true
-            })
+            });
