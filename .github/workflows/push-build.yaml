@@ -34,7 +34,7 @@ jobs:
         id: bumpVersion
         uses: actions/github-script@v8
         env:
-          COMMIT_MESSAGE: ${{ github.event.workflow_run.head_commit.message }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
           CURRENT_VERSION: ${{ steps.projectVersion.outputs.version }}
         with:
           script: |
