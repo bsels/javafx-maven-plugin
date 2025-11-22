@@ -69,13 +69,11 @@ jobs:
           git push origin tag "v${{ steps.bumpVersion.outputs.result }}"
       - name: Create release
         if: ${{ steps.bumpVersion.outputs.result != steps.projectVersion.outputs.version }}
-        uses: actions/github-script@v8
-        with:
-          script: |
-            await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: "v${{ steps.bumpVersion.outputs.result }}",
-              name: "v${{ steps.bumpVersion.outputs.result }}",
-              generate_release_notes: true
-            });
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ format('v{0}', steps.bumpVersion.outputs.result) }}
+        run: |
+          gh release create "$tag" \
+              --repo="$GITHUB_REPOSITORY" \
+              --title="${GITHUB_REPOSITORY#*/} ${tag#v}" \
+              --generate-notes
