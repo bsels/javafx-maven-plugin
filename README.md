@@ -1,6 +1,6 @@
 # javafx-maven-plugin
 
-[![Push Build](https://github.com/bsels/javafx-maven-plugin/actions/workflows/push-build.yaml/badge.svg?event=push)](https://github.com/bsels/javafx-maven-plugin/actions/workflows/push-build.yaml)
+[![Push Build](https://github.com/bsels/javafx-maven-plugin/actions/workflows/push-build.yaml/badge.svg)](https://github.com/bsels/javafx-maven-plugin/actions/workflows/push-build.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A concise Maven plugin that has been inspired from the JavaFX Maven Plugin
