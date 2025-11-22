@@ -2,10 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A concise Maven plugin that extends the JavaFX Maven Plugin.
-Two of its primary goals, `run` and `jlink`, leverage the implementation from the
-[openjfx/javafx‑maven‑plugin](https://github.com/openjfx/javafx-maven-plugin) project, reusing its proven JavaFX launch
-and module‑linking logic while providing our own lightweight wrapper and additional configuration options.
+A concise Maven plugin that has been inspired from the JavaFX Maven Plugin
+([openjfx/javafx‑maven‑plugin](https://github.com/openjfx/javafx-maven-plugin)).
 
 ## Features
 
@@ -129,7 +127,7 @@ It is used to reduce runtime dependencies because the JavaFX FXML loader is not 
   dependencies; otherwise class loading will fail.
 - **Incremental builds:** The plugin does not currently check timestamps, so it regenerates all files on each run.
   Consider cleaning the generated folder only when necessary.
-- **Use generics:** Generics needs to be explicitly declared in the FXML file, otherwise the plugin will fail.
+- **Use generics:** Generics need to be explicitly declared in the FXML file, otherwise the plugin will fail.
   This is done by XML comment: `<!-- generic <index>: <full.qualified.type> -->`, e.g.
   `<!-- generic 0: java.lang.Integer -->`.
 

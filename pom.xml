@@ -10,6 +10,20 @@
     <packaging>maven-plugin</packaging>
     <name>javafx-maven-plugin Maven Mojo</name>
 
+    <licenses>
+        <license>
+            <name>MIT</name>
+            <url>https://mit-license.org/</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>Boris Sels</name>
+        </developer>
+    </developers>
+
     <properties>
         <java.version>24</java.version>
         <!--region Plugin versions -->
@@ -180,4 +194,12 @@
         </dependency>
         <!-- endregion -->
     </dependencies>
+
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Maven Packages</name>
+            <url>https://maven.pkg.github.com/bsels/javafx-maven-plugin</url>
+        </repository>
+    </distributionManagement>
 </project>
