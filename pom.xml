@@ -6,7 +6,7 @@
 
     <groupId>com.github.bsels</groupId>
     <artifactId>javafx-maven-plugin</artifactId>
-    <version>0.0.1</version>
+    <version>1.0.0</version>
     <packaging>maven-plugin</packaging>
     <name>javafx-maven-plugin Maven Mojo</name>
 
