@@ -37,6 +37,7 @@ jobs:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
           CURRENT_VERSION: ${{ steps.projectVersion.outputs.version }}
         with:
+          result-encoding: string
           script: |
             const commitMessage = process.env.COMMIT_MESSAGE.trim().toLowerCase();
             const [major, minor, patch] = process.env.CURRENT_VERSION.trim().split('.');
