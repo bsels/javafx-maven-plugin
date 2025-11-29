@@ -69,7 +69,7 @@ It is used to reduce runtime dependencies because the JavaFX FXML loader is not 
         <plugin>
             <groupId>com.github.bsels</groupId>
             <artifactId>javafx-maven-plugin</artifactId>
-            <version>1.0.2</version>
+            <version>1.0.3</version>
 
             <executions>
                 <execution>
@@ -228,7 +228,7 @@ binaries,logging configuration, optional ZIP packaging, etc.).
 <plugin>
     <groupId>com.github.bsels</groupId>
     <artifactId>javafx-maven-plugin</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
 
     <executions>
         <execution>
@@ -363,7 +363,7 @@ The goal executes during the `proces-classes` phase and requires **runtime** dep
 <plugin>
     <groupId>com.github.bsels</groupId>
     <artifactId>javafx-maven-plugin</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
 
     <executions>
         <execution>
@@ -445,53 +445,4 @@ java -Djava.util.logging.SimpleFormatter.format=%1$tF %1$tT %4$s %2$s - %5$s%6$s
      -Xmx1024m -Dmy.property=42 \
      -cp target/classes:... \
      com.example.app.MainApp --mode demo --verbose
-```
-
-## 📦 Including This Library in Your Project
-
-What you need to do:
-
-1. Add the GitHub Packages registry to your Maven settings so Maven can resolve the artifact from GitHub’s Maven
-   Artifactory.
-2. Update your pom.xml (or Gradle build) to point to the new coordinates once they’re published.
-3. For a complete walkthrough—including how to generate a PAT and configure Maven/Gradle—see GitHub’s official
-   documentation: [🔗 Authenticating to GitHub Packages (Maven)](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry#authenticating-to-github-packages)
-
-```xml
-
-<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-                      http://maven.apache.org/xsd/settings-1.0.0.xsd">
-
-    <activeProfiles>
-        <activeProfile>github</activeProfile>
-    </activeProfiles>
-
-    <profiles>
-        <profile>
-            <id>github</id>
-            <repositories>
-                <repository>
-                    <id>central</id>
-                    <url>https://repo.maven.apache.org/maven2</url>
-                </repository>
-                <repository>
-                    <id>github</id>
-                    <url>https://maven.pkg.github.com/bsels/javafx-maven-plugin</url>
-                    <snapshots>
-                        <enabled>true</enabled>
-                    </snapshots>
-                </repository>
-            </repositories>
-        </profile>
-    </profiles>
-    <servers>
-        <server>
-            <id>github</id>
-            <username>YOUR-USERNAME</username>
-            <password>YOUR-PAT-TOKEN</password>
-        </server>
-    </servers>
-</settings>
 ```
