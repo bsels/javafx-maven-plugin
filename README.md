@@ -69,7 +69,7 @@ It is used to reduce runtime dependencies because the JavaFX FXML loader is not 
         <plugin>
             <groupId>com.github.bsels</groupId>
             <artifactId>javafx-maven-plugin</artifactId>
-            <version>1.0.3</version>
+            <version>1.1.0</version>
 
             <executions>
                 <execution>
@@ -228,7 +228,7 @@ binaries,logging configuration, optional ZIP packaging, etc.).
 <plugin>
     <groupId>com.github.bsels</groupId>
     <artifactId>javafx-maven-plugin</artifactId>
-    <version>1.0.3</version>
+    <version>1.1.0</version>
 
     <executions>
         <execution>
@@ -363,7 +363,7 @@ The goal executes during the `proces-classes` phase and requires **runtime** dep
 <plugin>
     <groupId>com.github.bsels</groupId>
     <artifactId>javafx-maven-plugin</artifactId>
-    <version>1.0.3</version>
+    <version>1.1.0</version>
 
     <executions>
         <execution>
