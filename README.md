@@ -3,6 +3,7 @@
 [![Push Build](https://github.com/bsels/javafx-maven-plugin/actions/workflows/push-build.yaml/badge.svg)](https://github.com/bsels/javafx-maven-plugin/actions/workflows/push-build.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Latest version](https://img.shields.io/github/v/release/bsels/javafx-maven-plugin?label=Latest%20version)](https://github.com/bsels/javafx-maven-plugin/releases)
+[![Maven Central Version](https://img.shields.io/maven-central/v/io.github.bsels/javafx-maven-plugin)](https://search.maven.org/artifact/io.github.bsels/javafx-maven-plugin)
 
 A concise Maven plugin that has been inspired from the JavaFX Maven Plugin
 ([openjfx/javafx‑maven‑plugin](https://github.com/openjfx/javafx-maven-plugin)).
@@ -67,7 +68,7 @@ It is used to reduce runtime dependencies because the JavaFX FXML loader is not 
 <build>
     <plugins>
         <plugin>
-            <groupId>com.github.bsels</groupId>
+            <groupId>io.github.bsels</groupId>
             <artifactId>javafx-maven-plugin</artifactId>
             <version>1.1.0</version>
 
@@ -226,7 +227,7 @@ binaries,logging configuration, optional ZIP packaging, etc.).
 ```xml
 
 <plugin>
-    <groupId>com.github.bsels</groupId>
+    <groupId>io.github.bsels</groupId>
     <artifactId>javafx-maven-plugin</artifactId>
     <version>1.1.0</version>
 
@@ -361,7 +362,7 @@ The goal executes during the `proces-classes` phase and requires **runtime** dep
 ```xml
 
 <plugin>
-    <groupId>com.github.bsels</groupId>
+    <groupId>io.github.bsels</groupId>
     <artifactId>javafx-maven-plugin</artifactId>
     <version>1.1.0</version>
 
