@@ -1,6 +1,6 @@
 # javafx-maven-plugin
-
-[![Push Build](https://github.com/bsels/javafx-maven-plugin/actions/workflows/push-build.yaml/badge.svg)](https://github.com/bsels/javafx-maven-plugin/actions/workflows/push-build.yaml)
+[![Push release](https://github.com/bsels/javafx-maven-plugin/actions/workflows/push-release.yaml/badge.svg)](https://github.com/bsels/javafx-maven-plugin/actions/workflows/push-release.yaml)
+[![Release Build](https://github.com/bsels/javafx-maven-plugin/actions/workflows/release-build.yaml/badge.svg)](https://github.com/bsels/javafx-maven-plugin/actions/workflows/release-build.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Latest version](https://img.shields.io/github/v/release/bsels/javafx-maven-plugin?label=Latest%20version)](https://github.com/bsels/javafx-maven-plugin/releases)
 [![Maven Central Version](https://img.shields.io/maven-central/v/io.github.bsels/javafx-maven-plugin)](https://search.maven.org/artifact/io.github.bsels/javafx-maven-plugin)
