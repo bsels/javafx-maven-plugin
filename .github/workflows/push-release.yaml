@@ -1,10 +1,9 @@
-name: Push Build
+name: Push create release
 on:
   push:
     branches: [ main ]
 permissions:
-  contents: write
-  packages: write
+  contents: none
 jobs:
   build:
     name: Build
@@ -13,24 +12,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
       - name: Setup Java JDK 25
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '25'
-          cache: 'maven'
-          cache-dependency-path: 'pom.xml'
-          server-id: ossrh
-          server-username: SERVER_USERNAME
-          server-password: SERVER_PASSWORD
-          gpg-private-key: ${{ secrets.GPG_KEY }}
-          gpg-passphrase: GPG_PASSPHRASE
-        env:
-          GPG_PASSPHRASE: ${{ secrets.GPG_KEY_PASSWORD }}
-          SERVER_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
-          SERVER_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ssh-key: ${{ secrets.SSH_KEY }}
       - name: Set up Git user
         run: |
           git config user.name github-actions[bot]
@@ -64,14 +54,6 @@ jobs:
         if: ${{ steps.bumpVersion.outputs.result != steps.projectVersion.outputs.version }}
         run: |
           ./mvnw versions:set --no-transfer-progress -DnewVersion=${{ steps.bumpVersion.outputs.result }}
-      - name: Build and deploy with Maven
-        if: ${{ steps.bumpVersion.outputs.result != steps.projectVersion.outputs.version }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SERVER_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
-          SERVER_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-        run: |
-          ./mvnw --batch-mode --no-transfer-progress clean deploy -Dgpg.passphrase=${{ secrets.GPG_KEY_PASSWORD }}
       - name: Commit changes
         if: ${{ steps.bumpVersion.outputs.result != steps.projectVersion.outputs.version }}
         run: |
