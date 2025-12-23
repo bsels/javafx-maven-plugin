@@ -12,6 +12,11 @@ import java.util.Objects;
 ///
 /// This class is part of the sealed hierarchy of [FXMLNode] and is primarily used in modeling FXML constructs,
 /// enabling structured representation and interaction with FXML elements in JavaFX.
+///
+/// @param internal a boolean indicating whether the [FXMLValueNode] is internal
+/// @param identifier the identifier of the [FXMLValueNode]; must not be null
+/// @param clazz the class metadata associated with the value; must not be null
+/// @param value the value held by this [FXMLValueNode]; must not be null
 public record FXMLValueNode(boolean internal, String identifier, Class<?> clazz, String value)
         implements FXMLNode, FXMLIdentifiableNode {
 

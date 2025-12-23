@@ -32,6 +32,8 @@ import java.util.stream.Stream;
 ///
 /// This class is designed to read FXML files, parse their XML content, and extract necessary information
 /// such as custom import statements and the root XML element hierarchy.
+///
+/// @param log a Log instance used for logging messages during the parsing of FXML files. Must not be null.
 public record FXMLReader(Log log) {
     /// A [Pattern] object used to match and validate custom import statements in the FXML file.
     /// An import statement must conform to the specified format:

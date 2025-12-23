@@ -6,6 +6,11 @@ import java.util.Objects;
 
 /// Represents a parsed XML structure including the name, attributes, children, and comments of an XML element.
 /// This class is designed to provide an immutable representation of an XML element hierarchy.
+///
+/// @param name       the name of the XML element
+/// @param properties the attributes of the XML element represented as a map of key-value pairs
+/// @param children   the nested child elements of this XML element represented as a list of [ParsedXMLStructure]
+/// @param comments   the comments related to the element
 public record ParsedXMLStructure(
         String name,
         Map<String, String> properties,

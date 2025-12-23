@@ -163,6 +163,17 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     @Parameter(property = "javafx.fxml.parameterization")
     List<FXMLParameterized> fxmlParameterizations;
 
+    /// Constructs a new instance of the [FXMLToSourceCodeMojo] class.
+    ///
+    /// This constructor initializes the object by invoking the superclass constructor of [AbstractMojo].
+    /// The class is responsible for converting FXML files into Java source code through its Maven plugin execution
+    /// logic.
+    /// Initialization of fields and dependencies required for the plugin's functionality
+    /// is performed within the context of the class configuration and execution lifecycle.
+    public FXMLToSourceCodeMojo() {
+        super();
+    }
+
     /// Executes the Maven plugin logic for generating FXML source code.
     ///
     /// This method reads FXML files from the specified directory, processes them to create an internal representation

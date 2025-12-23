@@ -8,6 +8,10 @@ import java.util.Objects;
 ///
 /// This class encapsulates the structure of an FXML file in an immutable format, providing access to
 /// its import declarations and root XML hierarchy.
+///
+/// @param imports   a list of import statements associated with the FXML file. The list is defensively copied to ensure immutability.
+/// @param root      the root element of the FXML file, represented as a [ParsedXMLStructure]. Must not be null.
+/// @param className the name of the Java class generated from the FXML file.
 public record ParsedFXML(List<String> imports, ParsedXMLStructure root, String className) {
 
     /// Constructs an instance of the [ParsedFXML] record.

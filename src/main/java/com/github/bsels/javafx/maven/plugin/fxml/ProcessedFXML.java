@@ -9,6 +9,12 @@ import java.util.Set;
 /// This record consolidates information about the structure of an FXML file, including imports, fields, methods,
 /// the root node, and the associated class name.
 /// It ensures immutability and validates that all provided properties are non-null.
+///
+/// @param imports the set of import strings required in the FXML context; must not be null
+/// @param fields the list of FXML fields in the structure; must not be null
+/// @param methods the list of FXML methods in the structure; must not be null
+/// @param root the root [FXMLNode] representing the top-level node in the hierarchy; must not be null
+/// @param className the name of the class associated with the FXML structure; must not be null
 public record ProcessedFXML(
         Set<String> imports,
         List<FXMLField> fields,

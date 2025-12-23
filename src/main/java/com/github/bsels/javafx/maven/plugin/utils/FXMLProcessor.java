@@ -65,6 +65,8 @@ import java.util.stream.Stream;
 /// - This class operates on parsed FXML structures defined by models such as [ParsedFXML] and [FXMLNode].
 /// - Private methods encapsulate the logic for handling node conversion, optimization, property extraction,
 ///   and static property resolution.
+///
+/// @param log the logging system used for internal diagnostic and process logging. Must not be null.
 public record FXMLProcessor(Log log) {
     /// A compiled regular expression pattern used to match and capture generic type definitions.
     ///
@@ -90,8 +92,7 @@ public record FXMLProcessor(Log log) {
     /// for further use in FXML-related operations.
     ///
     /// @param parsedFXML the parsed FXML structure to process. This includes the import statements, root XML structure, and generated class name. Must not be null.
-    /// @return a [ProcessedFXML] object containing the processed import statements, fields, methods,
-    /// root node representation, and class name.
+    /// @return a [ProcessedFXML] object containing the processed import statements, fields, methods, root node representation, and class name.
     public ProcessedFXML process(ParsedFXML parsedFXML) {
         AtomicInteger internalVariableCounter = new AtomicInteger();
         List<String> imports = new ArrayList<>(parsedFXML.imports());
@@ -437,7 +438,7 @@ public record FXMLProcessor(Log log) {
     /// @param clazz    the class associated with the FXML being processed, used to find matching setter methods or constructors
     /// @param property a map entry representing a property, where the key is the property name and the value is the property value to be set
     /// @return an Optional containing the resolved property as an FXMLProperty object if successful,
-    /// or an empty Optional if no valid property was found
+    ///         or an empty Optional if no valid property was found
     private Optional<FXMLProperty> getObjectOrConstructorProperty(List<String> imports, Class<?> clazz, Map.Entry<String, String> property) {
         String propertyName = property.getKey();
         String propertyValue = property.getValue();
@@ -481,9 +482,9 @@ public record FXMLProcessor(Log log) {
     ///
     /// @param imports  the list of import statements used to resolve the types referenced in property definitions
     /// @param property a map entry representing the static property, where the key is the full property name
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 (including class and property name delimited by a dot ".") and the value is the property value to set
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 (including class and property name delimited by a dot ".") and the value is the property value to set
     /// @return an [Optional] containing the resolved property as an [FXMLStaticProperty] object if successful,
-    /// or an empty `Optional` if no valid static setter was found or if there were multiple matching setters
+    ///         or an empty `Optional` if no valid static setter was found or if there were multiple matching setters
     private Optional<FXMLProperty> getStaticProperty(List<String> imports, Map.Entry<String, String> property) {
         String propertyName = property.getKey();
         String propertyValue = property.getValue();
@@ -520,7 +521,7 @@ public record FXMLProcessor(Log log) {
     /// @param propertyName  The name of the property to locate among constructor parameters.
     /// @param propertyValue The value for the located property to associate with the resulting FXMLProperty.
     /// @return An [Optional<FXMLProperty>] representing the found named property.
-    /// Returns an empty Optional if no matching property is found or if ambiguities exist.
+    ///         Returns an empty Optional if no matching property is found or if ambiguities exist.
     private Optional<FXMLProperty> getNamedConstructorProperty(
             Class<?> clazz,
             String propertyName,
@@ -621,7 +622,7 @@ public record FXMLProcessor(Log log) {
 
     /// Computes a mapping of named generic type parameters for a given class to their corresponding type arguments.
     ///
-    /// @param clazz the class for which the generic type mapping is to be computed
+    /// @param clazz    the class for which the generic type mapping is to be computed
     /// @param generics a list of type arguments corresponding to the class's type parameters
     /// @return a map where the keys are the names of the class's type parameters and the values are the provided type arguments
     /// @throws IllegalStateException if the number of generics provided does not match the number of the class's type parameters
@@ -652,7 +653,7 @@ public record FXMLProcessor(Log log) {
     ///
     /// @param node the [FXMLNode] whose children are to be retrieved. It can be an instance of [FXMLObjectNode], [FXMLWrapperNode], or [FXMLValueNode].
     /// @return a [Stream] of [FXMLNode] objects representing the children of the given node.
-    /// If the node has no children or is of type [FXMLValueNode], an empty stream is returned.
+    ///         If the node has no children or is of type [FXMLValueNode], an empty stream is returned.
     private Stream<FXMLNode> getChildrenStream(FXMLNode node) {
         return (switch (node) {
             case FXMLParentNode parentNode -> parentNode.children();
@@ -685,7 +686,7 @@ public record FXMLProcessor(Log log) {
     /// @param property      the `FXMLObjectProperty` defining the interface type and associated details to construct the [FXMLMethod].
     /// @param namedGenerics the list of generic types associated with the functional interface type. This is used to resolve the generic type arguments for the method.
     /// @return an [FXMLMethod] instance representing the processed method signature of the provided
-    /// functional interface, including parameter and return types.
+    ///         functional interface, including parameter and return types.
     /// @throws UnsupportedOperationException if the property type does not represent a functional interface.
     private FXMLMethod constructFXMLMethod(
             List<String> imports,

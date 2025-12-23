@@ -18,6 +18,11 @@ import java.util.Objects;
 /// - The `value` defines the actual value held by the property.
 ///
 /// All parameters in the constructor are validated to be non-null.
+///
+/// @param name the name of the property; must not be null
+/// @param setter the setter method name associated with the property; must not be null
+/// @param type the type of the property; must not be null
+/// @param value the value of the property; must not be null
 public record FXMLObjectProperty(String name, String setter, Type type, String value) implements FXMLProperty {
 
     /// Constructs an instance of [FXMLObjectProperty], representing an object property in an FXML-related context.

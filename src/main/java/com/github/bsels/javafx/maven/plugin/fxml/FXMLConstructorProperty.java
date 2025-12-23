@@ -7,6 +7,10 @@ import java.util.Objects;
 /// This property specifies a key-value pair along with the type of the property.
 /// It implements the [FXMLProperty] interface, allowing it to describe properties that can be used within the FXML
 /// context.
+///
+/// @param name the name of the property must not be null
+/// @param value the value of the property must not be null
+/// @param type the type of the property must not be null
 public record FXMLConstructorProperty(String name, String value, Type type) implements FXMLProperty {
 
     /// Constructs an instance of [FXMLConstructorProperty] with the specified name, value, and type.
