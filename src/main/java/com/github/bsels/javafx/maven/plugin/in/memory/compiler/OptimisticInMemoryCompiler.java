@@ -130,14 +130,16 @@ public final class OptimisticInMemoryCompiler {
     private List<Path> getSourceFiles(List<Path> sourceFolders) throws IOException {
         List<Path> sourceFilesGrouped = new ArrayList<>();
         for (Path sourceFolder : sourceFolders) {
-            try (Stream<Path> sourceFiles = Files.walk(sourceFolder)) {
-                sourceFiles.filter(Files::isRegularFile)
-                        .filter(Predicate.not(file -> MODULE_INFO_JAVA.equals(file.getFileName().toString())))
-                        .filter(Predicate.not(file -> PACKAGE_INFO_JAVA.equals(file.getFileName().toString())))
-                        .filter(file -> file.toString().toLowerCase().endsWith(JavaFileObject.Kind.SOURCE.extension))
-                        .forEach(sourceFilesGrouped::add);
+            if (Files.exists(sourceFolder)) {
+                try (Stream<Path> sourceFiles = Files.walk(sourceFolder)) {
+                    sourceFiles.filter(Files::isRegularFile)
+                            .filter(Predicate.not(file -> MODULE_INFO_JAVA.equalsIgnoreCase(file.getFileName().toString())))
+                            .filter(Predicate.not(file -> PACKAGE_INFO_JAVA.equalsIgnoreCase(file.getFileName().toString())))
+                            .filter(file -> file.toString().toLowerCase().endsWith(JavaFileObject.Kind.SOURCE.extension))
+                            .forEach(sourceFilesGrouped::add);
+                }
             }
         }
-        return sourceFilesGrouped;
+        return List.copyOf(sourceFilesGrouped);
     }
 }
