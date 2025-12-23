@@ -3,6 +3,7 @@ package com.github.bsels.javafx.maven.plugin.io;
 import org.apache.maven.monitor.logging.DefaultLog;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -29,15 +30,27 @@ class FXMLReaderTest {
 
     @TempDir
     Path tempDir;
+
+    private String originalJavaHome;
     private FXMLReader fxmlReader;
 
     @BeforeEach
     void setUp() {
         fxmlReader = new FXMLReader(new DefaultLog(new ConsoleLogger()));
+        originalJavaHome = System.getProperty("java.home");
         System.setProperty("java.home", "/java/home");
         assertThat(fxmlReader.toString())
                 .isNotNull()
                 .startsWith("FXMLReader[log=");
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (originalJavaHome != null) {
+            System.setProperty("java.home", originalJavaHome);
+        } else {
+            System.clearProperty("java.home");
+        }
     }
 
     @Nested

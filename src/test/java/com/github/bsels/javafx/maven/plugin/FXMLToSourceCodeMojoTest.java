@@ -71,8 +71,6 @@ public class FXMLToSourceCodeMojoTest {
         classUnderTest.debugInternalModel = false;
         classUnderTest.fxmlParameterizations = null;
         classUnderTest.project = mockProject;
-
-        System.setProperty("java.home", "/usr/lib/jvm/java-17-openjdk-amd64");
     }
 
     @AfterEach
