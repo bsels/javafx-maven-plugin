@@ -39,7 +39,7 @@ public final class InMemoryCompiledClass extends SimpleJavaFileObject {
     public InMemoryCompiledClass(String className) {
         this.className = Objects.requireNonNull(className, "`className` must not be null");
         this.outputStream = new ByteArrayOutputStream();
-        String uri = "memory:///%s%s".formatted(className.replace('.', '/'), Kind.CLASS.extension);
+        String uri = "jvm-memory:///%s%s".formatted(className.replace('.', '/'), Kind.CLASS.extension);
         super(URI.create(uri), Kind.CLASS);
     }
 

@@ -37,12 +37,12 @@ public final class InMemoryCompiledClassOutputJavaFileManager extends Forwarding
     /// This file manager allows in-memory storage of compiled classes,
     /// delegating to the given file manager for other operations.
     ///
-    /// @param fileManager the underlying JavaFileManager to which operations will be delegated. Must not be null.
-    /// @throws NullPointerException if the provided fileManager is null.
-    public InMemoryCompiledClassOutputJavaFileManager(JavaFileManager fileManager) {
-        Objects.requireNonNull(fileManager, "`fileManager` cannot be null");
+    /// @param javaFileManager the underlying JavaFileManager to which operations will be delegated. Must not be null.
+    /// @throws NullPointerException if the provided javaFileManager is null.
+    public InMemoryCompiledClassOutputJavaFileManager(JavaFileManager javaFileManager) {
+        Objects.requireNonNull(javaFileManager, "`javaFileManager` cannot be null");
         this.compiledClasses = new HashMap<>();
-        super(fileManager);
+        super(javaFileManager);
     }
 
     /// Retrieves an immutable map containing the compiled classes stored in memory.
