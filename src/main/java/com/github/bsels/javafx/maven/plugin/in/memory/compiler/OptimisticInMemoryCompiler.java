@@ -1,4 +1,4 @@
-package com.github.bsels.javafx.maven.plugin.compiler.in.memory;
+package com.github.bsels.javafx.maven.plugin.in.memory.compiler;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;

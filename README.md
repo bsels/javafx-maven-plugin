@@ -1,9 +1,11 @@
 # javafx-maven-plugin
+[![Latest version](https://img.shields.io/github/v/release/bsels/javafx-maven-plugin?color=blue&label=GitHub+Tag)](https://github.com/bsels/javafx-maven-plugin/releases)
+[![Maven Central Version](https://img.shields.io/maven-central/v/io.github.bsels/javafx-maven-plugin?color=blue&label=Maven+Central)](https://search.maven.org/artifact/io.github.bsels/javafx-maven-plugin)
+[![JavaDoc](https://javadoc.io/badge2/io.github.bsels/javafx-maven-plugin/javadoc.svg?color=blue&label=JavaDoc)](https://javadoc.io/doc/io.github.bsels/javafx-maven-plugin)
+
 [![Push create release](https://github.com/bsels/javafx-maven-plugin/actions/workflows/push-release.yaml/badge.svg)](https://github.com/bsels/javafx-maven-plugin/actions/workflows/push-release.yaml)
 [![Release Build](https://github.com/bsels/javafx-maven-plugin/actions/workflows/release-build.yaml/badge.svg?event=release)](https://github.com/bsels/javafx-maven-plugin/actions/workflows/release-build.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Latest version](https://img.shields.io/github/v/release/bsels/javafx-maven-plugin?label=Latest%20version)](https://github.com/bsels/javafx-maven-plugin/releases)
-[![Maven Central Version](https://img.shields.io/maven-central/v/io.github.bsels/javafx-maven-plugin)](https://search.maven.org/artifact/io.github.bsels/javafx-maven-plugin)
 
 A concise Maven plugin that has been inspired from the JavaFX Maven Plugin
 ([openjfx/javafx‑maven‑plugin](https://github.com/openjfx/javafx-maven-plugin)).

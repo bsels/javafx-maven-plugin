@@ -1,4 +1,4 @@
-package com.github.bsels.javafx.maven.plugin.compiler.in.memory;
+package com.github.bsels.javafx.maven.plugin.in.memory.compiler;
 
 import java.util.Map;
 import java.util.Objects;
