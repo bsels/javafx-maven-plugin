@@ -41,7 +41,7 @@
     </scm>
 
     <properties>
-        <java.version>24</java.version>
+        <java.version>25</java.version>
         <!--region Plugin versions -->
         <maven.plugin.api.version>3.9.12</maven.plugin.api.version>
         <maven.enforcer.plugin.version>3.6.2</maven.enforcer.plugin.version>
