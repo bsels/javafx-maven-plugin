@@ -1,4 +1,5 @@
 # javafx-maven-plugin
+
 [![Latest version](https://img.shields.io/github/v/release/bsels/javafx-maven-plugin?color=blue&label=GitHub+Tag)](https://github.com/bsels/javafx-maven-plugin/releases)
 [![Maven Central Version](https://img.shields.io/maven-central/v/io.github.bsels/javafx-maven-plugin?color=blue&label=Maven+Central)](https://search.maven.org/artifact/io.github.bsels/javafx-maven-plugin)
 
@@ -30,7 +31,8 @@ rapidly (`run`), and finally produce a lean, portable executable bundle (`jlink`
   encapsulation and reliable configuration at compile‑time and run‑time.
 - **FXML handling**:
     - All **FXML files** reference **classes that are part of the compiled classpath** (i.e., they must already be
-      compiled into the module).
+      compiled into the module), or that can be compiled without the source code that needs to be generated
+      (optimistic compilation: compiles everything that can be compiled without errors).
     - The **generic‑type references** used in those FXML files may reside in source code that has **not yet been
       compiled**; the plugin will generate the necessary Java source files that will require those classes to be
       part of the compilation classpath.
@@ -52,15 +54,16 @@ It is used to reduce runtime dependencies because the JavaFX FXML loader is not 
 
 ### Key Configuration Parameters
 
-| Parameter                  | Property                               | Required?      | Default                                             | Description                                                                                                                                       |
-|----------------------------|----------------------------------------|----------------|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
-| `project`                  | `${project}`                           | Yes (injected) | –                                                   | Maven project reference – used to add the generated source directoryto the compile claspath.                                                      |
-| `fxmlDirectory`            | `javafx.fxml.directory`                | Yes            | –                                                   | Directory that contains the FXML files to process.                                                                                                |
-| `packageName`              | `javafx.fxml.package`                  | No             | (no package)                                        | Base Java package for the generated classes. If omitted, classes are placed directly under the generated‑source folder.                           |
-| `resourceBundleObject`     | `javafx.fxml.resourceBundleObject`     | No             | –                                                   | Fully‑qualified name of a resource‑bundle class used for i18n look‑ups inside the generated code.                                                 |
-| `generatedSourceDirectory` | `javafx.fxml.generatedSourceDirectory` | Yes            | `${project.build.directory}/generated-sources/fxml` | Destination folder for the generated Java files.                                                                                                  |
-| `debugInternalModel`       | `javafx.fxml.debug.internal.model`     | No             | `false`                                             | When `true`, the plugin logs the intermediate JSON representation of the parsed and processed FXML models for troubleshoting.                     |
-| `fxmlParameterizations`    | `javafx.fxml.parameterization`         | No             | –                                                   | A list of `FXMLParameterized` objects that allow custom root parameters, interface mappings, and other fine‑grained tweaks to the generated code. |
+| Parameter                            | Property                               | Required?      | Default                                             | Description                                                                                                                                                              |
+|--------------------------------------|----------------------------------------|----------------|-----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `project`                            | `${project}`                           | Yes (injected) | –                                                   | Maven project reference – used to add the generated source directory to the compile classpath.                                                                           |
+| `fxmlDirectory`                      | `javafx.fxml.directory`                | Yes            | –                                                   | Directory that contains the FXML files to process.                                                                                                                       |
+| `packageName`                        | `javafx.fxml.package`                  | No             | (no package)                                        | Base Java package for the generated classes. If omitted, classes are placed directly under the generated‑source folder.                                                  |
+| `resourceBundleObject`               | `javafx.fxml.resourceBundleObject`     | No             | –                                                   | Fully‑qualified name of a resource‑bundle class used for i18n look‑ups inside the generated code.                                                                        |
+| `generatedSourceDirectory`           | `javafx.fxml.generatedSourceDirectory` | Yes            | `${project.build.directory}/generated-sources/fxml` | Destination folder for the generated Java files.                                                                                                                         |
+| `debugInternalModel`                 | `javafx.fxml.debug.internal.model`     | No             | `false`                                             | When `true`, the plugin logs the intermediate JSON representation of the parsed and processed FXML models for troubleshooting.                                           |
+| `fxmlParameterizations`              | `javafx.fxml.parameterization`         | No             | –                                                   | A list of `FXMLParameterized` objects that allow custom root parameters, interface mappings, and other fine‑grained tweaks to the generated code.                        |
+| `includeSourceFilesInClassDiscovery` | `javafx.fxml.include.source.discovery` | No             | `false`                                             | When `true`, the plugin tries to add as much of the uncompiled source code to the discovery classpath. It will only include classes that can be compiled without errors. |
 
 ### Typical Usage in `pom.xml`
 
