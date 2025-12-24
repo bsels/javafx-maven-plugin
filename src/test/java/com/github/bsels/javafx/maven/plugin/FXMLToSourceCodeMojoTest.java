@@ -171,7 +171,7 @@ public class FXMLToSourceCodeMojoTest {
                     .hasRootCauseInstanceOf(IOException.class);
 
             final Path generatedSourceDirectory;
-            if (packageName != null && packageName.length() > 0) {
+            if (packageName != null && !packageName.isEmpty()) {
                 generatedSourceDirectory = classUnderTest.generatedSourceDirectory.resolve(packageName.replace('.', '/'));
             } else {
                 generatedSourceDirectory = classUnderTest.generatedSourceDirectory;
