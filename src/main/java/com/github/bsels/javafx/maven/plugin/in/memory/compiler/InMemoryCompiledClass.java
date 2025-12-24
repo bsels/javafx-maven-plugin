@@ -56,6 +56,7 @@ public final class InMemoryCompiledClass extends SimpleJavaFileObject {
     /// @return the output stream used for writing the compiled class data
     @Override
     public ByteArrayOutputStream openOutputStream() {
+        outputStream.reset();
         return outputStream;
     }
 
