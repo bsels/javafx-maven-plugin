@@ -3,6 +3,7 @@ package com.github.bsels.javafx.maven.plugin.utils;
 import com.github.bsels.javafx.maven.plugin.CheckAndCast;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLConstantNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLConstructorProperty;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLController;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLField;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLNode;
@@ -96,19 +97,33 @@ public record FXMLProcessor(Log log) {
     public ProcessedFXML process(ParsedFXML parsedFXML) {
         AtomicInteger internalVariableCounter = new AtomicInteger();
         List<String> imports = new ArrayList<>(parsedFXML.imports());
-        FXMLNode root = convert(imports, parsedFXML.root(), internalVariableCounter);
+        ParsedXMLStructure fxmlRootStructure = parsedFXML.root();
+        FXMLNode root = convert(imports, fxmlRootStructure, internalVariableCounter);
         root = deduplicateConstants(root);
         root = deduplicateValueNodes(root);
         root = deduplicateObjectNodes(root);
         List<FXMLField> fields = extractFields(root).distinct().toList();
         List<FXMLMethod> methods = extractMethods(imports, root).distinct().toList();
+        Optional<FXMLController> controllerOptional = inspectControllerClass(imports, fxmlRootStructure);
         return new ProcessedFXML(
                 Set.copyOf(imports),
                 fields,
                 methods,
                 root,
-                parsedFXML.className()
+                parsedFXML.className(),
+                controllerOptional
         );
+    }
+
+    private Optional<FXMLController> inspectControllerClass(List<String> imports, ParsedXMLStructure structure) {
+        Map<String, String> properties = structure.properties();
+        if (!properties.containsKey("fx:controller")) {
+            return Optional.empty();
+        }
+        Class<?> controllerClass = Utils.findType(imports, structure.properties().get("fx:controller"));
+        String className = Utils.improveImportForParameter(imports, controllerClass.getName());
+        // TODO: Implement controller inspection
+        return Optional.of(new FXMLController(className, controllerClass, List.of(), List.of()));
     }
 
     /// Deduplicates object nodes within the given [FXMLNode] by combining identical nodes.
