@@ -1,16 +1,16 @@
 package com.github.bsels.javafx.maven.plugin;
 
-import com.github.bsels.javafx.maven.plugin.fxml.ProcessedFXML;
-import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
-import com.github.bsels.javafx.maven.plugin.parameters.FXMLParameterized;
-import com.github.bsels.javafx.maven.plugin.parameters.InterfacesWithMethod;
-import com.github.bsels.javafx.maven.plugin.utils.ObjectMapperProvider;
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.github.bsels.javafx.maven.plugin.fxml.ProcessedFXML;
+import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
+import com.github.bsels.javafx.maven.plugin.parameters.FXMLParameterized;
+import com.github.bsels.javafx.maven.plugin.parameters.InterfacesWithMethod;
+import com.github.bsels.javafx.maven.plugin.utils.ObjectMapperProvider;
 import javafx.scene.control.TableColumn;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -31,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.OpenOption;
@@ -56,12 +57,13 @@ public class FXMLToSourceCodeMojoTest {
     MavenProject mockProject;
 
     private MockedStatic<Files> filesMockedStatic;
-
     private FXMLToSourceCodeMojo classUnderTest;
+    private Path rootTestFolderPath;
+    private Path myButtonJavaPath;
 
     @BeforeEach
-    void setUp() {
-        filesMockedStatic = Mockito.mockStatic(Files.class);
+    void setUp() throws URISyntaxException {
+        filesMockedStatic = Mockito.mockStatic(Files.class, Mockito.CALLS_REAL_METHODS);
 
         classUnderTest = new FXMLToSourceCodeMojo();
         classUnderTest.resourceBundleObject = TEST_PROJECT_MY_CLASS_RESOURCE_BUNDLE;
@@ -71,6 +73,14 @@ public class FXMLToSourceCodeMojoTest {
         classUnderTest.debugInternalModel = false;
         classUnderTest.fxmlParameterizations = null;
         classUnderTest.project = mockProject;
+        myButtonJavaPath = Path.of(
+                Thread.currentThread()
+                        .getContextClassLoader()
+                        .getResource("test-source/javafx/test/MyButton.java")
+                        .toURI()
+        );
+        rootTestFolderPath = myButtonJavaPath.getParent().getParent().getParent()
+                .toAbsolutePath();
     }
 
     @AfterEach
@@ -146,6 +156,10 @@ public class FXMLToSourceCodeMojoTest {
         @NullAndEmptySource
         @ValueSource(strings = TEST_PACKAGE_GENERATED)
         void creatingOutputDirectoryFailedThrowMojoExecutionException(String packageName) {
+            // Custom settings
+            filesMockedStatic.close();
+            filesMockedStatic = Mockito.mockStatic(Files.class);
+
             // Given
             classUnderTest.packageName = packageName;
             filesMockedStatic.when(() -> Files.createDirectories(Mockito.any()))
@@ -753,6 +767,82 @@ public class FXMLToSourceCodeMojoTest {
             // When, Then
             assertThatNoException()
                     .isThrownBy(classUnderTest::execute);
+        }
+
+        @Test
+        void includeSourceCodeInClassDiscovery() {
+            // Given
+            classUnderTest.includeSourceFilesInClassDiscovery = true;
+            Mockito.when(mockProject.getCompileSourceRoots())
+                    .thenReturn(List.of(rootTestFolderPath.toString()));
+
+            ZonedDateTime now = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC))
+                        .thenReturn(now);
+
+                String fxml = """
+                        <?xml version="1.0" encoding="UTF-8"?>
+                        <?import javafx.test.MyButton?>
+                        <?import javafx.scene.layout.BorderPane?>
+                        <fx:root type="BorderPane" xmlns="http://javafx.com/javafx/11.0.1"
+                                 xmlns:fx="http://javafx.com/fxml/1">
+                            <center>
+                                <MyButton fx:id="button" text="Hello" />
+                            </center>
+                        </fx:root>
+                        """.strip();
+
+                Path fxmlFile = classUnderTest.fxmlDirectory.resolve("TestClass.fxml");
+                filesMockedStatic.when(() -> Files.walk(classUnderTest.fxmlDirectory))
+                        .thenReturn(Stream.of(fxmlFile));
+                filesMockedStatic.when(() -> Files.isRegularFile(fxmlFile))
+                        .thenReturn(true);
+                filesMockedStatic.when(() -> Files.lines(Mockito.eq(fxmlFile), Mockito.any()))
+                        .thenReturn(fxml.lines());
+                filesMockedStatic.when(() -> Files.newInputStream(fxmlFile))
+                        .thenReturn(new ByteArrayInputStream(fxml.getBytes(StandardCharsets.UTF_8)));
+                classUnderTest.debugInternalModel = true;
+
+                // When
+                assertThatNoException()
+                        .isThrownBy(classUnderTest::execute);
+
+                // Then
+                ArgumentCaptor<String> sourceCodeCaptor = ArgumentCaptor.forClass(String.class);
+
+                filesMockedStatic.verify(() -> Files.writeString(
+                        Mockito.any(), sourceCodeCaptor.capture(), Mockito.eq(StandardCharsets.UTF_8)
+                ), Mockito.times(1));
+
+                assertThat(sourceCodeCaptor.getValue())
+                        .isEqualToIgnoringNewLines("""
+                                package test.package.generated;
+                                
+                                import javafx.scene.layout.BorderPane;
+                                import javafx.test.MyButton;
+                                import java.util.ResourceBundle;
+                                import javax.annotation.processing.Generated;
+                                
+                                
+                                @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-01-01T00:00Z")
+                                public abstract class TestClass
+                                    extends BorderPane {
+                                    private static final ResourceBundle RESOURCE_BUNDLE = test.project.MyClass.RESOURCE_BUNDLE;
+                                
+                                    protected final MyButton button;
+                                
+                                    protected TestClass() {
+                                        button = new MyButton();
+                                
+                                        super();
+                                
+                                        button.setText("Hello");
+                                        this.setCenter(button);
+                                    }
+                                }
+                                """);
+            }
         }
     }
 }
