@@ -1,5 +1,6 @@
 package com.github.bsels.javafx.maven.plugin.in.memory.compiler;
 
+import org.apache.maven.plugin.logging.Log;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,9 @@ public class OptimisticInMemoryCompilerTest {
     JavaFileObject javaFileObject1Mock;
     @Mock
     JavaFileObject javaFileObject3Mock;
+
+    @Mock
+    Log logMock;
 
     private OptimisticInMemoryCompiler classUnderTest;
     private Path rootTestFolderPath;
@@ -193,9 +197,12 @@ public class OptimisticInMemoryCompilerTest {
         @NullAndEmptySource
         void noSourceFolders_ReturnEmpty(List<Path> sourceFolders) throws IOException {
             // Act & Assert
-            assertThat(classUnderTest.optimisticCompile(sourceFolders))
+            assertThat(classUnderTest.optimisticCompile(logMock, sourceFolders))
                     .isNotNull()
                     .isEmpty();
+
+            Mockito.verify(logMock, Mockito.times(1))
+                    .warn("No source folders provided for compilation");
         }
 
         @Test
@@ -204,9 +211,12 @@ public class OptimisticInMemoryCompilerTest {
             List<Path> sourceFolders = List.of(rootTestFolderPath.resolve("non-existing"));
 
             // Act & Assert
-            assertThat(classUnderTest.optimisticCompile(sourceFolders))
+            assertThat(classUnderTest.optimisticCompile(logMock, sourceFolders))
                     .isNotNull()
                     .isEmpty();
+
+            Mockito.verify(logMock, Mockito.times(1))
+                    .info("Compiled 0 of 0 source files");
         }
 
         @Test
@@ -215,9 +225,12 @@ public class OptimisticInMemoryCompilerTest {
             List<Path> sourceFolders = List.of(rootTestFolderPath.resolve("invalid"));
 
             // Act & Assert
-            assertThat(classUnderTest.optimisticCompile(sourceFolders))
+            assertThat(classUnderTest.optimisticCompile(logMock, sourceFolders))
                     .isNotNull()
                     .isEmpty();
+
+            Mockito.verify(logMock, Mockito.times(1))
+                    .info("Compiled 0 of 2 source files");
         }
 
         @Test
@@ -226,12 +239,15 @@ public class OptimisticInMemoryCompilerTest {
             List<Path> sourceFolders = List.of(rootTestFolderPath.resolve("partial-valid"));
 
             // Act & Assert
-            assertThat(classUnderTest.optimisticCompile(sourceFolders))
+            assertThat(classUnderTest.optimisticCompile(logMock, sourceFolders))
                     .isNotNull()
                     .isNotEmpty()
                     .hasSize(1)
                     .hasEntrySatisfying(MY_TEST_DUMMY_PARENT, compiledClass -> assertThat(compiledClass)
                             .hasFieldOrPropertyWithValue("className", MY_TEST_DUMMY_PARENT));
+
+            Mockito.verify(logMock, Mockito.times(1))
+                    .info("Compiled 1 of 2 source files");
         }
 
         @Test
@@ -240,7 +256,7 @@ public class OptimisticInMemoryCompilerTest {
             List<Path> sourceFolders = List.of(rootTestFolderPath.resolve("valid"));
 
             // Act & Assert
-            assertThat(classUnderTest.optimisticCompile(sourceFolders))
+            assertThat(classUnderTest.optimisticCompile(logMock, sourceFolders))
                     .isNotNull()
                     .isNotEmpty()
                     .hasSize(2)
@@ -248,6 +264,9 @@ public class OptimisticInMemoryCompilerTest {
                             .hasFieldOrPropertyWithValue("className", MY_TEST_DUMMY_PARENT))
                     .hasEntrySatisfying(MY_TEST_DUMMY_CHILD, compiledClass -> assertThat(compiledClass)
                             .hasFieldOrPropertyWithValue("className", MY_TEST_DUMMY_CHILD));
+
+            Mockito.verify(logMock, Mockito.times(1))
+                    .info("Compiled 2 of 2 source files");
         }
 
         @Test
@@ -259,7 +278,7 @@ public class OptimisticInMemoryCompilerTest {
             );
 
             // Act & Assert
-            assertThat(classUnderTest.optimisticCompile(sourceFolders))
+            assertThat(classUnderTest.optimisticCompile(logMock, sourceFolders))
                     .isNotNull()
                     .isNotEmpty()
                     .hasSize(2)
@@ -267,6 +286,9 @@ public class OptimisticInMemoryCompilerTest {
                             .hasFieldOrPropertyWithValue("className", MY_TEST_DUMMY_PARENT))
                     .hasEntrySatisfying(MY_TEST_DUMMY_CHILD, compiledClass -> assertThat(compiledClass)
                             .hasFieldOrPropertyWithValue("className", MY_TEST_DUMMY_CHILD));
+
+            Mockito.verify(logMock, Mockito.times(1))
+                    .info("Compiled 2 of 2 source files");
         }
     }
 
@@ -279,7 +301,7 @@ public class OptimisticInMemoryCompilerTest {
             List<Path> sourceFolders = List.of(rootTestFolderPath.resolve("invalid"));
 
             // Act
-            UnaryOperator<ClassLoader> classLoaderCreator = classUnderTest.optimisticCompileIntoClassLoader(sourceFolders);
+            UnaryOperator<ClassLoader> classLoaderCreator = classUnderTest.optimisticCompileIntoClassLoader(logMock, sourceFolders);
             ClassLoader classLoader = classLoaderCreator.apply(Thread.currentThread().getContextClassLoader());
 
             // Assert
@@ -289,6 +311,9 @@ public class OptimisticInMemoryCompilerTest {
             assertThatThrownBy(() -> classLoader.loadClass(MY_TEST_DUMMY_CHILD))
                     .isInstanceOf(ClassNotFoundException.class)
                     .hasMessage(MY_TEST_DUMMY_CHILD);
+
+            Mockito.verify(logMock, Mockito.times(1))
+                    .info("Compiled 0 of 2 source files");
         }
 
         @Test
@@ -297,7 +322,7 @@ public class OptimisticInMemoryCompilerTest {
             List<Path> sourceFolders = List.of(rootTestFolderPath.resolve("partial-valid"));
 
             // Act
-            UnaryOperator<ClassLoader> classLoaderCreator = classUnderTest.optimisticCompileIntoClassLoader(sourceFolders);
+            UnaryOperator<ClassLoader> classLoaderCreator = classUnderTest.optimisticCompileIntoClassLoader(logMock, sourceFolders);
             ClassLoader classLoader = classLoaderCreator.apply(Thread.currentThread().getContextClassLoader());
 
             // Assert
@@ -306,6 +331,9 @@ public class OptimisticInMemoryCompilerTest {
             assertThatThrownBy(() -> classLoader.loadClass(MY_TEST_DUMMY_CHILD))
                     .isInstanceOf(ClassNotFoundException.class)
                     .hasMessage(MY_TEST_DUMMY_CHILD);
+
+            Mockito.verify(logMock, Mockito.times(1))
+                    .info("Compiled 1 of 2 source files");
         }
 
         @Test
@@ -314,7 +342,7 @@ public class OptimisticInMemoryCompilerTest {
             List<Path> sourceFolders = List.of(rootTestFolderPath.resolve("valid"));
 
             // Act
-            UnaryOperator<ClassLoader> classLoaderCreator = classUnderTest.optimisticCompileIntoClassLoader(sourceFolders);
+            UnaryOperator<ClassLoader> classLoaderCreator = classUnderTest.optimisticCompileIntoClassLoader(logMock, sourceFolders);
             ClassLoader classLoader = classLoaderCreator.apply(Thread.currentThread().getContextClassLoader());
 
             // Assert
@@ -322,6 +350,9 @@ public class OptimisticInMemoryCompilerTest {
                     .isThrownBy(() -> classLoader.loadClass(MY_TEST_DUMMY_PARENT));
             assertThatNoException()
                     .isThrownBy(() -> classLoader.loadClass(MY_TEST_DUMMY_CHILD));
+
+            Mockito.verify(logMock, Mockito.times(1))
+                    .info("Compiled 2 of 2 source files");
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.github.bsels.javafx.maven.plugin.in.memory.compiler;
 
+import org.apache.maven.plugin.logging.Log;
+
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaCompiler;
@@ -12,6 +14,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
@@ -57,14 +60,18 @@ public final class OptimisticInMemoryCompiler {
     /// The method iterates through the compilation process and filters out files with compilation errors,
     /// until either all files are successfully compiled or no compilable files remain.
     ///
+    /// @param logger the logger to use for logging compilation progress and errors. Must not be null.
     /// @param sourceFolders a list of paths representing the directories containing Java source files to be compiled. Each folder in the list is scanned for `.java` files, excluding files named "module-info.java" or "package-info.java". Must not be null or empty.
     /// @return a map where the keys are the fully qualified names of the successfully compiled classes, and the values are their corresponding `InMemoryCompiledClass` instances containing the compiled bytecode, or an empty map if no files were successfully compiled.
     /// @throws IOException if an I/O error occurs while accessing the source folders or their contents.
-    public Map<String, InMemoryCompiledClass> optimisticCompile(List<Path> sourceFolders) throws IOException {
+    public Map<String, InMemoryCompiledClass> optimisticCompile(Log logger, List<Path> sourceFolders) throws IOException {
+        Objects.requireNonNull(logger, "`logger` cannot be null");
         if (sourceFolders == null || sourceFolders.isEmpty()) {
+            logger.warn("No source folders provided for compilation");
             return Map.of();
         }
         List<Path> sourceFiles = getSourceFiles(sourceFolders);
+        int originalSize = sourceFiles.size();
         JavaCompiler javaCompiler = ToolProvider.getSystemJavaCompiler();
         try (
                 StandardJavaFileManager standardJavaFileManager = javaCompiler.getStandardFileManager(null, null, null);
@@ -85,7 +92,9 @@ public final class OptimisticInMemoryCompiler {
                             .toList();
                 }
             }
-            return javaFileManager.getCompiledClasses();
+            Map<String, InMemoryCompiledClass> compiledClasses = javaFileManager.getCompiledClasses();
+            logger.info("Compiled %d of %d source files".formatted(compiledClasses.size(), originalSize));
+            return compiledClasses;
         }
     }
 
@@ -94,11 +103,12 @@ public final class OptimisticInMemoryCompiler {
     /// This method compiles source files iteratively, removing files with errors until all compilable files
     /// are successfully processed or no further files can be compiled.
     ///
+    /// @param logger the logger to use for logging compilation progress and errors. Must not be null.
     /// @param sourceFolders a list of paths representing the source directories containing Java source files to be compiled. Each directory is scanned for `.java` files, excluding "module-info.java" and "package-info.java". Must not be null or empty.
     /// @return a unary operator that takes a class loader, defines the compiled classes into it, and returns the updated class loader.
     /// @throws IOException if an I/O error occurs while accessing the source directories or processing their contents.
-    public UnaryOperator<ClassLoader> optimisticCompileIntoClassLoader(List<Path> sourceFolders) throws IOException {
-        Map<String, InMemoryCompiledClass> compiledClasses = optimisticCompile(sourceFolders);
+    public UnaryOperator<ClassLoader> optimisticCompileIntoClassLoader(Log logger, List<Path> sourceFolders) throws IOException {
+        Map<String, InMemoryCompiledClass> compiledClasses = optimisticCompile(logger, sourceFolders);
         return classLoader -> new InMemoryClassLoader(compiledClasses, classLoader);
     }
 
