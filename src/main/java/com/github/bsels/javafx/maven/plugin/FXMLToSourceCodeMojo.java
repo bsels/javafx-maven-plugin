@@ -211,8 +211,7 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     /// - [IOException] or other issues during file writing.
     /// - JSON processing exceptions for debugging purposes.
     ///
-    /// @throws MojoExecutionException if an error occurs during any stage of the execution process,
-    ///                                such as file I/O operations or failure to process FXML files.
+    /// @throws MojoExecutionException if an error occurs during any stage of the execution process, such as file I/O operations or failure to process FXML files.
     @Override
     public void execute() throws MojoExecutionException {
         Objects.requireNonNull(fxmlDirectory, "FXML directory must be specified");
