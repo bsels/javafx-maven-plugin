@@ -133,6 +133,9 @@ public record FXMLProcessor(Log log) {
             return Optional.empty();
         }
         Class<?> controllerClass = Utils.findType(imports, structure.properties().get("fx:controller"));
+        if (Modifier.isAbstract(controllerClass.getModifiers())) {
+            throw new IllegalArgumentException("Controller class '%s' is abstract".formatted(controllerClass.getName()));
+        }
         String className = Utils.improveImportForParameter(imports, controllerClass.getName());
         IntPredicate isFinal = Modifier::isFinal;
         List<ControllerField> fields = iterateClass(
