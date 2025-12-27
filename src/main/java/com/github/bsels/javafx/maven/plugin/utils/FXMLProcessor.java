@@ -16,6 +16,9 @@ import com.github.bsels.javafx.maven.plugin.fxml.FXMLStaticProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLValueNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLWrapperNode;
 import com.github.bsels.javafx.maven.plugin.fxml.ProcessedFXML;
+import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField;
+import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerMethod;
+import com.github.bsels.javafx.maven.plugin.fxml.introspect.Visibility;
 import com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder;
 import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import com.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
@@ -25,6 +28,7 @@ import javafx.scene.layout.ConstraintsBase;
 import org.apache.maven.plugin.logging.Log;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
@@ -43,6 +47,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiPredicate;
+import java.util.function.Function;
+import java.util.function.IntPredicate;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
@@ -115,6 +121,12 @@ public record FXMLProcessor(Log log) {
         );
     }
 
+    /// Inspects the controller class based on the provided imports and parsed XML structure
+    /// and returns an [Optional] containing an [FXMLController] if the controller is valid.
+    ///
+    /// @param imports   a list of imported class names to resolve the controller class
+    /// @param structure the parsed XML structure containing properties and other details
+    /// @return an [Optional] containing the [FXMLController] if a valid controller is found, otherwise [Optional#empty()]
     private Optional<FXMLController> inspectControllerClass(List<String> imports, ParsedXMLStructure structure) {
         Map<String, String> properties = structure.properties();
         if (!properties.containsKey("fx:controller")) {
@@ -122,8 +134,71 @@ public record FXMLProcessor(Log log) {
         }
         Class<?> controllerClass = Utils.findType(imports, structure.properties().get("fx:controller"));
         String className = Utils.improveImportForParameter(imports, controllerClass.getName());
-        // TODO: Implement controller inspection
-        return Optional.of(new FXMLController(className, controllerClass, List.of(), List.of()));
+        IntPredicate isFinal = Modifier::isFinal;
+        List<ControllerField> fields = iterateClass(
+                controllerClass,
+                Class::getDeclaredFields,
+                field -> new ControllerField(
+                        getVisibility(field.getModifiers()),
+                        field.getName(),
+                        field.getGenericType()
+                ),
+                isFinal.negate()
+        ).toList();
+        List<ControllerMethod> methods = iterateClass(
+                controllerClass,
+                Class::getDeclaredMethods,
+                method -> new ControllerMethod(
+                        getVisibility(method.getModifiers()),
+                        method.getName(),
+                        method.getGenericReturnType(),
+                        List.of(method.getGenericParameterTypes())),
+                _ -> true
+        ).toList();
+        return Optional.of(new FXMLController(className, controllerClass, fields, methods));
+    }
+
+    /// Iterates through the given class and its superclasses (if any) to apply specific operations
+    /// on class members using the provided mapper and filters.
+    ///
+    /// @param <I>              The type of class members, which must extend Member.
+    /// @param <O>              The type of the output produced by the mapper function.
+    /// @param clazz            The class to iterate and retrieve members from. If null, the operation will not proceed.
+    /// @param elements         A function to extract an array of members from the given class.
+    /// @param mapper           A function to map individual members to a desired output type.
+    /// @param additionalFilter A predicate to filter members based on their modifiers.
+    /// @return A Stream of the mapped outputs for members that satisfy the given filters.
+    private <I extends Member, O> Stream<O> iterateClass(
+            Class<?> clazz,
+            Function<Class<?>, I[]> elements,
+            Function<I, O> mapper,
+            IntPredicate additionalFilter
+    ) {
+        return Optional.ofNullable(clazz)
+                .stream()
+                .flatMap(c -> Stream.concat(
+                        Stream.of(elements.apply(c))
+                                .filter(element -> !Modifier.isStatic(element.getModifiers())
+                                        && additionalFilter.test(element.getModifiers()))
+                                .map(mapper),
+                        iterateClass(c.getSuperclass(), elements, mapper, additionalFilter)
+                ));
+    }
+
+    /// Determines the visibility type of member based on its modifier flags.
+    ///
+    /// @param modifiers the integer value representing the modifier flags of a member
+    /// @return the Visibility enumeration value corresponding to the member's visibility
+    private Visibility getVisibility(int modifiers) {
+        if (Modifier.isPrivate(modifiers)) {
+            return Visibility.PRIVATE;
+        } else if (Modifier.isProtected(modifiers)) {
+            return Visibility.PROTECTED;
+        } else if (Modifier.isPublic(modifiers)) {
+            return Visibility.PUBLIC;
+        } else {
+            return Visibility.PACKAGE;
+        }
     }
 
     /// Deduplicates object nodes within the given [FXMLNode] by combining identical nodes.
@@ -496,7 +571,7 @@ public record FXMLProcessor(Log log) {
     ///
     /// @param imports  the list of import statements used to resolve the types referenced in property definitions
     /// @param property a map entry representing the static property, where the key is the full property name
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 (including class and property name delimited by a dot ".") and the value is the property value to set
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 (including class and property name delimited by a dot ".") and the value is the property value to set
     /// @return an [Optional] containing the resolved property as an [FXMLStaticProperty] object if successful, or an empty `Optional` if no valid static setter was found or if there were multiple matching setters
     private Optional<FXMLProperty> getStaticProperty(List<String> imports, Map.Entry<String, String> property) {
         String propertyName = property.getKey();
