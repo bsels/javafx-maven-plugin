@@ -12,6 +12,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -195,6 +196,8 @@ public class SourceCodeBuilder {
         return this;
     }
 
+    // TODO: Handle FXML Node
+
     /// Builds a string representation of a Java source code file based on the configured package, imports,
     /// class definition, fields, and methods.
     /// The method ensures that all relevant structural elements of the class are appended to the resulting source code
@@ -239,6 +242,7 @@ public class SourceCodeBuilder {
                 .sorted()
                 .distinct()
                 .forEach(f -> builder.append(indent(f, 2)).append("\n"));
+        builder.append(indent("\n", 1));
         if (superLine != null) {
             builder.append(indent(superLine, 2)).append("\n");
         } else {
@@ -246,11 +250,13 @@ public class SourceCodeBuilder {
         }
         if (!reflectionMethodInitializers.isEmpty()) {
             builder.append("\n")
+                    .append(indent("// Initialize reflection-based method handlers\n", 1))
                     .append(indent("try {\n", 2));
             reflectionMethodInitializers.forEach(f -> builder.append(indent(f, 3)).append("\n"));
             builder.append(indent("} catch (Throwable e) {\n", 2))
                     .append(indent("throw new RuntimeException(e);\n", 3))
-                    .append(indent("}\n", 2));
+                    .append(indent("}\n\n", 2))
+                    .append(indent("// End reflection-based method handlers, continue with the rest of the constructor body\n", 1));
         }
         constructorBody.forEach(f -> builder.append(indent(f, 2)).append("\n"));
         builder.append(indent("}\n\n", 1));
@@ -259,8 +265,63 @@ public class SourceCodeBuilder {
         return builder.toString();
     }
 
+    /// Finds a matching method in the controller instance for the given [FXMLMethod].
+    /// The matching is based on method name, return type compatibility, and parameter type compatibility.
+    /// If multiple matching methods are found, the method with the highest visibility
+    /// and the largest number of parameter types (in descending order of size) is chosen.
+    ///
+    /// @param method the [FXMLMethod] instance representing the method to match against
+    /// @return an [Optional] containing the matching [ControllerMethod] if found, or an empty [Optional] if no matching method exists
     private Optional<ControllerMethod> findMatchingMethod(FXMLMethod method) {
-        return Optional.empty(); // TODO
+        if (controller == null) {
+            return Optional.empty();
+        }
+        String methodName = method.name();
+        Comparator<List<?>> listSizeComparator = Comparator.comparingInt(List::size);
+        return controller.instanceMethods()
+                .stream()
+                .filter(controllerMethod -> methodName.equals(controllerMethod.name()))
+                .filter(controllerMethod -> validateReturnType(method, controllerMethod))
+                .filter(controllerMethod -> validateParameterTypes(method, controllerMethod))
+                .min(
+                        // Sort by visibility, then by parameter types in descending order of size
+                        Comparator.comparing(ControllerMethod::visibility)
+                                .thenComparing(ControllerMethod::parameterTypes, listSizeComparator.reversed())
+                );
+    }
+
+    /// Validates whether the parameter types of the given [FXMLMethod] match the parameter types of the corresponding
+    /// [ControllerMethod].
+    /// Ensures that the parameters are compatible and can be assigned appropriately.
+    ///
+    /// @param method           the FXMLMethod whose parameter types are being validated
+    /// @param controllerMethod the ControllerMethod whose parameter types are compared
+    /// @return true if the parameter types are compatible, false otherwise
+    private boolean validateParameterTypes(FXMLMethod method, ControllerMethod controllerMethod) {
+        if (method.parameters().size() != controllerMethod.parameterTypes().size()) {
+            return false;
+        }
+        int size = method.parameters().size();
+        for (int i = 0; i < size; i++) {
+            Type methodParam = method.parameters().get(i);
+            Type controllerParam = controllerMethod.parameterTypes().get(i);
+            if (!TypeEncoder.typeToClass(controllerParam).isAssignableFrom(TypeEncoder.typeToClass(methodParam))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Validates if the return type of the FXML method matches or is compatible with the return type of the
+    /// corresponding controller method.
+    ///
+    /// @param method           the FXML method whose return type is being validated
+    /// @param controllerMethod the controller method against which the FXML method's return type is validated
+    /// @return true if the return type of the FXML method is void or is assignable from the return type of the controller method; false otherwise
+    private boolean validateReturnType(FXMLMethod method, ControllerMethod controllerMethod) {
+        return void.class.equals(method.returnType()) ||
+                TypeEncoder.typeToClass(method.returnType())
+                        .isAssignableFrom(TypeEncoder.typeToClass(controllerMethod.returnType()));
     }
 
     /// Constructs and appends the method call logic to the given StringBuilder.

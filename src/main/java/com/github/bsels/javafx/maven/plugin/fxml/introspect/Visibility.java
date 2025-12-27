@@ -12,12 +12,6 @@ public enum Visibility {
     /// The `PUBLIC` value indicates that a member is accessible from any other class or package.
     /// This visibility level is the most permissive and allows unrestricted access to the member.
     PUBLIC,
-    /// Represents the `PRIVATE` visibility level within the `Visibility` enumeration.
-    ///
-    /// The `PRIVATE` value indicates that a member is accessible only within its own class.
-    /// This visibility level is commonly used to enforce encapsulation and restrict member access entirely from outside
-    /// its defining class.
-    PRIVATE,
     /// Represents the `PROTECTED` visibility level within the `Visibility` enumeration.
     ///
     /// The `PROTECTED` value indicates that a member is accessible within its own package and by subclasses.
@@ -29,5 +23,11 @@ public enum Visibility {
     /// The `PACKAGE_PRIVATE` value indicates that a member is visible only within its own package
     /// and cannot be accessed from classes in other packages.
     /// It is a commonly used visibility modifier in Java to restrict access for encapsulation purposes.
-    PACKAGE_PRIVATE
+    PACKAGE_PRIVATE,
+    /// Represents the `PRIVATE` visibility level within the `Visibility` enumeration.
+    ///
+    /// The `PRIVATE` value indicates that a member is accessible only within its own class.
+    /// This visibility level is commonly used to enforce encapsulation and restrict member access entirely from outside
+    /// its defining class.
+    PRIVATE
 }

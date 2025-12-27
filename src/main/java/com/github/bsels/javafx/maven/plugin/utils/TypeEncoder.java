@@ -149,6 +149,21 @@ public final class TypeEncoder {
         };
     }
 
+    /// Converts a given Type object to its corresponding [Class] object.
+    /// The method processes instances of [Class] and [ParameterizedType],
+    /// and returns the raw class type. Unsupported types will throw an exception.
+    ///
+    /// @param type the Type object to be converted; must be an instance of [Class] or [ParameterizedType]
+    /// @return the equivalent [Class] object of the provided type
+    /// @throws IllegalArgumentException if the provided type is unsupported
+    public static Class<?> typeToClass(Type type) {
+        return switch (type) {
+            case Class<?> c -> c;
+            case ParameterizedType parameterizedType -> (Class<?>) parameterizedType.getRawType();
+            default -> throw new IllegalArgumentException("Unsupported type: " + type);
+        };
+    }
+
     /// Converts a given [Type] object to the fully qualified class name of its corresponding raw type.
     /// If the type is a [Class], it directly returns the class's fully qualified name.
     /// If the type is a [ParameterizedType], it recursively processes the raw type of the parameterized type.
