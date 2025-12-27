@@ -422,7 +422,7 @@ public final class FXMLSourceCodeBuilder {
     ///
     /// @param node the FXML node whose child nodes are to be retrieved
     /// @return a list of child nodes for the given FXML node,
-    /// or an empty list if the node type does not contain children
+    ///         or an empty list if the node type does not contain children
     private List<FXMLNode> getChildren(FXMLNode node) {
         return switch (node) {
             case FXMLParentNode parentNode -> parentNode.children();

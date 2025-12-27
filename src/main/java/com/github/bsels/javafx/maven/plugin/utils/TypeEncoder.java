@@ -149,6 +149,22 @@ public final class TypeEncoder {
         };
     }
 
+    /// Converts a given [Type] object to the fully qualified class name of its corresponding raw type.
+    /// If the type is a [Class], it directly returns the class's fully qualified name.
+    /// If the type is a [ParameterizedType], it recursively processes the raw type of the parameterized type.
+    /// Unsupported types will result in an exception.
+    ///
+    /// @param type the [Type] object to be converted; it must either be an instance of [Class] or [ParameterizedType]
+    /// @return the fully qualified class name of the type if it is supported with the `.class` suffix, such as `java.lang.String.class`
+    /// @throws IllegalArgumentException if the provided type is unsupported
+    public static String typeToReflectionClassString(Type type) {
+        return switch (type) {
+            case Class<?> c -> c.getName();
+            case ParameterizedType parameterizedType -> typeToReflectionClassString(parameterizedType.getRawType());
+            default -> throw new IllegalArgumentException("Unsupported type: " + type);
+        } + ".class";
+    }
+
     /// Returns a default value as a string for the given primitive type or null for non-primitive types.
     ///
     /// @param type the class object representing the type for which the default value is to be determined
