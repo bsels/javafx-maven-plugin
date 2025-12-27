@@ -1,10 +1,14 @@
 package com.github.bsels.javafx.maven.plugin.utils;
 
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLConstantNode;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLController;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLObjectNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLValueNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLWrapperNode;
 import com.github.bsels.javafx.maven.plugin.fxml.ProcessedFXML;
+import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField;
+import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerMethod;
+import com.github.bsels.javafx.maven.plugin.fxml.introspect.Visibility;
 import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import com.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
 import com.github.bsels.javafx.maven.plugin.utils.models.NamedConstructorParameter;
@@ -15,6 +19,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.layout.VBox;
 import org.apache.maven.monitor.logging.DefaultLog;
 import org.apache.maven.plugin.logging.Log;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -1116,4 +1121,172 @@ class FXMLProcessorTest {
         }
     }
 
+    @Nested
+    @DisplayName("Controller tests")
+    class ControllerTests {
+
+        @Test
+        @DisplayName("Should process FXML without controller")
+        void shouldProcessFxmlWithoutController() {
+            // Given
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "VBox",
+                    Map.of(),
+                    List.of()
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("javafx.scene.layout.VBox"),
+                    rootStructure,
+                    "NoControllerTest"
+            );
+
+            // When
+            ProcessedFXML result = fxmlProcessor.process(parsedFXML);
+
+            // Then
+            assertThat(result.fxmlController())
+                    .isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should throw exception when controller is abstract")
+        void shouldThrowExceptionWhenControllerIsAbstract() {
+            // Given
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "VBox",
+                    Map.of("fx:controller", "java.util.List"), // List is an abstract interface
+                    List.of()
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("javafx.scene.layout.VBox", "java.util.List"),
+                    rootStructure,
+                    "AbstractControllerTest"
+            );
+
+            // When & Then
+            assertThatThrownBy(() -> fxmlProcessor.process(parsedFXML))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Controller class 'java.util.List' is abstract");
+        }
+
+        @Test
+        @DisplayName("Should process controller with instanceFields() of different visibility")
+        void shouldProcessControllerWithFieldsOfDifferentVisibility() {
+            // Given
+            class TestControllerWithFields {
+                public static int ignoredStaticField = 0;
+                public final int ignoredFinalField = 0;
+
+                public String publicField;
+                protected long protectedField;
+                int packagePrivateField;
+                private boolean privateField;
+            }
+
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "VBox",
+                    Map.of("fx:controller", TestControllerWithFields.class.getName()),
+                    List.of()
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("javafx.scene.layout.VBox", TestControllerWithFields.class.getName()),
+                    rootStructure,
+                    "FieldVisibilityTest"
+            );
+
+            // When
+            ProcessedFXML result = fxmlProcessor.process(parsedFXML);
+
+            // Then
+            assertThat(result.fxmlController())
+                    .isPresent()
+                    .get()
+                    .extracting(FXMLController::instanceFields)
+                    .asInstanceOf(InstanceOfAssertFactories.collection(ControllerField.class))
+                    .hasSize(4)
+                    .satisfiesExactlyInAnyOrder(
+                            field -> assertThat(field)
+                                    .hasFieldOrPropertyWithValue("name", "publicField")
+                                    .hasFieldOrPropertyWithValue("type", String.class)
+                                    .hasFieldOrPropertyWithValue("visibility", Visibility.PUBLIC),
+                            field -> assertThat(field)
+                                    .hasFieldOrPropertyWithValue("name", "protectedField")
+                                    .hasFieldOrPropertyWithValue("type", long.class)
+                                    .hasFieldOrPropertyWithValue("visibility", Visibility.PROTECTED),
+                            field -> assertThat(field)
+                                    .hasFieldOrPropertyWithValue("name", "packagePrivateField")
+                                    .hasFieldOrPropertyWithValue("type", int.class)
+                                    .hasFieldOrPropertyWithValue("visibility", Visibility.PACKAGE_PRIVATE),
+                            field -> assertThat(field)
+                                    .hasFieldOrPropertyWithValue("name", "privateField")
+                                    .hasFieldOrPropertyWithValue("type", boolean.class)
+                                    .hasFieldOrPropertyWithValue("visibility", Visibility.PRIVATE)
+                    );
+        }
+
+        @Test
+        @DisplayName("Should process controller with methods of different visibility")
+        void shouldProcessControllerWithMethodsOfDifferentVisibility() throws NoSuchMethodException {
+            // Given
+            class TestControllerWithMethods {
+                public int publicMethod(String data) {
+                    return data.length();
+                }
+
+                protected void protectedMethod() {
+                }
+
+                long packagePrivateMethod(long x, long y) {
+                    return x + y;
+                }
+
+                private void privateMethod() {
+                }
+            }
+
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "VBox",
+                    Map.of("fx:controller", TestControllerWithMethods.class.getName()),
+                    List.of()
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("javafx.scene.layout.VBox", TestControllerWithMethods.class.getName()),
+                    rootStructure,
+                    "MethodVisibilityTest"
+            );
+
+            // When
+            ProcessedFXML result = fxmlProcessor.process(parsedFXML);
+
+            // Then
+            assertThat(result.fxmlController())
+                    .isPresent()
+                    .get()
+                    .extracting(FXMLController::instanceMethods)
+                    .asInstanceOf(InstanceOfAssertFactories.collection(ControllerMethod.class))
+                    .hasSize(16)
+                    .containsExactlyInAnyOrder(
+                            new ControllerMethod(Visibility.PROTECTED, "protectedMethod", void.class, List.of()),
+                            new ControllerMethod(Visibility.PACKAGE_PRIVATE, "packagePrivateMethod", long.class, List.of(long.class, long.class)),
+                            new ControllerMethod(Visibility.PRIVATE, "privateMethod", void.class, List.of()),
+                            new ControllerMethod(Visibility.PUBLIC, "publicMethod", int.class, List.of(String.class)),
+                            new ControllerMethod(Visibility.PROTECTED, "finalize", void.class, List.of()),
+                            new ControllerMethod(Visibility.PRIVATE, "wait0", void.class, List.of(long.class)),
+                            new ControllerMethod(Visibility.PUBLIC, "equals", boolean.class, List.of(Object.class)),
+                            new ControllerMethod(Visibility.PUBLIC, "toString", String.class, List.of()),
+                            new ControllerMethod(Visibility.PUBLIC,"hashCode", int.class, List.of()),
+                            new ControllerMethod(Visibility.PUBLIC, "getClass", Object.class.getMethod("getClass").getGenericReturnType(), List.of()),
+                            new ControllerMethod(Visibility.PROTECTED, "clone", Object.class, List.of()),
+                            new ControllerMethod(Visibility.PUBLIC, "notify", void.class, List.of()),
+                            new ControllerMethod(Visibility.PUBLIC, "notifyAll", void.class, List.of()),
+                            new ControllerMethod(Visibility.PUBLIC, "wait", void.class, List.of(long.class)),
+                            new ControllerMethod(Visibility.PUBLIC, "wait", void.class, List.of(long.class, int.class)),
+                            new ControllerMethod(Visibility.PUBLIC, "wait", void.class, List.of())
+                    );
+        }
+    }
 }

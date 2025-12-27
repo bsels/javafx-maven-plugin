@@ -200,7 +200,7 @@ public record FXMLProcessor(Log log) {
         } else if (Modifier.isPublic(modifiers)) {
             return Visibility.PUBLIC;
         } else {
-            return Visibility.PACKAGE;
+            return Visibility.PACKAGE_PRIVATE;
         }
     }
 
