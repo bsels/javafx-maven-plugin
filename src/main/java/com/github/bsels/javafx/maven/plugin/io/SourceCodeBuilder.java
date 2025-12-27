@@ -22,22 +22,26 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 
 public class SourceCodeBuilder {
+    private static final String INTERNAL_CONTROLLER_FIELD = "$internalController$";
+    private static final String INTERNAL_REFLECTION_METHOD_FIELD = "$reflectionMethod$%d";
+    private static final String PARAM_NAME_FORMAT = "param%d";
 
-    public static final String INTERNAL_CONTROLLER_FIELD = "$internalController$";
-    public static final String PARAM_NAME_FORMAT = "param%d";
     private final List<String> imports;
     private final List<String> fields;
     private final List<String> fieldInitializers;
+    private final List<String> reflectionMethodInitializers;
     private final List<String> constructorBody;
     private final List<String> methods;
     private final Log log;
     private String packageLine;
+    private String superLine;
     private Boolean isAbstractClass;
     private String classDefinition;
     private String className;
     private boolean isRoot;
     private FXMLController controller;
     private boolean resourceBundleSet;
+    private int reflectionMethodCounter;
 
     public SourceCodeBuilder(Log log) {
         packageLine = null;
@@ -47,11 +51,13 @@ public class SourceCodeBuilder {
         fields = new ArrayList<>();
         className = null;
         fieldInitializers = new ArrayList<>();
+        reflectionMethodInitializers = new ArrayList<>();
         constructorBody = new ArrayList<>();
         methods = new ArrayList<>();
         controller = null;
         resourceBundleSet = false;
         this.log = log;
+        reflectionMethodCounter = 0;
         super();
         imports.add("java.lang.annotation.Generated");
     }
@@ -233,7 +239,19 @@ public class SourceCodeBuilder {
                 .sorted()
                 .distinct()
                 .forEach(f -> builder.append(indent(f, 2)).append("\n"));
-        builder.append(indent("super();\n", 2));
+        if (superLine != null) {
+            builder.append(indent(superLine, 2)).append("\n");
+        } else {
+            builder.append(indent("super();\n", 2));
+        }
+        if (!reflectionMethodInitializers.isEmpty()) {
+            builder.append("\n")
+                    .append(indent("try {\n", 2));
+            reflectionMethodInitializers.forEach(f -> builder.append(indent(f, 3)).append("\n"));
+            builder.append(indent("} catch (Throwable e) {\n", 2))
+                    .append(indent("throw new RuntimeException(e);\n", 3))
+                    .append(indent("}\n", 2));
+        }
         constructorBody.forEach(f -> builder.append(indent(f, 2)).append("\n"));
         builder.append(indent("}\n\n", 1));
         methods.forEach(m -> builder.append(m).append("\n"));
@@ -245,13 +263,13 @@ public class SourceCodeBuilder {
         return Optional.empty(); // TODO
     }
 
-    /// Constructs a method call and appends it to the given `StringBuilder`.
-    /// Depending on the visibility of the `ControllerMethod`, it either directly invokes the method
-    /// or uses reflection to call it.
+    /// Constructs and appends the method call logic to the given StringBuilder.
+    /// Handles both public and non-public methods, including reflection for the latter.
+    /// Ensures proper method invocation and exception handling.
     ///
-    /// @param builder    the `StringBuilder` to append the constructed method call
-    /// @param method     the `ControllerMethod` representing the method to be called
-    /// @param fxmlMethod the `FXMLMethod` providing additional details about the method, such as return type
+    /// @param builder    The `StringBuilder` used to construct the method call representation.
+    /// @param method     The `ControllerMethod` representing the method to be called.
+    /// @param fxmlMethod The `FXMLMethod` providing additional metadata about the method such as return type.
     private void callMethod(StringBuilder builder, ControllerMethod method, FXMLMethod fxmlMethod) {
         log.debug("Constructing method call: %s".formatted(method.name()));
         builder.append(" {");
@@ -264,14 +282,21 @@ public class SourceCodeBuilder {
                     .append(");");
         } else {
             log.debug("Calling non-public method %s on %s using reflection".formatted(method.name(), controller.className()));
-            builder.append(indent("try {\n", 2))
-                    .append(indent("Method declaredMethod = %s.getDeclaredMethod(\"%s\",".formatted(
-                            controller.className(),
-                            method.name()
-                    ), 3));
-            handleSequenceOfArguments(builder, method.parameterTypes(), TypeEncoder::typeToReflectionClassString)
-                    .append("%s);\n")
-                    .append(indent("declaredMethod.setAccessible(true);\n", 3));
+            String reflectionMethodName = getNewReflectionMethodName();
+
+            fields.add("private final java.lang.reflect.Method %s;".formatted(reflectionMethodName));
+            reflectionMethodInitializers.add(
+                    handleSequenceOfArguments(
+                            new StringBuilder()
+                                    .append(reflectionMethodName).append(" = ").append(controller.className())
+                                    .append(".class.getDeclaredMethod(\"").append(method.name()).append("\", "),
+                            method.parameterTypes(),
+                            TypeEncoder::typeToReflectionClassString
+                    ).append(");").toString()
+            );
+            constructorBody.add("%s.setAccessible(true);".formatted(reflectionMethodName));
+
+            builder.append(indent("try {\n", 2));
             addReturnIfNeeded(builder, isVoid, 3)
                     .append("declaredMethod.invoke(%s, ".formatted(INTERNAL_CONTROLLER_FIELD));
             handlerParameterSequence(builder, method)
@@ -281,6 +306,16 @@ public class SourceCodeBuilder {
                     .append(indent("}\n", 2));
         }
         builder.append(indent("}\n", 1));
+    }
+
+    /// Generates and returns a new reflection method name by formatting the internal reflection method field
+    /// with an incrementing counter.
+    ///
+    /// @return a string representing the newly generated reflection method name
+    private String getNewReflectionMethodName() {
+        String methodName = INTERNAL_REFLECTION_METHOD_FIELD.formatted(reflectionMethodCounter);
+        reflectionMethodCounter++;
+        return methodName;
     }
 
     /// Adds a `return ` statement to the provided StringBuilder if the method is not void,
