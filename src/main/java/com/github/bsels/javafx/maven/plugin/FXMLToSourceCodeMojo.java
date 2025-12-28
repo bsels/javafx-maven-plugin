@@ -7,8 +7,8 @@ import com.github.bsels.javafx.maven.plugin.fxml.FXMLObjectNode;
 import com.github.bsels.javafx.maven.plugin.fxml.ProcessedFXML;
 import com.github.bsels.javafx.maven.plugin.in.memory.compiler.OptimisticInMemoryCompiler;
 import com.github.bsels.javafx.maven.plugin.io.FXMLReader;
-import com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder;
 import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
+import com.github.bsels.javafx.maven.plugin.io.SourceCodeBuilder;
 import com.github.bsels.javafx.maven.plugin.parameters.FXMLParameterized;
 import com.github.bsels.javafx.maven.plugin.parameters.InterfacesWithMethod;
 import com.github.bsels.javafx.maven.plugin.utils.FXMLProcessor;
@@ -399,6 +399,9 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     /// @return a string representing the source code generated from the processed FXML structure
     private String convertFXMLToSourceCode(ProcessedFXML processedFXML, FXMLParameterized fxmlParameterized) {
         getLog().info("Generating FXML source code for %s".formatted(processedFXML.className()));
+
+        SourceCodeBuilder sourceCodeBuilder = new SourceCodeBuilder(getLog())
+                .setPackage(packageName);
         Set<String> imports = new HashSet<>(processedFXML.imports());
         Map<String, List<String>> interfacesMap = Optional.ofNullable(fxmlParameterized.getInterfaces())
                 .stream()
@@ -414,6 +417,7 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
                     Utils.improveImportsForParameters(interfacesWithMethod.getGenerics(), imports);
                 })
                 .collect(Collectors.toMap(InterfacesWithMethod::getInterfaceName, InterfacesWithMethod::getGenerics));
+
         Set<String> interfaceMethods = Optional.ofNullable(fxmlParameterized.getInterfaces())
                 .stream()
                 .flatMap(List::stream)
@@ -422,38 +426,40 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
                 .flatMap(Set::stream)
                 .collect(Collectors.toSet());
 
-        FXMLSourceCodeBuilder builder = new FXMLSourceCodeBuilder(getLog())
-                .addPackage(packageName)
-                .addImports(imports);
+        sourceCodeBuilder.addImports(imports)
+                .setResourceBundle(resourceBundleObject);
+        processedFXML.fxmlController()
+                .ifPresent(sourceCodeBuilder::setFXMLController);
 
-        if (processedFXML.root() instanceof FXMLObjectNode(_, _, Class<?> clazz, _, _, List<String> generics)) {
-            builder.openClass(processedFXML.className(), clazz.getSimpleName(), generics, interfacesMap);
+        if (processedFXML.root() instanceof FXMLObjectNode(
+                _, String identifier, Class<?> rootClass, _, _, List<String> generics
+        ) && SourceCodeBuilder.THIS.equals(identifier)) {
+            sourceCodeBuilder.openClass(
+                    processedFXML.className(),
+                    new SourceCodeBuilder.ParentClass(rootClass.getSimpleName(), generics),
+                    interfacesMap
+            );
         } else {
-            builder.openClass(processedFXML.className(), null, List.of(), interfacesMap);
+            sourceCodeBuilder.openClass(processedFXML.className(), null, interfacesMap);
         }
-        builder.addResourceBundle(resourceBundleObject);
 
+        // Add fields
         processedFXML.fields()
                 .stream()
-                .sorted(Comparator.comparing(FXMLField::internal).thenComparing(FXMLField::name))
-                .filter(field -> !"this".equals(field.name()))
-                .reduce(
-                        builder,
-                        (b, field) -> b.addField(
-                                field.internal(),
-                                field.name(),
-                                field.clazz().getSimpleName(),
-                                field.generics()
-                        ),
-                        Utils.getFirstLambda()
-                )
-                .addConstructor(processedFXML.root());
+                .filter(field -> !SourceCodeBuilder.THIS.equals(field.name()))
+                .sorted(Comparator.comparing(FXMLField::name))
+                .reduce(sourceCodeBuilder, SourceCodeBuilder::addField, Utils.getFirstLambda())
+                // Process node
+                .handleFXMLNode(processedFXML.root());
 
+        // Add methods
+        // TODO: Check interface methods in FXML controller
         return processedFXML.methods()
                 .stream()
-                .sorted(Comparator.comparing(FXMLMethod::name))
                 .filter(method -> !interfaceMethods.contains(method.name()))
-                .reduce(builder, FXMLSourceCodeBuilder::addAbstractMethod, Utils.getFirstLambda())
+                .sorted(Comparator.comparing(FXMLMethod::name))
+                .reduce(sourceCodeBuilder, SourceCodeBuilder::addMethod, Utils.getFirstLambda())
+                // Create a string representation of the class
                 .build();
     }
 }

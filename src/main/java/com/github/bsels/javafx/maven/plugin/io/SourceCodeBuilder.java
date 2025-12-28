@@ -1,7 +1,9 @@
 package com.github.bsels.javafx.maven.plugin.io;
 
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLController;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLField;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLMethod;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLNode;
 import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.introspect.Visibility;
 import com.github.bsels.javafx.maven.plugin.utils.TypeEncoder;
@@ -23,6 +25,11 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 
 public class SourceCodeBuilder {
+    /// A constant string representing the literal value "this".
+    /// This variable is typically used as a fixed identifier or marker and is declared as public, static,
+    /// and final to ensure its value remains constant throughout the application.
+    public static final String THIS = "this";
+
     private static final String INTERNAL_CONTROLLER_FIELD = "$internalController$";
     private static final String INTERNAL_REFLECTION_METHOD_FIELD = "$reflectionMethod$%d";
     private static final String PARAM_NAME_FORMAT = "param%d";
@@ -60,15 +67,21 @@ public class SourceCodeBuilder {
         this.log = log;
         reflectionMethodCounter = 0;
         super();
-        imports.add("java.lang.annotation.Generated");
+        addImport("javax.annotation.processing.Generated");
     }
 
-    /// Sets the package declaration for the source code being built.
-    /// This will define the package name used in the generated source file.
+    /// Sets the package declaration for the source code. This method can only be
+    /// called once per instance. If the package is already set, an exception will be thrown.
     ///
-    /// @param packageName the name of the package to be set in the source code
-    /// @return the current instance of `SourceCodeBuilder` for method chaining
-    public SourceCodeBuilder setPackage(String packageName) {
+    /// @param packageName the name of the package to set. If null or blank, the method will return without making any changes.
+    /// @return the current instance of `SourceCodeBuilder`.
+    /// @throws IllegalStateException if the package has already been set.
+    public SourceCodeBuilder setPackage(String packageName) throws IllegalStateException {
+        if (packageLine != null) {
+            throw new IllegalStateException("Package is already set.");
+        } else if (packageName == null || packageName.isBlank()) {
+            return this;
+        }
         packageLine = "package " + packageName + ";";
         return this;
     }
@@ -79,7 +92,11 @@ public class SourceCodeBuilder {
     ///
     /// @param importClass the fully qualified name of the class to be imported
     /// @return the current instance of `SourceCodeBuilder` for method chaining
-    public SourceCodeBuilder addImport(String importClass) {
+    /// @throws NullPointerException if the `importClass` is null or blank
+    public SourceCodeBuilder addImport(String importClass) throws NullPointerException {
+        if (importClass == null || importClass.isBlank()) {
+            throw new NullPointerException("`importClass` cannot be null or blank.");
+        }
         imports.add("import %s;".formatted(importClass));
         return this;
     }
@@ -89,7 +106,9 @@ public class SourceCodeBuilder {
     ///
     /// @param importClasses a collection of fully qualified class names to be imported
     /// @return the current instance of `SourceCodeBuilder` for method chaining
-    public SourceCodeBuilder addImports(Collection<String> importClasses) {
+    /// @throws NullPointerException if the `importClasses` collection is null or empty or has null elements
+    public SourceCodeBuilder addImports(Collection<String> importClasses) throws NullPointerException {
+        Objects.requireNonNull(importClasses, "`importClasses` must not be null");
         importClasses.forEach(this::addImport);
         return this;
     }
@@ -99,12 +118,16 @@ public class SourceCodeBuilder {
     ///
     /// @param resourceBundleStaticFieldPath the static field path of the resource bundle to be added; it should define the full reference to the ResourceBundle in the code.
     /// @return the current instance of `SourceCodeBuilder` for method chaining
-    public SourceCodeBuilder setResourceBundle(String resourceBundleStaticFieldPath) {
+    /// @throws IllegalStateException if the resource bundle already has been set
+    public SourceCodeBuilder setResourceBundle(String resourceBundleStaticFieldPath) throws IllegalStateException {
         if (resourceBundleSet) {
             throw new IllegalStateException("Resource bundle is already set.");
         }
+        if (resourceBundleStaticFieldPath == null || resourceBundleStaticFieldPath.isBlank()) {
+            return this;
+        }
         resourceBundleSet = true;
-        imports.add("java.util.ResourceBundle;");
+        addImport("java.util.ResourceBundle");
         fields.add("private static final ResourceBundle RESOURCE_BUNDLE = %s;".formatted(resourceBundleStaticFieldPath));
         return this;
     }
@@ -116,34 +139,49 @@ public class SourceCodeBuilder {
     ///
     /// @param method the `FXMLMethod` representing the method details such as return type, parameters, and method name to be added
     /// @return the `SourceCodeBuilder` instance, allowing for method chaining
-    public SourceCodeBuilder addMethod(FXMLMethod method) {
+    /// @throws NullPointerException if the passed method is null
+    public SourceCodeBuilder addMethod(FXMLMethod method) throws NullPointerException {
+        Objects.requireNonNull(method, "`method` must not be null");
         Optional<ControllerMethod> matchingMethod;
         if (controller == null) {
             matchingMethod = Optional.empty();
         } else {
             matchingMethod = findMatchingMethod(method);
         }
-        StringBuilder builder = new StringBuilder()
-                .append(indent("protected ", 1));
+        StringBuilder builder = new StringBuilder().append(indent("protected ", 1));
         if (matchingMethod.isEmpty()) {
             log.debug("Controller method not found for %s, creating an abstract method".formatted(method.name()));
             isAbstractClass = true;
             builder.append("abstract ");
         }
-        builder.append(TypeEncoder.typeToTypeString(method.returnType(), method.namedGenerics()))
-                .append(" ").append(method.name()).append("(");
+        builder.append(TypeEncoder.typeToTypeString(method.returnType(), method.namedGenerics())).append(" ").append(method.name()).append("(");
         Function<Type, String> typeToTypeString = type -> TypeEncoder.typeToTypeString(type, method.namedGenerics());
         AtomicInteger counter = new AtomicInteger(0);
-        handleSequenceOfArguments(
-                builder,
-                method.parameters(),
-                typeToTypeString.andThen(p -> p + " " + PARAM_NAME_FORMAT.formatted(counter.getAndIncrement()))
-        ).append(")");
-        matchingMethod.ifPresentOrElse(
-                controllerMethod -> callMethod(builder, controllerMethod, method),
-                () -> builder.append(";\n")
-        );
+        handleSequenceOfArguments(builder, method.parameters(), typeToTypeString.andThen(p -> p + " " + PARAM_NAME_FORMAT.formatted(counter.getAndIncrement()))).append(")");
+        matchingMethod.ifPresentOrElse(controllerMethod -> callMethod(builder, controllerMethod, method), () -> builder.append(";\n"));
         methods.add(builder.append('\n').toString());
+        return this;
+    }
+
+    /// Adds a field to the source code being constructed.
+    /// The field's visibility, type, and name are determined based on the properties of the provided [FXMLField] object.
+    /// The constructed field is stored internally.
+    ///
+    /// @param field the field information encapsulated in an [FXMLField] object; must not be null
+    /// @return the current instance of [SourceCodeBuilder], allowing for method chaining
+    /// @throws NullPointerException if the `field` parameter is null
+    public SourceCodeBuilder addField(FXMLField field) throws NullPointerException {
+        Objects.requireNonNull(field, "`field` must not be null");
+        StringBuilder builder = new StringBuilder();
+        if (field.internal()) {
+            builder.append("private");
+        } else {
+            builder.append("protected");
+        }
+
+        builder.append(" final ").append(field.clazz().getSimpleName());
+        constructGenerics(field.generics(), builder).append(' ').append(field.name()).append(';');
+        fields.add(builder.toString());
         return this;
     }
 
@@ -155,12 +193,15 @@ public class SourceCodeBuilder {
     /// @param parentClass the parent class of the new class; can be null if the class does not extend any parent
     /// @param interfaces  a map where the key is the name of the interface and the value is the list of generics associated with the interface; can be null or empty if no interfaces are implemented
     /// @return the current instance of `SourceCodeBuilder` for method chaining
-    /// @throws NullPointerException if the `className` is null
-    public SourceCodeBuilder openClass(String className, ParentClass parentClass, Map<String, List<String>> interfaces) {
+    /// @throws NullPointerException  if the `className` is null
+    /// @throws IllegalStateException if the class has already been opened
+    public SourceCodeBuilder openClass(String className, ParentClass parentClass, Map<String, List<String>> interfaces) throws NullPointerException, IllegalStateException {
+        if (classDefinition != null) {
+            throw new IllegalStateException("Class definition is already set.");
+        }
         Objects.requireNonNull(className, "`className` must not be null");
         this.className = className;
-        StringBuilder builder = new StringBuilder()
-                .append("class ").append(className);
+        StringBuilder builder = new StringBuilder().append("class ").append(className);
         if (parentClass != null) {
             builder.append('\n').append(indent("extends ", 2)).append(parentClass.parentClassName());
             constructGenerics(parentClass.generics(), builder);
@@ -168,12 +209,7 @@ public class SourceCodeBuilder {
         if (interfaces != null && !interfaces.isEmpty()) {
             isAbstractClass = true;
             builder.append("\n").append(indent("implements ", 2));
-            handleSequenceOfArguments(
-                    builder,
-                    interfaces.entrySet(),
-                    entry ->
-                            entry.getKey() + constructGenerics(entry.getValue(), new StringBuilder()).toString()
-            );
+            handleSequenceOfArguments(builder, interfaces.entrySet(), entry -> entry.getKey() + constructGenerics(entry.getValue(), new StringBuilder()).toString());
         }
         classDefinition = builder.toString();
         return this;
@@ -186,17 +222,24 @@ public class SourceCodeBuilder {
     /// @param controller the FXMLController instance to be set
     /// @return the current instance of `SourceCodeBuilder` for method chaining
     /// @throws IllegalStateException if a controller is already set
-    public SourceCodeBuilder setFXMLController(FXMLController controller) {
+    /// @throws NullPointerException  if the passed controller is null
+    public SourceCodeBuilder setFXMLController(FXMLController controller) throws IllegalStateException, NullPointerException {
         if (this.controller != null) {
             throw new IllegalStateException("Controller is already set.");
         }
+        Objects.requireNonNull(controller, "`controller` must not be null");
         fields.add("private final %s %s;".formatted(controller.className(), INTERNAL_CONTROLLER_FIELD));
         fieldInitializers.add("%s = new %s();".formatted(INTERNAL_CONTROLLER_FIELD, controller.className()));
         this.controller = controller;
         return this;
     }
 
-    // TODO: Handle FXML Node
+
+    public SourceCodeBuilder handleFXMLNode(FXMLNode node) {
+        // TODO: Handle FXML Node
+        return this;
+    }
+
 
     /// Builds a string representation of a Java source code file based on the configured package, imports,
     /// class definition, fields, and methods.
@@ -205,7 +248,7 @@ public class SourceCodeBuilder {
     ///
     /// @return a string representing the complete source code of the defined class
     /// @throws IllegalStateException if the class definition is not set
-    public String build() {
+    public String build() throws IllegalStateException {
         if (classDefinition == null) {
             throw new IllegalStateException("Class definition is not set.");
         }
@@ -216,51 +259,29 @@ public class SourceCodeBuilder {
         if (packageLine != null) {
             builder.append(packageLine).append("\n\n");
         }
-        imports.stream()
-                .sorted()
-                .distinct()
-                .forEach(importLine -> builder.append(importLine).append("\n"));
-        builder.append("\n\n@Generated(value=\"")
-                .append(getClass().getName())
-                .append("\", date=\"")
-                .append(ZonedDateTime.now(ZoneOffset.UTC))
-                .append("\")\n")
-                .append("\n\n")
-                .append("public ");
+        imports.stream().sorted().distinct().forEach(importLine -> builder.append(importLine).append("\n"));
+        builder.append("\n\n@Generated(value=\"").append(getClass().getName()).append("\", date=\"").append(ZonedDateTime.now(ZoneOffset.UTC)).append("\")\n").append("public ");
         if (isAbstract) {
             builder.append("abstract ");
         }
-        builder.append(classDefinition)
-                .append(" {\n\n");
+        builder.append(classDefinition).append(" {\n\n");
         fields.forEach(f -> builder.append(indent(f, 1)).append("\n"));
-        builder.append("\n\n")
-                .append(indent(" ", 1))
-                .append("public")
-                .append(className)
-                .append(" {\n");
-        fieldInitializers.stream()
-                .sorted()
-                .distinct()
-                .forEach(f -> builder.append(indent(f, 2)).append("\n"));
+        builder.append("\n\n").append(indent(isAbstract ? "protected" : "public", 1)).append(' ').append(className).append("() {\n");
+        fieldInitializers.stream().sorted().distinct().forEach(f -> builder.append(indent(f, 2)).append("\n"));
         builder.append(indent("\n", 1));
         if (superLine != null) {
-            builder.append(indent(superLine, 2)).append("\n");
+            builder.append(indent(superLine, 2)).append("\n\n");
         } else {
-            builder.append(indent("super();\n", 2));
+            builder.append(indent("super();\n\n", 2));
         }
         if (!reflectionMethodInitializers.isEmpty()) {
-            builder.append("\n")
-                    .append(indent("// Initialize reflection-based method handlers\n", 1))
-                    .append(indent("try {\n", 2));
+            builder.append(indent("// Initialize reflection-based method handlers\n", 1)).append(indent("try {\n", 2));
             reflectionMethodInitializers.forEach(f -> builder.append(indent(f, 3)).append("\n"));
-            builder.append(indent("} catch (Throwable e) {\n", 2))
-                    .append(indent("throw new RuntimeException(e);\n", 3))
-                    .append(indent("}\n\n", 2))
-                    .append(indent("// End reflection-based method handlers, continue with the rest of the constructor body\n", 1));
+            builder.append(indent("} catch (Throwable e) {\n", 2)).append(indent("throw new RuntimeException(e);\n", 3)).append(indent("}\n\n", 2)).append(indent("// End reflection-based method handlers, continue with the rest of the constructor body\n\n", 1));
         }
         constructorBody.forEach(f -> builder.append(indent(f, 2)).append("\n"));
         builder.append(indent("}\n\n", 1));
-        methods.forEach(m -> builder.append(m).append("\n"));
+        methods.forEach(builder::append);
         builder.append("}\n");
         return builder.toString();
     }
@@ -278,16 +299,9 @@ public class SourceCodeBuilder {
         }
         String methodName = method.name();
         Comparator<List<?>> listSizeComparator = Comparator.comparingInt(List::size);
-        return controller.instanceMethods()
-                .stream()
-                .filter(controllerMethod -> methodName.equals(controllerMethod.name()))
-                .filter(controllerMethod -> validateReturnType(method, controllerMethod))
-                .filter(controllerMethod -> validateParameterTypes(method, controllerMethod))
-                .min(
-                        // Sort by visibility, then by parameter types in descending order of size
-                        Comparator.comparing(ControllerMethod::visibility)
-                                .thenComparing(ControllerMethod::parameterTypes, listSizeComparator.reversed())
-                );
+        return controller.instanceMethods().stream().filter(controllerMethod -> methodName.equals(controllerMethod.name())).filter(controllerMethod -> validateReturnType(method, controllerMethod)).filter(controllerMethod -> validateParameterTypes(method, controllerMethod)).min(
+                // Sort by visibility, then by parameter types in descending order of size
+                Comparator.comparing(ControllerMethod::visibility).thenComparing(ControllerMethod::parameterTypes, listSizeComparator.reversed()));
     }
 
     /// Validates whether the parameter types of the given [FXMLMethod] match the parameter types of the corresponding
@@ -319,9 +333,7 @@ public class SourceCodeBuilder {
     /// @param controllerMethod the controller method against which the FXML method's return type is validated
     /// @return true if the return type of the FXML method is void or is assignable from the return type of the controller method; false otherwise
     private boolean validateReturnType(FXMLMethod method, ControllerMethod controllerMethod) {
-        return void.class.equals(method.returnType()) ||
-                TypeEncoder.typeToClass(method.returnType())
-                        .isAssignableFrom(TypeEncoder.typeToClass(controllerMethod.returnType()));
+        return void.class.equals(method.returnType()) || TypeEncoder.typeToClass(method.returnType()).isAssignableFrom(TypeEncoder.typeToClass(controllerMethod.returnType()));
     }
 
     /// Constructs and appends the method call logic to the given StringBuilder.
@@ -337,34 +349,19 @@ public class SourceCodeBuilder {
         boolean isVoid = void.class.equals(fxmlMethod.returnType());
         if (Visibility.PUBLIC == method.visibility()) {
             log.debug("Calling public method %s on %s".formatted(method.name(), controller.className()));
-            addReturnIfNeeded(builder, isVoid, 2)
-                    .append(INTERNAL_CONTROLLER_FIELD).append(".").append(method.name()).append("(");
-            handlerParameterSequence(builder, method)
-                    .append(");");
+            addReturnIfNeeded(builder, isVoid, 2).append(INTERNAL_CONTROLLER_FIELD).append(".").append(method.name()).append("(");
+            handlerParameterSequence(builder, method).append(");");
         } else {
             log.debug("Calling non-public method %s on %s using reflection".formatted(method.name(), controller.className()));
             String reflectionMethodName = getNewReflectionMethodName();
 
             fields.add("private final java.lang.reflect.Method %s;".formatted(reflectionMethodName));
-            reflectionMethodInitializers.add(
-                    handleSequenceOfArguments(
-                            new StringBuilder()
-                                    .append(reflectionMethodName).append(" = ").append(controller.className())
-                                    .append(".class.getDeclaredMethod(\"").append(method.name()).append("\", "),
-                            method.parameterTypes(),
-                            TypeEncoder::typeToReflectionClassString
-                    ).append(");").toString()
-            );
+            reflectionMethodInitializers.add(handleSequenceOfArguments(new StringBuilder().append(reflectionMethodName).append(" = ").append(controller.className()).append(".class.getDeclaredMethod(\"").append(method.name()).append("\", "), method.parameterTypes(), TypeEncoder::typeToReflectionClassString).append(");").toString());
             constructorBody.add("%s.setAccessible(true);".formatted(reflectionMethodName));
 
             builder.append(indent("try {\n", 2));
-            addReturnIfNeeded(builder, isVoid, 3)
-                    .append("declaredMethod.invoke(%s, ".formatted(INTERNAL_CONTROLLER_FIELD));
-            handlerParameterSequence(builder, method)
-                    .append(");\n")
-                    .append(indent("} catch (Throwable e) {\n", 2))
-                    .append(indent("throw new RuntimeException(e);\n", 3))
-                    .append(indent("}\n", 2));
+            addReturnIfNeeded(builder, isVoid, 3).append("declaredMethod.invoke(%s, ".formatted(INTERNAL_CONTROLLER_FIELD));
+            handlerParameterSequence(builder, method).append(");\n").append(indent("} catch (Throwable e) {\n", 2)).append(indent("throw new RuntimeException(e);\n", 3)).append(indent("}\n", 2));
         }
         builder.append(indent("}\n", 1));
     }
@@ -401,11 +398,7 @@ public class SourceCodeBuilder {
     /// @param method  the ControllerMethod whose parameters are to be processed
     /// @return the modified StringBuilder containing the constructed parameter sequence
     private StringBuilder handlerParameterSequence(StringBuilder builder, ControllerMethod method) {
-        return handleSequenceOfArguments(
-                builder,
-                IntStream.range(0, method.parameterTypes().size()).mapToObj(PARAM_NAME_FORMAT::formatted).toList(),
-                Function.identity()
-        );
+        return handleSequenceOfArguments(builder, IntStream.range(0, method.parameterTypes().size()).mapToObj(PARAM_NAME_FORMAT::formatted).toList(), Function.identity());
     }
 
     /// Constructs a generic type representation by appending the provided generics to the given StringBuilder.
@@ -420,8 +413,7 @@ public class SourceCodeBuilder {
             return builder;
         }
         builder.append("<");
-        return handleSequenceOfArguments(builder, generics, Function.identity())
-                .append(">");
+        return handleSequenceOfArguments(builder, generics, Function.identity()).append(">");
     }
 
     /// Processes a sequence of arguments, applying a specified handling function to each
@@ -432,11 +424,7 @@ public class SourceCodeBuilder {
     /// @param arguments      the collection of arguments to process; if the collection is empty, the method performs no action
     /// @param handleArgument a function that processes each argument and converts it into a string representation
     /// @return the provided string build
-    private <T> StringBuilder handleSequenceOfArguments(
-            StringBuilder builder,
-            Collection<T> arguments,
-            Function<T, String> handleArgument
-    ) {
+    private <T> StringBuilder handleSequenceOfArguments(StringBuilder builder, Collection<T> arguments, Function<T, String> handleArgument) {
         Iterator<T> iterator = arguments.iterator();
         if (iterator.hasNext()) {
             builder.append(handleArgument.apply(iterator.next()));
