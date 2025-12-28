@@ -154,11 +154,21 @@ public class SourceCodeBuilder {
             isAbstractClass = true;
             builder.append("abstract ");
         }
-        builder.append(TypeEncoder.typeToTypeString(method.returnType(), method.namedGenerics())).append(" ").append(method.name()).append("(");
+        builder.append(TypeEncoder.typeToTypeString(method.returnType(), method.namedGenerics()))
+                .append(" ")
+                .append(method.name())
+                .append("(");
         Function<Type, String> typeToTypeString = type -> TypeEncoder.typeToTypeString(type, method.namedGenerics());
         AtomicInteger counter = new AtomicInteger(0);
-        handleSequenceOfArguments(builder, method.parameters(), typeToTypeString.andThen(p -> p + " " + PARAM_NAME_FORMAT.formatted(counter.getAndIncrement()))).append(")");
-        matchingMethod.ifPresentOrElse(controllerMethod -> callMethod(builder, controllerMethod, method), () -> builder.append(";\n"));
+        handleSequenceOfArguments(
+                builder,
+                method.parameters(),
+                typeToTypeString.andThen(p -> p + " " + PARAM_NAME_FORMAT.formatted(counter.getAndIncrement()))
+        ).append(")");
+        matchingMethod.ifPresentOrElse(
+                controllerMethod -> callMethod(builder, controllerMethod, method),
+                () -> builder.append(";\n")
+        );
         methods.add(builder.append('\n').toString());
         return this;
     }
@@ -209,7 +219,11 @@ public class SourceCodeBuilder {
         if (interfaces != null && !interfaces.isEmpty()) {
             isAbstractClass = true;
             builder.append("\n").append(indent("implements ", 2));
-            handleSequenceOfArguments(builder, interfaces.entrySet(), entry -> entry.getKey() + constructGenerics(entry.getValue(), new StringBuilder()).toString());
+            handleSequenceOfArguments(
+                    builder,
+                    interfaces.entrySet(),
+                    entry -> entry.getKey() + constructGenerics(entry.getValue(), new StringBuilder()).toString()
+            );
         }
         classDefinition = builder.toString();
         return this;
@@ -259,15 +273,30 @@ public class SourceCodeBuilder {
         if (packageLine != null) {
             builder.append(packageLine).append("\n\n");
         }
-        imports.stream().sorted().distinct().forEach(importLine -> builder.append(importLine).append("\n"));
-        builder.append("\n\n@Generated(value=\"").append(getClass().getName()).append("\", date=\"").append(ZonedDateTime.now(ZoneOffset.UTC)).append("\")\n").append("public ");
+        imports.stream()
+                .sorted()
+                .distinct()
+                .forEach(importLine -> builder.append(importLine).append("\n"));
+        builder.append("\n\n@Generated(value=\"")
+                .append(getClass().getName())
+                .append("\", date=\"")
+                .append(ZonedDateTime.now(ZoneOffset.UTC))
+                .append("\")\n")
+                .append("public ");
         if (isAbstract) {
             builder.append("abstract ");
         }
         builder.append(classDefinition).append(" {\n\n");
         fields.forEach(f -> builder.append(indent(f, 1)).append("\n"));
-        builder.append("\n\n").append(indent(isAbstract ? "protected" : "public", 1)).append(' ').append(className).append("() {\n");
-        fieldInitializers.stream().sorted().distinct().forEach(f -> builder.append(indent(f, 2)).append("\n"));
+        builder.append("\n\n")
+                .append(indent(isAbstract ? "protected" : "public", 1))
+                .append(' ')
+                .append(className)
+                .append("() {\n");
+        fieldInitializers.stream()
+                .sorted()
+                .distinct()
+                .forEach(f -> builder.append(indent(f, 2)).append("\n"));
         builder.append(indent("\n", 1));
         if (superLine != null) {
             builder.append(indent(superLine, 2)).append("\n\n");
@@ -275,9 +304,13 @@ public class SourceCodeBuilder {
             builder.append(indent("super();\n\n", 2));
         }
         if (!reflectionMethodInitializers.isEmpty()) {
-            builder.append(indent("// Initialize reflection-based method handlers\n", 1)).append(indent("try {\n", 2));
+            builder.append(indent("// Initialize reflection-based method handlers\n", 1))
+                    .append(indent("try {\n", 2));
             reflectionMethodInitializers.forEach(f -> builder.append(indent(f, 3)).append("\n"));
-            builder.append(indent("} catch (Throwable e) {\n", 2)).append(indent("throw new RuntimeException(e);\n", 3)).append(indent("}\n\n", 2)).append(indent("// End reflection-based method handlers, continue with the rest of the constructor body\n\n", 1));
+            builder.append(indent("} catch (Throwable e) {\n", 2))
+                    .append(indent("throw new RuntimeException(e);\n", 3))
+                    .append(indent("}\n\n", 2))
+                    .append(indent("// End reflection-based method handlers, continue with the rest of the constructor body\n\n", 1));
         }
         constructorBody.forEach(f -> builder.append(indent(f, 2)).append("\n"));
         builder.append(indent("}\n\n", 1));
@@ -299,9 +332,16 @@ public class SourceCodeBuilder {
         }
         String methodName = method.name();
         Comparator<List<?>> listSizeComparator = Comparator.comparingInt(List::size);
-        return controller.instanceMethods().stream().filter(controllerMethod -> methodName.equals(controllerMethod.name())).filter(controllerMethod -> validateReturnType(method, controllerMethod)).filter(controllerMethod -> validateParameterTypes(method, controllerMethod)).min(
-                // Sort by visibility, then by parameter types in descending order of size
-                Comparator.comparing(ControllerMethod::visibility).thenComparing(ControllerMethod::parameterTypes, listSizeComparator.reversed()));
+        return controller.instanceMethods()
+                .stream()
+                .filter(controllerMethod -> methodName.equals(controllerMethod.name()))
+                .filter(controllerMethod -> validateReturnType(method, controllerMethod))
+                .filter(controllerMethod -> validateParameterTypes(method, controllerMethod))
+                .min(
+                        // Sort by visibility, then by parameter types in descending order of size
+                        Comparator.comparing(ControllerMethod::visibility)
+                                .thenComparing(ControllerMethod::parameterTypes, listSizeComparator.reversed())
+                );
     }
 
     /// Validates whether the parameter types of the given [FXMLMethod] match the parameter types of the corresponding
@@ -312,6 +352,9 @@ public class SourceCodeBuilder {
     /// @param controllerMethod the ControllerMethod whose parameter types are compared
     /// @return true if the parameter types are compatible, false otherwise
     private boolean validateParameterTypes(FXMLMethod method, ControllerMethod controllerMethod) {
+        if (controllerMethod.parameterTypes().isEmpty()) {
+            return true;
+        }
         if (method.parameters().size() != controllerMethod.parameterTypes().size()) {
             return false;
         }
@@ -333,7 +376,8 @@ public class SourceCodeBuilder {
     /// @param controllerMethod the controller method against which the FXML method's return type is validated
     /// @return true if the return type of the FXML method is void or is assignable from the return type of the controller method; false otherwise
     private boolean validateReturnType(FXMLMethod method, ControllerMethod controllerMethod) {
-        return void.class.equals(method.returnType()) || TypeEncoder.typeToClass(method.returnType()).isAssignableFrom(TypeEncoder.typeToClass(controllerMethod.returnType()));
+        return void.class.equals(method.returnType()) || TypeEncoder.typeToClass(method.returnType())
+                .isAssignableFrom(TypeEncoder.typeToClass(controllerMethod.returnType()));
     }
 
     /// Constructs and appends the method call logic to the given StringBuilder.
@@ -349,19 +393,38 @@ public class SourceCodeBuilder {
         boolean isVoid = void.class.equals(fxmlMethod.returnType());
         if (Visibility.PUBLIC == method.visibility()) {
             log.debug("Calling public method %s on %s".formatted(method.name(), controller.className()));
-            addReturnIfNeeded(builder, isVoid, 2).append(INTERNAL_CONTROLLER_FIELD).append(".").append(method.name()).append("(");
+            addReturnIfNeeded(builder, isVoid, 2)
+                    .append(INTERNAL_CONTROLLER_FIELD)
+                    .append(".")
+                    .append(method.name())
+                    .append("(");
             handlerParameterSequence(builder, method).append(");");
         } else {
             log.debug("Calling non-public method %s on %s using reflection".formatted(method.name(), controller.className()));
             String reflectionMethodName = getNewReflectionMethodName();
 
             fields.add("private final java.lang.reflect.Method %s;".formatted(reflectionMethodName));
-            reflectionMethodInitializers.add(handleSequenceOfArguments(new StringBuilder().append(reflectionMethodName).append(" = ").append(controller.className()).append(".class.getDeclaredMethod(\"").append(method.name()).append("\", "), method.parameterTypes(), TypeEncoder::typeToReflectionClassString).append(");").toString());
+            reflectionMethodInitializers.add(handleSequenceOfArguments(
+                    new StringBuilder()
+                            .append(reflectionMethodName)
+                            .append(" = ")
+                            .append(controller.className())
+                            .append(".class.getDeclaredMethod(\"")
+                            .append(method.name())
+                            .append("\", "),
+                    method.parameterTypes(),
+                    TypeEncoder::typeToReflectionClassString
+            ).append(");").toString());
             constructorBody.add("%s.setAccessible(true);".formatted(reflectionMethodName));
 
             builder.append(indent("try {\n", 2));
-            addReturnIfNeeded(builder, isVoid, 3).append("declaredMethod.invoke(%s, ".formatted(INTERNAL_CONTROLLER_FIELD));
-            handlerParameterSequence(builder, method).append(");\n").append(indent("} catch (Throwable e) {\n", 2)).append(indent("throw new RuntimeException(e);\n", 3)).append(indent("}\n", 2));
+            addReturnIfNeeded(builder, isVoid, 3)
+                    .append("declaredMethod.invoke(%s, ".formatted(INTERNAL_CONTROLLER_FIELD));
+            handlerParameterSequence(builder, method)
+                    .append(");\n")
+                    .append(indent("} catch (Throwable e) {\n", 2))
+                    .append(indent("throw new RuntimeException(e);\n", 3))
+                    .append(indent("}\n", 2));
         }
         builder.append(indent("}\n", 1));
     }
@@ -398,7 +461,11 @@ public class SourceCodeBuilder {
     /// @param method  the ControllerMethod whose parameters are to be processed
     /// @return the modified StringBuilder containing the constructed parameter sequence
     private StringBuilder handlerParameterSequence(StringBuilder builder, ControllerMethod method) {
-        return handleSequenceOfArguments(builder, IntStream.range(0, method.parameterTypes().size()).mapToObj(PARAM_NAME_FORMAT::formatted).toList(), Function.identity());
+        return handleSequenceOfArguments(
+                builder,
+                IntStream.range(0, method.parameterTypes().size()).mapToObj(PARAM_NAME_FORMAT::formatted).toList(),
+                Function.identity()
+        );
     }
 
     /// Constructs a generic type representation by appending the provided generics to the given StringBuilder.
@@ -412,8 +479,7 @@ public class SourceCodeBuilder {
         if (generics == null || generics.isEmpty()) {
             return builder;
         }
-        builder.append("<");
-        return handleSequenceOfArguments(builder, generics, Function.identity()).append(">");
+        return handleSequenceOfArguments(builder.append("<"), generics, Function.identity()).append(">");
     }
 
     /// Processes a sequence of arguments, applying a specified handling function to each
