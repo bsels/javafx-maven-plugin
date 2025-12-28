@@ -1,56 +1,142 @@
 package com.github.bsels.javafx.maven.plugin.io;
 
+import com.github.bsels.javafx.maven.plugin.CheckAndCast;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLConstantNode;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLConstructorProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLController;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLField;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLNode;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLObjectNode;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLObjectProperty;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLParentNode;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLProperty;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLStaticMethod;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLStaticProperty;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLValueNode;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLWrapperNode;
 import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.introspect.Visibility;
 import com.github.bsels.javafx.maven.plugin.utils.TypeEncoder;
+import com.github.bsels.javafx.maven.plugin.utils.Utils;
+import javafx.beans.NamedArg;
+import javafx.collections.ObservableList;
+import javafx.scene.Node;
 import org.apache.maven.plugin.logging.Log;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.lang.reflect.Type;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
+import static com.github.bsels.javafx.maven.plugin.utils.TypeEncoder.encodeTypeValue;
+
+/// The `SourceCodeBuilder` class is a utility for constructing Java source code programmatically.
+/// It allows developers to define packages, imports, classes, fields, methods,
+/// and resource bundles in a structured manner.
+/// This class is designed to manage the generation of Java code, ensuring correctness in structure and syntax.
+/// It supports method chaining for a more streamlined API.
 public class SourceCodeBuilder {
     /// A constant string representing the literal value "this".
     /// This variable is typically used as a fixed identifier or marker and is declared as public, static,
     /// and final to ensure its value remains constant throughout the application.
     public static final String THIS = "this";
 
+    /// A constant representing the internal controller field name used within the system.
+    /// This identifier is typically utilized internally for system logic and should not be modified
+    /// or accessed directly outside the scope of its intended usage.
     private static final String INTERNAL_CONTROLLER_FIELD = "$internalController$";
+    /// A constant string pattern used internally to represent the key for reflection-method-related fields.
+    /// The placeholder '%d' in the pattern is intended to be replaced with an integer value dynamically.
+    /// This is primarily used to generate unique identifiers in reflection-based operations or internal mechanisms.
     private static final String INTERNAL_REFLECTION_METHOD_FIELD = "$reflectionMethod$%d";
+    /// A constant string that defines the format for parameter names.
+    /// Used to construct parameter names dynamically by inserting a numeric value in place of `%d`.
+    /// The `%d` placeholder is replaced with a number to generate unique parameter names.
     private static final String PARAM_NAME_FORMAT = "param%d";
 
+    /// A list that stores the fully qualified names of classes or packages imported into the current Java file.
+    /// This list represents the import declarations used in the source code.
     private final List<String> imports;
+    /// A list of strings representing the fields associated with this class.
+    /// This list is immutable and cannot be modified after the initial assignment.
     private final List<String> fields;
+    /// A list of field initializers represented as strings.
+    /// This list contains the initial values or configurations assigned to fields,
+    /// often used for setup or initialization.
     private final List<String> fieldInitializers;
+    /// A list containing the names of methods intended to be used for reflection-based initialization.
+    /// Each string in the list represents the name of a method.
+    /// This collection is immutable and cannot be modified after initialization.
     private final List<String> reflectionMethodInitializers;
+    /// Represents the body of a constructor as a list of strings.
+    /// Each string in the list corresponds to a line or statement within the constructor body.
+    /// This variable is immutable and cannot be modified after initialization.
     private final List<String> constructorBody;
+    /// A list of method names represented as strings.
+    /// This list is immutable and contains the method definitions or references.
     private final List<String> methods;
+    /// A logger instance used for logging messages and events within the application.
+    /// This is a final variable ensuring that the logger reference cannot be re-assigned.
+    /// It can be used to log debug information, errors, warnings, and other messages.
     private final Log log;
+
+    /// Represents a single line of text related to the package information.
+    /// This variable can be used to store or manipulate data specific to a package,
+    /// such as its name, description, or other related details.
     private String packageLine;
+    /// Represents a line of text or a string value that holds important
+    /// or significant information within the given context of the application.
+    /// The exact purpose and content of this string may vary depending on how it is used within the program's logic
+    /// or functionality.
     private String superLine;
+    /// A boolean flag indicating whether the class is abstract.
+    /// If `true`, the class is an abstract class that cannot be instantiated directly.
+    /// If `false`, the class is a concrete class that can be instantiated.
     private Boolean isAbstractClass;
+    /// Represents the definition or description of a class in the system.
+    /// This variable is intended to hold the textual representation or details regarding a specific class.
     private String classDefinition;
+    /// Represents the name of a class.
+    /// This variable typically stores the identifier or title used to refer to a specific class in the context
+    /// of the application.
     private String className;
+    /// Represents whether the current node or entity is the root element in a hierarchy or structure.
+    /// Typically used in tree-like or hierarchical data structures to denote the top-most element.
+    ///
+    /// When set to `true`, this indicates that the current element is the root.
+    /// When set to `false`, this indicates it is not the root.
     private boolean isRoot;
+    /// Represents the FXML controller that is responsible for managing the user interface
+    /// and handling interactions within the application.
+    /// This variable is used to link and control the FXML-based user interface components.
     private FXMLController controller;
+    /// A flag indicating whether the resource bundle has been set.
+    /// This variable is used to determine if the resource bundle configuration is initialized and available for use.
     private boolean resourceBundleSet;
+    /// Counter to track the number of methods accessed or processed via reflection during program execution.
     private int reflectionMethodCounter;
 
+    /// Constructs a new SourceCodeBuilder instance to build source code structures.
+    ///
+    /// @param log the logging utility used for logging messages and tracking actions during source code generation
     public SourceCodeBuilder(Log log) {
         packageLine = null;
         imports = new ArrayList<>();
@@ -66,6 +152,8 @@ public class SourceCodeBuilder {
         resourceBundleSet = false;
         this.log = log;
         reflectionMethodCounter = 0;
+        superLine = null;
+        isRoot = false;
         super();
         addImport("javax.annotation.processing.Generated");
     }
@@ -248,12 +336,20 @@ public class SourceCodeBuilder {
         return this;
     }
 
-
+    /// Handles the processing of a given FXMLNode by constructing objects, setting non-constructor properties,
+    /// and binding wrapping objects.
+    ///
+    /// @param node the FXMLNode to process
+    /// @return the current instance of SourceCodeBuilder for method chaining
     public SourceCodeBuilder handleFXMLNode(FXMLNode node) {
-        // TODO: Handle FXML Node
+        if (node instanceof FXMLObjectNode(_, String identifier, _, _, _, _) && THIS.equals(identifier)) {
+            isRoot = true;
+        }
+        constructObjects(node, new HashSet<>());
+        setNonConstructorProperties(node, new HashSet<>());
+        bindWrappingObjects(null, node, new HashSet<>());
         return this;
     }
-
 
     /// Builds a string representation of a Java source code file based on the configured package, imports,
     /// class definition, fields, and methods.
@@ -288,16 +384,15 @@ public class SourceCodeBuilder {
         }
         builder.append(classDefinition).append(" {\n\n");
         fields.forEach(f -> builder.append(indent(f, 1)).append("\n"));
-        builder.append("\n\n")
+        builder.append("\n")
                 .append(indent(isAbstract ? "protected" : "public", 1))
                 .append(' ')
                 .append(className)
                 .append("() {\n");
         fieldInitializers.stream()
-                .sorted()
                 .distinct()
                 .forEach(f -> builder.append(indent(f, 2)).append("\n"));
-        builder.append(indent("\n", 1));
+        builder.append('\n');
         if (superLine != null) {
             builder.append(indent(superLine, 2)).append("\n\n");
         } else {
@@ -317,6 +412,150 @@ public class SourceCodeBuilder {
         methods.forEach(builder::append);
         builder.append("}\n");
         return builder.toString();
+    }
+
+    /// Constructs and initializes objects based on the provided FXMLNode structure.
+    /// The method traverses through the hierarchy of nodes to initialize all necessary objects,
+    /// ensuring no duplicate objects are processed using the given set of seen objects.
+    ///
+    /// @param node        The root FXMLNode to process. This node and its children will be traversed and used to construct objects.
+    /// @param seenObjects A set of object identifiers that have already been processed. This is used to ensure that objects are not initialized more than once.
+    private void constructObjects(FXMLNode node, Set<String> seenObjects) {
+        for (FXMLNode child : getChildren(node)) {
+            constructObjects(child, seenObjects);
+        }
+        switch (node) {
+            case FXMLValueNode(
+                    _, String identifier, Type type, String value
+            ) when isNewNonThisNode(seenObjects, identifier) ->
+                    fieldInitializers.add("%s = %s;".formatted(identifier, TypeEncoder.encodeTypeValue(type, value)));
+            case FXMLObjectNode(
+                    _, String identifier, Class<?> clazz, List<FXMLProperty> properties, _, List<String> generics
+            ) when isNewNonThisNode(seenObjects, identifier) -> {
+                StringBuilder builder = new StringBuilder()
+                        .append(identifier)
+                        .append(" = new ")
+                        .append(clazz.getSimpleName());
+                if (!generics.isEmpty()) {
+                    builder.append("<>");
+                }
+                fieldInitializers.add(addConstructorParameters(builder, clazz, properties).toString());
+            }
+
+            case FXMLObjectNode(_, String identifier, Class<?> clazz, List<FXMLProperty> properties, _, _)
+                    when THIS.equals(identifier) ->
+                    superLine = addConstructorParameters(new StringBuilder("super"), clazz, properties).toString();
+            case FXMLNode _ -> {
+            }
+        }
+    }
+
+    /// Configures and associates constructor parameters for the specified class and its properties.
+    /// Validates the presence of a matching constructor in the class, ensuring the parameter types
+    /// and annotations align with the given properties.
+    /// Throws an exception if either no valid constructor or multiple matching constructors are found.
+    ///
+    /// @param clazz      the class whose constructor parameters are to be processed
+    /// @param properties a list of FXMLProperty objects to be associated with the constructor parameters
+    private StringBuilder addConstructorParameters(
+            StringBuilder builder,
+            Class<?> clazz,
+            List<FXMLProperty> properties
+    ) {
+        Map<String, FXMLConstructorProperty> constructorProperties = properties.stream()
+                .gather(CheckAndCast.of(FXMLConstructorProperty.class))
+                .collect(Collectors.toMap(FXMLConstructorProperty::name, Function.identity()));
+        return findMinimalConstructor(builder, clazz, constructorProperties);
+    }
+
+    /// Identifies and processes the minimal constructor of the given class that matches the specified set of
+    /// constructor properties. A constructor is considered minimal if it has the least number of parameters
+    /// while still satisfying the property name and annotation requirements.
+    ///
+    /// @param clazz                 the class whose constructors are being evaluated
+    /// @param constructorProperties a map of property names to `FXMLConstructorProperty` that defines the required constructor parameters and their corresponding values
+    /// @throws IllegalStateException if no minimal matching constructor can be found
+    private StringBuilder findMinimalConstructor(
+            StringBuilder builder,
+            Class<?> clazz,
+            Map<String, FXMLConstructorProperty> constructorProperties
+    ) throws IllegalStateException {
+        List<Parameter> minimalConstructorParameters = Stream.of(clazz.getConstructors())
+                .filter(constructor -> Stream.of(constructor.getParameters()).allMatch(parameter -> parameter.isAnnotationPresent(NamedArg.class)))
+                .filter(c -> Set.copyOf(constructorParameterNames(c)).containsAll(constructorProperties.keySet()))
+                .map(c -> List.of(c.getParameters()))
+                .min(Comparator.comparing(List::size))
+                .orElseThrow(() -> new IllegalStateException(
+                        "No matching constructor found for parameters: %s for type %s".formatted(
+                                constructorProperties.keySet(), clazz
+                        )
+                ));
+
+        return handleSequenceOfArguments(
+                builder.append('('),
+                minimalConstructorParameters,
+                parameter -> {
+                    String parameterName = parameter.getAnnotation(NamedArg.class).value();
+                    if (constructorProperties.containsKey(parameterName)) {
+                        FXMLConstructorProperty constructorProperty = constructorProperties.get(parameterName);
+                        return encodeTypeValue(constructorProperty.type(), constructorProperty.value());
+                    } else {
+                        return TypeEncoder.defaultValueAsString(parameter.getType());
+                    }
+                }
+        ).append(");");
+    }
+
+    /// Retrieves a list of parameter names annotated with `@NamedArg` from the given constructor.
+    ///
+    /// @param constructor the constructor to examine for parameters annotated with `@NamedArg`
+    /// @return a list of parameter names annotated with `@NamedArg`, or an empty list if none are found
+    private List<String> constructorParameterNames(Constructor<?> constructor) {
+        return Stream.of(constructor.getParameters())
+                .filter(parameter -> parameter.isAnnotationPresent(NamedArg.class))
+                .map(parameter -> parameter.getAnnotation(NamedArg.class).value())
+                .toList();
+    }
+
+    /// Processes the non-constructor properties of the specified FXMLNode and its children,
+    /// appending the necessary code to configure those properties.
+    ///
+    /// @param node      the FXMLNode object whose non-constructor properties will be processed and configured
+    /// @param seenNodes a set of [FXMLNode] objects that have already been processed to ensure no duplicate processing occurs
+    private void setNonConstructorProperties(FXMLNode node, Set<FXMLNode> seenNodes) {
+        if (!seenNodes.add(node)) {
+            return;
+        }
+        if (node instanceof FXMLObjectNode(_, String identifier, _, List<FXMLProperty> properties, _, _)) {
+            List<FXMLProperty> sortedProperties = properties.stream()
+                    .sorted(Comparator.comparing(FXMLProperty::name))
+                    .toList();
+            for (FXMLProperty property : sortedProperties) {
+                switch (property) {
+                    case FXMLConstructorProperty _ -> {
+                    }
+                    case FXMLObjectProperty(_, String setter, Type type, String value) ->
+                            constructorBody.add("%s.%s(%s);".formatted(identifier, setter, encodeTypeValue(type, value)));
+                    case FXMLStaticProperty(_, Class<?> staticClass, String staticSetter, Type type, String value) ->
+                            constructorBody.add("%s.%s(%s, %s);".formatted(staticClass.getSimpleName(), staticSetter, identifier, encodeTypeValue(type, value)));
+                }
+            }
+        }
+        getChildren(node).forEach(child -> setNonConstructorProperties(child, seenNodes));
+    }
+
+    /// Retrieves the list of child nodes associated with the provided FXML node.
+    /// Depending on the type of the given FXMLNode, this method extracts and returns the child nodes if applicable,
+    /// or an empty list if the node type does not contain child nodes.
+    ///
+    /// @param node the FXML node whose child nodes are to be retrieved
+    /// @return a list of child nodes for the given FXML node,
+    ///                                                                                                                                                                                         or an empty list if the node type does not contain children
+    private List<FXMLNode> getChildren(FXMLNode node) {
+        return switch (node) {
+            case FXMLParentNode parentNode -> parentNode.children();
+            case FXMLValueNode _, FXMLConstantNode _ -> List.of();
+        };
     }
 
     /// Finds a matching method in the controller instance for the given [FXMLMethod].
@@ -510,6 +749,164 @@ public class SourceCodeBuilder {
     private String indent(String line, int indent) {
         return " ".repeat(Math.max(0, indent) * 4) + line;
     }
+
+    /// Determines if the given identifier represents a new node that has not been encountered before.
+    ///
+    /// @param seenObjects a set of identifiers that have already been encountered
+    /// @param identifier  the identifier to be checked
+    /// @return true if the identifier is new and has been added to the set, false otherwise
+    private boolean isNewNonThisNode(Set<String> seenObjects, String identifier) {
+        return !THIS.equals(identifier) && seenObjects.add(identifier);
+    }
+
+
+    /// Binds wrapping objects based on the provided type and FXML node.
+    /// Processes different types of nodes and generates the appropriate bindings
+    /// or logs debug messages for unexpected configurations.
+    ///
+    /// @param type      The class type associated with the parent FXML object.
+    /// @param node      The FXML node to process and bind, which may include object nodes, wrapper nodes, or other types of nodes.
+    /// @param seenNodes a set of [FXMLNode] objects that have already been processed to ensure no duplicate processing occurs
+    private void bindWrappingObjects(Class<?> type, FXMLNode node, Set<FXMLNode> seenNodes) {
+        if (!seenNodes.add(node)) {
+            return;
+        }
+        if (node instanceof FXMLValueNode _ || node instanceof FXMLWrapperNode _) {
+            log.debug("Unexpected root node type: %s, for wrapping objects".formatted(node.getClass()));
+            return;
+        }
+        final Class<?> finalType;
+        if (node instanceof FXMLObjectNode(_, _, Class<?> clazz, _, _, _)) {
+            finalType = clazz;
+        } else {
+            finalType = type;
+        }
+        String objectIdentifier = TypeEncoder.getIdentifier(node);
+        for (FXMLNode child : getChildren(node)) {
+            switch (child) {
+                case FXMLValueNode _, FXMLConstantNode _ -> {
+                }
+                case FXMLObjectNode(
+                        _, String identifier, Class<?> clazz, _, _, _
+                ) when Node.class.isAssignableFrom(clazz) ->
+                        constructorBody.add("%s.getChildren().add(%s);".formatted(objectIdentifier, identifier));
+                case FXMLObjectNode objectNode ->
+                        log.debug("Unexpected child node type: %s without wrapper node".formatted(objectNode.getClass()));
+                case FXMLStaticMethod staticMethod when Node.class.isAssignableFrom(finalType) ->
+                        bindStaticMethod(objectIdentifier, staticMethod);
+                case FXMLStaticMethod _ -> log.debug("Unexpected child node type: %s".formatted(finalType));
+                case FXMLWrapperNode(String identifier, List<FXMLNode> children) ->
+                        bindWrappingObjects(finalType, objectIdentifier, identifier, children);
+            }
+            switch (child) {
+                case FXMLValueNode _, FXMLConstantNode _ -> {
+                }
+                case FXMLObjectNode objectNode -> bindWrappingObjects(finalType, objectNode, seenNodes);
+                case FXMLParentNode parentNode ->
+                        parentNode.children().forEach(subChild -> bindWrappingObjects(finalType, subChild, seenNodes));
+            }
+        }
+    }
+
+    /// Binds a static method to a generated behavior based on the specified object identifier and method details.
+    /// It processes the child nodes of the static method and determines the appropriate parameters to call the static
+    /// method.
+    ///
+    /// @param objectIdentifier the identifier for the object instance on which the static method should be bound
+    /// @param staticMethod     the definition of the static method including its characteristics and child nodes
+    private void bindStaticMethod(String objectIdentifier, FXMLStaticMethod staticMethod) {
+        List<FXMLNode> children = staticMethod.children();
+        List<Class<?>> parameterClasses = Stream.concat(
+                Stream.of(Node.class),
+                children.stream()
+                        .map(node -> switch (node) {
+                            case FXMLConstantNode(_, _, Type type) -> Utils.getClassType(type);
+                            case FXMLObjectNode(_, _, Class<?> clazz, _, _, _) -> clazz;
+                            case FXMLValueNode(_, _, Class<?> clazz, _) -> clazz;
+                            case FXMLStaticMethod _, FXMLWrapperNode _ ->
+                                    throw new IllegalStateException("Unexpected static method node: %s".formatted(node));
+                        })
+        ).toList();
+        String setterName = Utils.getSetterName(staticMethod.method());
+        Class<?> clazz = staticMethod.clazz();
+        if (Utils.checkIfStaticMethodExists(clazz, setterName, parameterClasses)) {
+            constructorBody.add(
+                    handleSequenceOfArguments(
+                            new StringBuilder()
+                                    .append(clazz.getSimpleName())
+                                    .append('.')
+                                    .append(setterName)
+                                    .append("("),
+                            Stream.concat(
+                                    Stream.of(new FXMLValueNode(true, objectIdentifier, Object.class, "")),
+                                    children.stream()
+                            ).toList(),
+                            TypeEncoder::getIdentifier
+                    ).append(");")
+                            .toString()
+            );
+        }
+    }
+
+    /// Binds wrapping objects by checking the provided child nodes and generating code to set or add those child
+    /// objects to a specified parent object.
+    /// This method processes different types of FXMLNode and attempts to create the appropriate binding based on
+    /// the types and structures of the children.
+    ///
+    /// @param clazz            The class of the parent object where the children will be bound.
+    /// @param objectIdentifier The identifier for the parent object in the generated code.
+    /// @param identifier       The name of the property or field in the parent object to which the children will be bound.
+    /// @param children         A list of child nodes representing the objects to be bound.
+    private void bindWrappingObjects(
+            Class<?> clazz,
+            String objectIdentifier,
+            String identifier,
+            List<FXMLNode> children
+    ) {
+        if (children.isEmpty()) {
+            return;
+        }
+        Class<?> paramType = switch (children.getFirst()) {
+            case FXMLConstantNode(_, _, Type type) -> Utils.getClassType(type);
+            case FXMLValueNode(_, _, Type type, _) -> Utils.getClassType(type);
+            case FXMLObjectNode(_, _, Class<?> subClass, _, _, _) -> subClass;
+            case FXMLWrapperNode _, FXMLStaticMethod _ -> throw new IllegalStateException("Unexpected child node");
+        };
+        if (children.size() == 1) {
+            String setterForName = Utils.getSetterName(identifier);
+            Optional<Method> method = Utils.findMethod(clazz, setterForName, paramType);
+            if (method.isPresent()) {
+                constructorBody.add("%s.%s(%s);".formatted(objectIdentifier, setterForName, TypeEncoder.getIdentifier(children.getFirst())));
+                return;
+            }
+        }
+        try {
+            String listGetterName = Utils.getGetterName(identifier);
+            Class<?> returnType = Utils.findCollectionGetterWithAllowedReturnType(clazz, identifier, listGetterName, paramType);
+            if (ObservableList.class.isAssignableFrom(returnType)) {
+                constructorBody.add(
+                        handleSequenceOfArguments(
+                                new StringBuilder()
+                                        .append(objectIdentifier)
+                                        .append(".")
+                                        .append(listGetterName)
+                                        .append("()")
+                                        .append(".addAll("),
+                                children,
+                                TypeEncoder::getIdentifier
+                        ).append(");")
+                                .toString()
+                );
+            } else {
+                for (FXMLNode child : children) {
+                    constructorBody.add("%s.%s.add(%s);".formatted(objectIdentifier, listGetterName, TypeEncoder.getIdentifier(child)));
+                }
+            }
+        } catch (IllegalStateException | NoSuchMethodException e) {
+            log.warn("Unable to bind wrapping objects for %s".formatted(identifier), e);
+        }
+    }
+
 
     /// Represents a parent class in a source code structure, including its name and any associated generics.
     ///
