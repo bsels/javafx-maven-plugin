@@ -1124,7 +1124,7 @@ class UtilsTest {
 
             // When & Then
             assertThat(predicate.test(int.class)).isTrue();
-            assertThat(predicate.test(Integer.class)).isFalse(); // Autoboxing not considered by isAssignableFrom
+            assertThat(predicate.test(Integer.class)).isTrue();
         }
 
         @Test
@@ -1134,7 +1134,7 @@ class UtilsTest {
 
             // When & Then
             assertThat(predicate.test(Integer.class)).isTrue();
-            assertThat(predicate.test(int.class)).isFalse(); // Autoboxing not considered by isAssignableFrom
+            assertThat(predicate.test(Integer.class)).isTrue();
         }
 
         @Test

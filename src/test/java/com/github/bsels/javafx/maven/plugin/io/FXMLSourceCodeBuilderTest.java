@@ -7,6 +7,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.FXMLField;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLObjectNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLObjectProperty;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLStaticMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLStaticProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLValueNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLWrapperNode;
@@ -14,12 +15,16 @@ import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.introspect.Visibility;
 import com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder.ParentClass;
 import javafx.beans.NamedArg;
+import javafx.css.PseudoClass;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
 import org.apache.maven.monitor.logging.DefaultLog;
 import org.apache.maven.plugin.logging.Log;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
@@ -38,7 +43,6 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.in;
 
 class FXMLSourceCodeBuilderTest {
     private Log mockLog;
@@ -95,6 +99,15 @@ class FXMLSourceCodeBuilderTest {
         }
 
         public TestControlWithMultipleNamedArgs(@NamedArg("text") String text, @NamedArg("value") int value, @NamedArg("enabled") boolean enabled) {
+        }
+    }
+
+    public static class TestPseudoClass extends PseudoClass {
+        public static final PseudoClass TRUE = new TestPseudoClass();
+
+        @Override
+        public String getPseudoClassName() {
+            return "test";
         }
     }
 
@@ -1369,6 +1382,332 @@ class FXMLSourceCodeBuilderTest {
                     .contains("innerButton = new Button();")
                     .contains("outerBox.getChildren().add(middleBox);")
                     .contains("middleBox.getChildren().add(innerButton);");
+        }
+
+        @Test
+        void handleFXMLNodeWithNullThrowsNullPointerException() {
+            assertThatThrownBy(() -> builder.handleFXMLNode(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`node` must not be null");
+        }
+
+        @Test
+        void handleRootWrappingNodeNothingToProcess() {
+            FXMLWrapperNode rootNode = new FXMLWrapperNode("this", List.of());
+
+            String result = builder
+                    .openClass("TestClass", null, null)
+                    .handleFXMLNode(rootNode)
+                    .build();
+
+            assertThat(result).doesNotContain("this = new ");
+        }
+
+        @Test
+        void handleFXMLNodeWithUnknownChildrenIgnoreThem() {
+            FXMLValueNode valueNode = new FXMLValueNode(false, "myString", String.class, "Hello World");
+            FXMLConstantNode constantNode = new FXMLConstantNode(Priority.class, "priorityValue", Priority.class);
+            FXMLObjectNode unsupportedObjectNode = new FXMLObjectNode(
+                    false,
+                    "font",
+                    Font.class,
+                    List.of(),
+                    List.of(new FXMLStaticMethod(String.class, "join", List.of())), // Ignored as font is not a node
+                    List.of()
+            );
+            FXMLStaticMethod staticMethodNonNodeParam = new FXMLStaticMethod(String.class, "valueOf", List.of());
+            FXMLObjectNode objectNode = new FXMLObjectNode(
+                    false,
+                    "myButton",
+                    Button.class,
+                    List.of(),
+                    List.of(valueNode, constantNode, unsupportedObjectNode, staticMethodNonNodeParam),
+                    List.of()
+            );
+
+
+            ZonedDateTime now = ZonedDateTime.of(2025, 12, 29, 11, 12, 0, 0, ZoneOffset.UTC);
+            String result;
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(now);
+                result = builder
+                        .openClass("TestClass", null, null)
+                        .addField(new FXMLField(Button.class, "myButton", false, List.of()))
+                        .addField(new FXMLField(String.class, "myString", false, List.of()))
+                        .addField(new FXMLField(Font.class, "font", false, List.of()))
+                        .handleFXMLNode(objectNode)
+                        .build();
+            }
+
+            assertThat(result)
+                    .isEqualToIgnoringNewLines("""
+                            import javax.annotation.processing.Generated;
+                            
+                            
+                            @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-12-29T11:12Z")
+                            public class TestClass {
+                            
+                            
+                                protected final Button myButton;
+                                protected final String myString;
+                                protected final Font font;
+                            
+                                public TestClass() {
+                                    myString = "Hello World";
+                                    font = new Font(0.0);
+                                    myButton = new Button();
+                            
+                                    super();
+                            
+                                }
+                            
+                            }
+                            """);
+        }
+
+        @Test
+        void handleNestedWrappingNodeThrowsIllegalStateException() {
+            FXMLWrapperNode wrapping = new FXMLWrapperNode("outer", List.of(new FXMLWrapperNode("inner", List.of())));
+            FXMLObjectNode objectNode = new FXMLObjectNode(false, "this", Button.class, List.of(), List.of(wrapping), List.of());
+
+            assertThatThrownBy(() -> builder.handleFXMLNode(objectNode))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Unexpected child node");
+        }
+
+        @Test
+        void handleStaticMethodInWrappingNodeThrowsIllegalStateException() {
+            FXMLWrapperNode wrapping = new FXMLWrapperNode("outer", List.of(new FXMLStaticMethod(String.class, "valueOf", List.of())));
+            FXMLObjectNode objectNode = new FXMLObjectNode(false, "this", Button.class, List.of(), List.of(wrapping), List.of());
+
+            assertThatThrownBy(() -> builder.handleFXMLNode(objectNode))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Unexpected child node");
+        }
+
+        @Test
+        void nonObservableListAsGetterAndUnknownStaticMethod() {
+            ZonedDateTime now = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC))
+                        .thenReturn(now);
+                // Given
+                FXMLStaticMethod unknown = new FXMLStaticMethod(
+                        TestController.class, "unknown", List.of()
+                );
+                FXMLConstantNode insets = new FXMLConstantNode(
+                        TestPseudoClass.class, "TRUE", PseudoClass.class
+                );
+                FXMLWrapperNode padding = new FXMLWrapperNode("pseudoClassStates", List.of(insets));
+                FXMLObjectNode rootNode = new FXMLObjectNode(
+                        true, "this", BorderPane.class, List.of(), List.of(padding, unknown), List.of()
+                );
+
+                // When
+                String sourceCode = builder
+                        .openClass("TestController", new ParentClass("BorderPane", List.of()), Map.of())
+                        .handleFXMLNode(rootNode)
+                        .build();
+
+                // Then
+                assertThat(sourceCode)
+                        .isEqualToIgnoringNewLines("""
+                                import javax.annotation.processing.Generated;
+                                
+                                
+                                @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
+                                public abstract class TestController
+                                        extends BorderPane {
+                                
+                                    protected TestController() {
+                                
+                                        super();
+                                
+                                        this.getPseudoClassStates().add(TestPseudoClass.TRUE);
+                                    }
+                                }
+                                """.formatted(now));
+            }
+        }
+
+        // TODO: Call static methods with constant, object node, and/or value node
+
+        @Test
+        void borderPaneExampleValidSource() {
+            ZonedDateTime now = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC))
+                        .thenReturn(now);
+                // Given
+                FXMLObjectNode insets = new FXMLObjectNode(
+                        true, "insets$000", Insets.class, List.of(), List.of(), List.of()
+                );
+                FXMLStaticMethod borderPaneMargin = new FXMLStaticMethod(
+                        BorderPane.class, "margin", List.of(insets)
+                );
+                FXMLWrapperNode padding = new FXMLWrapperNode("padding", List.of(insets));
+                FXMLObjectNode gridPane = new FXMLObjectNode(
+                        true, "gridPane$000", GridPane.class, List.of(), List.of(borderPaneMargin), List.of()
+                );
+                FXMLWrapperNode centerNode = new FXMLWrapperNode("center", List.of(gridPane));
+                FXMLObjectNode rootNode = new FXMLObjectNode(
+                        true, "this", BorderPane.class, List.of(), List.of(centerNode, padding), List.of()
+                );
+
+                // When
+                String sourceCode = builder
+                        .openClass("TestController", new ParentClass("BorderPane", List.of()), null)
+                        .addField(new FXMLField(GridPane.class, "gridPane$000", false, List.of()))
+                        .addField(new FXMLField(Insets.class, "insets$000", false, List.of()))
+                        .handleFXMLNode(rootNode)
+                        .build();
+
+                // Then
+                assertThat(sourceCode)
+                        .isEqualToIgnoringNewLines("""
+                                import javax.annotation.processing.Generated;
+                                
+                                
+                                @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
+                                public abstract class TestController
+                                        extends BorderPane {
+                                    protected final GridPane gridPane$000;
+                                    protected final Insets insets$000;
+                                
+                                    protected TestController() {
+                                        insets$000 = new Insets(0.0);
+                                        gridPane$000 = new GridPane();
+                                
+                                        super();
+                                
+                                        this.setCenter(gridPane$000);
+                                        BorderPane.setMargin(gridPane$000, insets$000);
+                                        this.setPadding(insets$000);
+                                    }
+                                }
+                                """.formatted(now));
+            }
+        }
+
+        @Test
+        void borderPaneEmptyInsets() {
+            ZonedDateTime now = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC))
+                        .thenReturn(now);
+                // Given
+                FXMLConstantNode insets = new FXMLConstantNode(
+                        Insets.class, "EMPTY", Insets.class
+                );
+                FXMLStaticMethod borderPaneMargin = new FXMLStaticMethod(
+                        BorderPane.class, "margin", List.of(insets)
+                );
+                FXMLWrapperNode padding = new FXMLWrapperNode("padding", List.of(insets));
+                FXMLObjectNode gridPane = new FXMLObjectNode(
+                        true, "gridPane$000", GridPane.class, List.of(), List.of(borderPaneMargin), List.of()
+                );
+                FXMLWrapperNode centerNode = new FXMLWrapperNode("center", List.of(gridPane));
+                FXMLObjectNode rootNode = new FXMLObjectNode(
+                        true, "this", BorderPane.class, List.of(), List.of(centerNode, padding), List.of()
+                );
+
+                // When
+                String sourceCode = builder
+                        .openClass("TestController", new ParentClass("BorderPane", List.of()), null)
+                        .addField(new FXMLField(GridPane.class, "gridPane$000", false, List.of()))
+                        .handleFXMLNode(rootNode)
+                        .build();
+
+                // Then
+                assertThat(sourceCode)
+                        .isEqualToIgnoringNewLines("""
+                                import javax.annotation.processing.Generated;
+                                
+                                
+                                @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
+                                public abstract class TestController
+                                        extends BorderPane {
+                                    protected final GridPane gridPane$000;
+                                
+                                    protected TestController() {
+                                        gridPane$000 = new GridPane();
+                                
+                                        super();
+                                
+                                        this.setCenter(gridPane$000);
+                                        BorderPane.setMargin(gridPane$000, Insets.EMPTY);
+                                        this.setPadding(Insets.EMPTY);
+                                    }
+                                }
+                                """.formatted(now));
+            }
+        }
+
+        @Test
+        void gridPaneValidSource() {
+            ZonedDateTime now = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC))
+                        .thenReturn(now);
+                // Given
+                FXMLStaticMethod columnIndex = new FXMLStaticMethod(
+                        GridPane.class, "columnIndex", List.of(new FXMLValueNode(true, "index0", int.class, "0"))
+                );
+                FXMLObjectNode buttonNode = new FXMLObjectNode(
+                        true, "internal", Button.class, List.of(), List.of(columnIndex), List.of()
+                );
+                FXMLObjectNode rootNode = new FXMLObjectNode(
+                        true, "this", GridPane.class, List.of(), List.of(buttonNode), List.of()
+                );
+
+                // When
+                String sourceCode = builder
+                        .openClass("TestController", new ParentClass("GridPane", List.of()), null)
+                        .handleFXMLNode(rootNode)
+                        .build();
+
+                // Then
+                assertThat(sourceCode)
+                        .isEqualToIgnoringNewLines("""
+                                import javax.annotation.processing.Generated;
+                                
+                                
+                                @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
+                                public abstract class TestController
+                                        extends GridPane {
+                                
+                                    protected TestController() {
+                                        index0 = 0;
+                                        internal = new Button();
+                                
+                                        super();
+                                
+                                        this.getChildren().add(internal);
+                                        GridPane.setColumnIndex(internal, index0);
+                                    }
+                                }
+                                """.formatted(now));
+            }
+        }
+
+        @Test
+        void handleNesteStaticMethodNodeThrowsIllegalStateException() {
+            FXMLStaticMethod wrapping = new FXMLStaticMethod(String.class, "outer", List.of(new FXMLStaticMethod(String.class, "valueOf", List.of())));
+            FXMLObjectNode objectNode = new FXMLObjectNode(false, "this", Button.class, List.of(), List.of(wrapping), List.of());
+
+            assertThatThrownBy(() -> builder.handleFXMLNode(objectNode))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Unexpected static method node: ");
+        }
+
+        @Test
+        void handleWrappingNodeInStaticMethodThrowsIllegalStateException() {
+            FXMLStaticMethod wrapping = new FXMLStaticMethod(String.class, "outer", List.of(new FXMLWrapperNode("valueOf", List.of())));
+            FXMLObjectNode objectNode = new FXMLObjectNode(false, "this", Button.class, List.of(), List.of(wrapping), List.of());
+
+            assertThatThrownBy(() -> builder.handleFXMLNode(objectNode))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Unexpected static method node: ");
         }
     }
 

@@ -335,6 +335,7 @@ public class FXMLSourceCodeBuilder {
     /// @param node the FXMLNode to process
     /// @return the current instance of SourceCodeBuilder for method chaining
     public FXMLSourceCodeBuilder handleFXMLNode(FXMLNode node) {
+        Objects.requireNonNull(node, "`node` must not be null");
         if (node instanceof FXMLObjectNode(_, String identifier, _, _, _, _) && THIS.equals(identifier)) {
             isRoot = true;
         }
@@ -918,7 +919,7 @@ public class FXMLSourceCodeBuilder {
                 );
             } else {
                 for (FXMLNode child : children) {
-                    constructorBody.add("%s.%s.add(%s);".formatted(objectIdentifier, listGetterName, TypeEncoder.getIdentifier(child)));
+                    constructorBody.add("%s.%s().add(%s);".formatted(objectIdentifier, listGetterName, TypeEncoder.getIdentifier(child)));
                 }
             }
         } catch (IllegalStateException | NoSuchMethodException e) {
