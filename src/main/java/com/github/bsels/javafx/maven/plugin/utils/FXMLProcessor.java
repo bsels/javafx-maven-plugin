@@ -19,7 +19,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.ProcessedFXML;
 import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField;
 import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.introspect.Visibility;
-import com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilderOld;
+import com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder;
 import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import com.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
 import javafx.css.Styleable;
@@ -381,7 +381,7 @@ public record FXMLProcessor(Log log) {
                 }
                 properties = new HashMap<>(properties);
                 properties.remove("type");
-                variableName = FXMLSourceCodeBuilderOld.THIS;
+                variableName = FXMLSourceCodeBuilder.THIS;
                 internal = true;
             } else if (structure.name().contains(".")) {
                 int endIndex = structure.name().lastIndexOf('.');
