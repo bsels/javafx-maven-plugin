@@ -159,7 +159,7 @@ public final class TypeEncoder {
     public static Class<?> typeToClass(Type type) {
         return switch (type) {
             case Class<?> c -> c;
-            case ParameterizedType parameterizedType -> (Class<?>) parameterizedType.getRawType();
+            case ParameterizedType parameterizedType -> typeToClass(parameterizedType.getRawType());
             default -> throw new IllegalArgumentException("Unsupported type: " + type);
         };
     }
@@ -173,11 +173,7 @@ public final class TypeEncoder {
     /// @return the fully qualified class name of the type if it is supported with the `.class` suffix, such as `java.lang.String.class`
     /// @throws IllegalArgumentException if the provided type is unsupported
     public static String typeToReflectionClassString(Type type) {
-        return switch (type) {
-            case Class<?> c -> c.getName();
-            case ParameterizedType parameterizedType -> typeToReflectionClassString(parameterizedType.getRawType());
-            default -> throw new IllegalArgumentException("Unsupported type: " + type);
-        } + ".class";
+        return typeToClass(type).getName() + ".class";
     }
 
     /// Returns a default value as a string for the given primitive type or null for non-primitive types.
