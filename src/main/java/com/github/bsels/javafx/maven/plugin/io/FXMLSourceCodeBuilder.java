@@ -195,8 +195,8 @@ public class FXMLSourceCodeBuilder {
     /// @throws NullPointerException if the `importClasses` collection is null or empty or has null elements
     public FXMLSourceCodeBuilder addImports(Collection<String> importClasses) throws NullPointerException {
         Objects.requireNonNull(importClasses, "`importClasses` must not be null");
-        importClasses.forEach(this::addImport);
-        return this;
+        return importClasses.stream()
+                        .reduce(this, FXMLSourceCodeBuilder::addImport, Utils.getFirstLambda());
     }
 
     /// Sets the resource bundle to the source code being built.
