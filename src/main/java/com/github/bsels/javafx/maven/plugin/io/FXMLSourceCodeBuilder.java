@@ -441,7 +441,7 @@ public class FXMLSourceCodeBuilder {
             case FXMLObjectNode(_, String identifier, Class<?> clazz, List<FXMLProperty> properties, _, _)
                     when THIS.equals(identifier) ->
                     superLine = addConstructorParameters(new StringBuilder("super"), clazz, properties).toString();
-            case FXMLNode _ -> {
+            default -> {
             }
         }
     }

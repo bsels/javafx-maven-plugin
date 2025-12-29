@@ -1,5 +1,6 @@
 package com.github.bsels.javafx.maven.plugin.io;
 
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLConstantNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLConstructorProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLController;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLField;
@@ -8,38 +9,85 @@ import com.github.bsels.javafx.maven.plugin.fxml.FXMLObjectNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLObjectProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLStaticProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLValueNode;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLWrapperNode;
 import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.introspect.Visibility;
 import com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder.ParentClass;
 import javafx.beans.NamedArg;
+import javafx.event.ActionEvent;
+import javafx.geometry.Insets;
 import javafx.scene.control.Button;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import org.apache.maven.monitor.logging.DefaultLog;
 import org.apache.maven.plugin.logging.Log;
+import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.verify;
 
-@ExtendWith(MockitoExtension.class)
 class FXMLSourceCodeBuilderTest {
-
-    @Mock
     private Log mockLog;
 
     private FXMLSourceCodeBuilder builder;
 
     @BeforeEach
     void setUp() {
+        mockLog = new DefaultLog(new ConsoleLogger());
         builder = new FXMLSourceCodeBuilder(mockLog);
+    }
+
+    // Test helper classes
+    public static class TestController {
+        public void handleClick() {
+        }
+
+        protected void handleProtected() {
+        }
+
+        void handlePackagePrivate() {
+        }
+
+        private void handlePrivate() {
+        }
+
+        public String getValue() {
+            return "value";
+        }
+
+        public void process(String s, Integer i) {
+        }
+
+        public void process(String s) {
+        }
+
+        public void handleAction(ActionEvent event) {
+        }
+    }
+
+    public static class TestButtonWithNamedArg {
+        public TestButtonWithNamedArg(@NamedArg("text") String text) {
+        }
+    }
+
+    public static class TestControlWithMultipleNamedArgs {
+        public TestControlWithMultipleNamedArgs(@NamedArg("text") String text, @NamedArg("value") int value) {
+        }
+
+        public TestControlWithMultipleNamedArgs(@NamedArg("text") String text, @NamedArg("value") int value, @NamedArg("enabled") boolean enabled) {
+        }
     }
 
     @Nested
@@ -213,7 +261,6 @@ class FXMLSourceCodeBuilderTest {
             assertThat(result)
                     .contains("public abstract class TestClass")
                     .contains("protected abstract void handleClick();");
-            verify(mockLog).debug("Controller method not found for handleClick, creating an abstract method");
         }
 
         @Test
@@ -362,6 +409,39 @@ class FXMLSourceCodeBuilderTest {
         }
 
         @Test
+        void addMethodWithPackagePrivateControllerMethodSamePackageCallsDirectly() {
+            FXMLController fxmlController = new FXMLController(
+                    TestController.class.getSimpleName(),
+                    TestController.class,
+                    List.of(),
+                    List.of(new ControllerMethod(
+                            Visibility.PACKAGE_PRIVATE,
+                            "handlePackagePrivate",
+                            void.class,
+                            List.of()
+                    ))
+            );
+
+            FXMLMethod method = new FXMLMethod(
+                    "handlePackagePrivate",
+                    List.of(),
+                    void.class,
+                    Map.of()
+            );
+
+            String result = builder
+                    .setPackage("com.github.bsels.javafx.maven.plugin.io")
+                    .openClass("TestClass", null, null)
+                    .setFXMLController(fxmlController)
+                    .addMethod(method)
+                    .build();
+
+            assertThat(result)
+                    .contains("$internalController$.handlePackagePrivate();")
+                    .doesNotContain("getDeclaredMethod");
+        }
+
+        @Test
         void addMethodWithNonVoidReturnTypeIncludesReturn() {
             FXMLController fxmlController = new FXMLController(
                     TestController.class.getSimpleName(),
@@ -428,6 +508,39 @@ class FXMLSourceCodeBuilderTest {
         }
 
         @Test
+        void addMethodWithControllerMethodAcceptingEventParameter() {
+            FXMLController fxmlController = new FXMLController(
+                    TestController.class.getSimpleName(),
+                    TestController.class,
+                    List.of(),
+                    List.of(new ControllerMethod(
+                            Visibility.PUBLIC,
+                            "handleAction",
+                            void.class,
+                            List.of(ActionEvent.class)
+                    ))
+            );
+
+            FXMLMethod method = new FXMLMethod(
+                    "handleAction",
+                    List.of(ActionEvent.class),
+                    void.class,
+                    Map.of()
+            );
+
+            String result = builder
+                    .setPackage("com.example")
+                    .openClass("TestClass", null, null)
+                    .setFXMLController(fxmlController)
+                    .addMethod(method)
+                    .build();
+
+            assertThat(result)
+                    .contains("protected void handleAction(ActionEvent param0) {")
+                    .contains("$internalController$.handleAction(param0);");
+        }
+
+        @Test
         void addMethodWithIncompatibleReturnTypeCreatesAbstractMethod() {
             FXMLController fxmlController = new FXMLController(
                     TestController.class.getSimpleName(),
@@ -491,6 +604,39 @@ class FXMLSourceCodeBuilderTest {
             assertThat(result)
                     .contains("public abstract class TestClass")
                     .contains("protected abstract void process(String param0);");
+        }
+
+        @Test
+        void addMethodWithMismatchedParameterCountCreatesAbstractMethod() {
+            FXMLController fxmlController = new FXMLController(
+                    TestController.class.getSimpleName(),
+                    TestController.class,
+                    List.of(),
+                    List.of(new ControllerMethod(
+                            Visibility.PUBLIC,
+                            "process",
+                            void.class,
+                            List.of(String.class)
+                    ))
+            );
+
+            FXMLMethod method = new FXMLMethod(
+                    "process",
+                    List.of(String.class, Integer.class),
+                    void.class,
+                    Map.of()
+            );
+
+            String result = builder
+                    .setPackage("com.example")
+                    .openClass("TestClass", null, null)
+                    .setFXMLController(fxmlController)
+                    .addMethod(method)
+                    .build();
+
+            assertThat(result)
+                    .contains("public abstract class TestClass")
+                    .contains("protected abstract void process(String param0, Integer param1);");
         }
     }
 
@@ -724,6 +870,104 @@ class FXMLSourceCodeBuilderTest {
         }
 
         @Test
+        void handleDuplicateValueNodesOnlyCreatesOneInitializer() {
+            FXMLValueNode labelString = new FXMLValueNode(
+                    false,
+                    "labelString",
+                    String.class,
+                    "Hello World"
+            );
+
+            FXMLObjectNode insets = new FXMLObjectNode(
+                    true,
+                    "insets",
+                    Insets.class,
+                    List.of(new FXMLConstructorProperty("topRightBottomLeft", "2.0", Double.class)),
+                    List.of(),
+                    List.of()
+            );
+
+            FXMLWrapperNode labelWrapper0 = new FXMLWrapperNode("text", List.of(labelString));
+            FXMLWrapperNode labelWrapper1 = new FXMLWrapperNode("text", List.of(labelString));
+
+            FXMLWrapperNode paddingWrapper0 = new FXMLWrapperNode("padding", List.of(insets));
+            FXMLWrapperNode paddingWrapper1 = new FXMLWrapperNode("padding", List.of(insets));
+
+            FXMLObjectNode button0 = new FXMLObjectNode(
+                    true,
+                    "button0",
+                    Button.class,
+                    List.of(),
+                    List.of(labelWrapper0, paddingWrapper0),
+                    List.of()
+            );
+            FXMLObjectNode button1 = new FXMLObjectNode(
+                    true,
+                    "button1",
+                    Button.class,
+                    List.of(),
+                    List.of(labelWrapper1, paddingWrapper1),
+                    List.of()
+            );
+
+            FXMLObjectNode rootNode = new FXMLObjectNode(
+                    true,
+                    "this",
+                    VBox.class,
+                    List.of(),
+                    List.of(button0, button1),
+                    List.of()
+            );
+
+            ZonedDateTime now = ZonedDateTime.of(2025, 12, 29, 11, 12, 0, 0, ZoneOffset.UTC);
+            String result;
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(now);
+                result = builder
+                        .openClass("TestClass", null, null)
+                        .addField(new FXMLField(String.class, "labelString", false, List.of()))
+                        .addField(new FXMLField(Insets.class, "insets", false, List.of()))
+                        .addField(new FXMLField(Button.class, "button0", false, List.of()))
+                        .addField(new FXMLField(Button.class, "button1", false, List.of()))
+                        .handleFXMLNode(rootNode)
+                        .build();
+            }
+
+            assertThat(result)
+                    .isEqualToIgnoringNewLines("""
+                            import javax.annotation.processing.Generated;
+                            
+                            
+                            @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-12-29T11:12Z")
+                            public abstract class TestClass {
+                            
+                            
+                                protected final String labelString;
+                                protected final Insets insets;
+                                protected final Button button0;
+                                protected final Button button1;
+                            
+                                protected TestClass() {
+                                    labelString = "Hello World";
+                                    insets = new Insets(2.0);
+                                    button0 = new Button();
+                                    button1 = new Button();
+                            
+                                    super();
+                            
+                                    this.getChildren().add(button0);
+                                    button0.setText(labelString);
+                                    button0.setPadding(insets);
+                                    this.getChildren().add(button1);
+                                    button1.setText(labelString);
+                                    button1.setPadding(insets);
+                                }
+                            
+                            }
+                            """);
+        }
+
+        @Test
         void handleFXMLObjectNodeCreatesObjectConstruction() {
             FXMLObjectNode objectNode = new FXMLObjectNode(
                     false,
@@ -741,6 +985,41 @@ class FXMLSourceCodeBuilderTest {
                     .build();
 
             assertThat(result).contains("myButton = new Button();");
+        }
+
+        @Test
+        void handleDuplicateObjectNodesOnlyCreatesOneInitializer() {
+            FXMLObjectNode objectNode1 = new FXMLObjectNode(
+                    false,
+                    "myButton",
+                    Button.class,
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+
+            FXMLObjectNode objectNode2 = new FXMLObjectNode(
+                    false,
+                    "myButton",
+                    Button.class,
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+
+            String result = builder
+                    .openClass("TestClass", null, null)
+                    .addField(new FXMLField(Button.class, "myButton", false, List.of()))
+                    .handleFXMLNode(objectNode1)
+                    .handleFXMLNode(objectNode2)
+                    .build();
+
+            int firstIndex = result.indexOf("myButton = new Button();");
+            int lastIndex = result.lastIndexOf("myButton = new Button();");
+
+            assertThat(firstIndex)
+                    .isGreaterThan(-1)
+                    .isEqualTo(lastIndex);
         }
 
         @Test
@@ -864,6 +1143,32 @@ class FXMLSourceCodeBuilderTest {
         }
 
         @Test
+        void handleFXMLNodeWithPartialConstructorPropertiesUsesMinimalConstructor() {
+            FXMLConstructorProperty property = new FXMLConstructorProperty(
+                    "text",
+                    "Hello",
+                    String.class
+            );
+
+            FXMLObjectNode objectNode = new FXMLObjectNode(
+                    false,
+                    "myControl",
+                    TestControlWithMultipleNamedArgs.class,
+                    List.of(property),
+                    List.of(),
+                    List.of()
+            );
+
+            String result = builder
+                    .openClass("TestClass", null, null)
+                    .addField(new FXMLField(TestControlWithMultipleNamedArgs.class, "myControl", false, List.of()))
+                    .handleFXMLNode(objectNode)
+                    .build();
+
+            assertThat(result).contains("myControl = new TestControlWithMultipleNamedArgs(\"Hello\", 0);");
+        }
+
+        @Test
         void handleFXMLNodeWithMissingConstructorPropertyThrowsIllegalStateException() {
             FXMLConstructorProperty property = new FXMLConstructorProperty(
                     "nonExistentProperty",
@@ -886,6 +1191,101 @@ class FXMLSourceCodeBuilderTest {
             assertThatThrownBy(() -> builder.handleFXMLNode(objectNode))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("No matching constructor found");
+        }
+
+        @Test
+        void handleFXMLConstantNodeCreatesFieldInitializerWithConstant() {
+            FXMLConstantNode constantNode = new FXMLConstantNode(
+                    Priority.class,
+                    "priorityValue",
+                    Priority.class
+            );
+
+            String result = builder
+                    .openClass("TestClass", null, null)
+                    .addField(new FXMLField(Priority.class, "priorityValue", false, List.of()))
+                    .handleFXMLNode(constantNode)
+                    .build();
+
+            assertThat(result).contains("protected final Priority priorityValue;");
+        }
+
+        @Test
+        void handleFXMLObjectNodeWithChildren() {
+            FXMLObjectNode childButton = new FXMLObjectNode(
+                    false,
+                    "childButton",
+                    Button.class,
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+
+            FXMLObjectNode parentHBox = new FXMLObjectNode(
+                    false,
+                    "parentBox",
+                    HBox.class,
+                    List.of(),
+                    List.of(childButton),
+                    List.of()
+            );
+
+            String result = builder
+                    .openClass("TestClass", null, null)
+                    .addField(new FXMLField(HBox.class, "parentBox", false, List.of()))
+                    .addField(new FXMLField(Button.class, "childButton", false, List.of()))
+                    .handleFXMLNode(parentHBox)
+                    .build();
+
+            assertThat(result)
+                    .contains("parentBox = new HBox();")
+                    .contains("childButton = new Button();")
+                    .contains("parentBox.getChildren().add(childButton);");
+        }
+
+        @Test
+        void handleFXMLObjectNodeWithNestedChildren() {
+            FXMLObjectNode innerButton = new FXMLObjectNode(
+                    false,
+                    "innerButton",
+                    Button.class,
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+
+            FXMLObjectNode middleBox = new FXMLObjectNode(
+                    false,
+                    "middleBox",
+                    HBox.class,
+                    List.of(),
+                    List.of(innerButton),
+                    List.of()
+            );
+
+            FXMLObjectNode outerBox = new FXMLObjectNode(
+                    false,
+                    "outerBox",
+                    HBox.class,
+                    List.of(),
+                    List.of(middleBox),
+                    List.of()
+            );
+
+            String result = builder
+                    .openClass("TestClass", null, null)
+                    .addField(new FXMLField(HBox.class, "outerBox", false, List.of()))
+                    .addField(new FXMLField(HBox.class, "middleBox", false, List.of()))
+                    .addField(new FXMLField(Button.class, "innerButton", false, List.of()))
+                    .handleFXMLNode(outerBox)
+                    .build();
+
+            assertThat(result)
+                    .contains("outerBox = new HBox();")
+                    .contains("middleBox = new HBox();")
+                    .contains("innerButton = new Button();")
+                    .contains("outerBox.getChildren().add(middleBox);")
+                    .contains("middleBox.getChildren().add(innerButton);");
         }
     }
 
@@ -977,7 +1377,7 @@ class FXMLSourceCodeBuilderTest {
         void buildIncludesFieldsAndConstructor() {
             String result = builder
                     .openClass("TestClass", null, null)
-                    .addField(new FXMLField(String.class,"myField", false,  List.of()))
+                    .addField(new FXMLField(String.class, "myField", false, List.of()))
                     .build();
 
             assertThat(result)
@@ -1086,30 +1486,6 @@ class FXMLSourceCodeBuilderTest {
         @Test
         void thisConstantHasCorrectValue() {
             assertThat(FXMLSourceCodeBuilder.THIS).isEqualTo("this");
-        }
-    }
-
-    // Test helper classes
-    public static class TestController {
-        public void handleClick() {
-        }
-
-        protected void handleProtected() {
-        }
-
-        private void handlePrivate() {
-        }
-
-        public String getValue() {
-            return "value";
-        }
-
-        public void process(String s, Integer i) {
-        }
-    }
-
-    public static class TestButtonWithNamedArg {
-        public TestButtonWithNamedArg(@NamedArg("text") String text) {
         }
     }
 }
