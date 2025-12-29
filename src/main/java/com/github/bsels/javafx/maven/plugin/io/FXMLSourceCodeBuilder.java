@@ -60,7 +60,7 @@ public class FXMLSourceCodeBuilder {
     public static final String THIS = "this";
 
     /// A constant representing the internal controller field name used within the system.
-    /// This identifier is typically utilized internally for system logic and should not be modified
+    /// This identifier is typically used internally for system logic and should not be modified
     /// or accessed directly outside the scope of its intended usage.
     private static final String INTERNAL_CONTROLLER_FIELD = "$internalController$";
     /// A constant string pattern used internally to represent the key for reflection-method-related fields.
@@ -228,12 +228,7 @@ public class FXMLSourceCodeBuilder {
     /// @throws NullPointerException if the passed method is null
     public FXMLSourceCodeBuilder addMethod(FXMLMethod method) throws NullPointerException {
         Objects.requireNonNull(method, "`method` must not be null");
-        Optional<ControllerMethod> matchingMethod;
-        if (controller == null) {
-            matchingMethod = Optional.empty();
-        } else {
-            matchingMethod = findMatchingMethod(method);
-        }
+        Optional<ControllerMethod> matchingMethod = findMatchingMethod(method);
         StringBuilder builder = new StringBuilder().append(indent("protected ", 1));
         if (matchingMethod.isEmpty()) {
             log.debug("Controller method not found for %s, creating an abstract method".formatted(method.name()));
@@ -443,7 +438,6 @@ public class FXMLSourceCodeBuilder {
                 }
                 fieldInitializers.add(addConstructorParameters(builder, clazz, properties).toString());
             }
-
             case FXMLObjectNode(_, String identifier, Class<?> clazz, List<FXMLProperty> properties, _, _)
                     when THIS.equals(identifier) ->
                     superLine = addConstructorParameters(new StringBuilder("super"), clazz, properties).toString();
@@ -629,7 +623,7 @@ public class FXMLSourceCodeBuilder {
     /// @param fxmlMethod The `FXMLMethod` providing additional metadata about the method such as return type.
     private void callMethod(StringBuilder builder, ControllerMethod method, FXMLMethod fxmlMethod) {
         log.debug("Constructing method call: %s".formatted(method.name()));
-        builder.append(" {");
+        builder.append(" {\n");
         boolean isVoid = void.class.equals(fxmlMethod.returnType());
         if (canCallControllerWithoutReflection(method.visibility())) {
             log.debug("Calling public method %s on %s".formatted(method.name(), controller.className()));
@@ -644,14 +638,18 @@ public class FXMLSourceCodeBuilder {
             String reflectionMethodName = getNewReflectionMethodName();
 
             fields.add("private final java.lang.reflect.Method %s;".formatted(reflectionMethodName));
+            StringBuilder declaredMethodBuilder = new StringBuilder()
+                    .append(reflectionMethodName)
+                    .append(" = ")
+                    .append(controller.className())
+                    .append(".class.getDeclaredMethod(\"")
+                    .append(method.name())
+                    .append("\"");
+            if (!method.parameterTypes().isEmpty()) {
+                declaredMethodBuilder.append(", ");
+            }
             reflectionMethodInitializers.add(handleSequenceOfArguments(
-                    new StringBuilder()
-                            .append(reflectionMethodName)
-                            .append(" = ")
-                            .append(controller.className())
-                            .append(".class.getDeclaredMethod(\"")
-                            .append(method.name())
-                            .append("\", "),
+                    declaredMethodBuilder,
                     method.parameterTypes(),
                     TypeEncoder::typeToReflectionClassString
             ).append(");").toString());
@@ -779,7 +777,6 @@ public class FXMLSourceCodeBuilder {
     private boolean isNewNonThisNode(Set<String> seenObjects, String identifier) {
         return !THIS.equals(identifier) && seenObjects.add(identifier);
     }
-
 
     /// Binds wrapping objects based on the provided type and FXML node.
     /// Processes different types of nodes and generates the appropriate bindings

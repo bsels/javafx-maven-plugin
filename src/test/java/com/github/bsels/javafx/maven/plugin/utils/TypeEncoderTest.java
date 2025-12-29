@@ -605,6 +605,112 @@ public class TypeEncoderTest {
         }
     }
 
+    @Nested
+    class TypeToClassTest {
+        @Test
+        public void testTypeToClassWithClassType() {
+            // Given
+            Type type = String.class;
+
+            // When
+            Class<?> result = TypeEncoder.typeToClass(type);
+
+            // Then
+            assertThat(result).isEqualTo(String.class);
+        }
+
+        @Test
+        public void testTypeToClassWithParameterizedType() {
+            // Given
+            ParameterizedType type = new ParameterizedType() {
+                @Override
+                public Type[] getActualTypeArguments() {
+                    return new Type[]{String.class};
+                }
+
+                @Override
+                public Type getRawType() {
+                    return List.class;
+                }
+
+                @Override
+                public Type getOwnerType() {
+                    return null;
+                }
+            };
+
+            // When
+            Class<?> result = TypeEncoder.typeToClass(type);
+
+            // Then
+            assertThat(result).isEqualTo(List.class);
+        }
+
+        @Test
+        public void testTypeToClassWithUnsupportedType() {
+            // Given
+            Type unsupportedType = new Type() {};
+
+            // When & Then
+            assertThatExceptionOfType(IllegalArgumentException.class)
+                    .isThrownBy(() -> TypeEncoder.typeToClass(unsupportedType))
+                    .withMessage("Unsupported type: " + unsupportedType);
+        }
+    }
+
+    @Nested
+    class TypeToReflectionClassStringTest {
+        @Test
+        public void testTypeToReflectionClassStringWithClassType() {
+            // Given
+            Type type = String.class;
+
+            // When
+            String result = TypeEncoder.typeToReflectionClassString(type);
+
+            // Then
+            assertThat(result).isEqualTo("java.lang.String.class");
+        }
+
+        @Test
+        public void testTypeToReflectionClassStringWithParameterizedType() {
+            // Given
+            ParameterizedType type = new ParameterizedType() {
+                @Override
+                public Type[] getActualTypeArguments() {
+                    return new Type[]{String.class};
+                }
+
+                @Override
+                public Type getRawType() {
+                    return List.class;
+                }
+
+                @Override
+                public Type getOwnerType() {
+                    return null;
+                }
+            };
+
+            // When
+            String result = TypeEncoder.typeToReflectionClassString(type);
+
+            // Then
+            assertThat(result).isEqualTo("java.util.List.class");
+        }
+
+        @Test
+        public void testTypeToReflectionClassStringWithUnsupportedType() {
+            // Given
+            Type unsupportedType = new Type() {};
+
+            // When & Then
+            assertThatExceptionOfType(IllegalArgumentException.class)
+                    .isThrownBy(() -> TypeEncoder.typeToReflectionClassString(unsupportedType))
+                    .withMessage("Unsupported type: " + unsupportedType);
+        }
+    }
+
     private static class DummyClass {
         public DummyClass(String s) {
         }

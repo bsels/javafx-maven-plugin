@@ -183,7 +183,7 @@ public class FXMLToSourceCodeMojoTest {
         }
 
         @Test
-        void handleTableViewValidSourceCode() {
+        void handleTableViewAsRootValidSourceCode() {
             // Given
             ZonedDateTime now = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
             try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
@@ -306,6 +306,138 @@ public class FXMLToSourceCodeMojoTest {
                                         nameColumn.setText("Name");
                                         ageColumn.setText("Age");
                                         this.getColumns().addAll(nameColumn, ageColumn);
+                                    }
+                                
+                                    protected abstract void edit(CellEditEvent<Student, String> param0);
+                                }
+                                """.formatted(now));
+            }
+        }
+
+        @Test
+        void handleTableViewAsNonRootValidSourceCode() {
+            // Given
+            ZonedDateTime now = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC))
+                        .thenReturn(now);
+
+                String tableViewFxml = """
+                         <?xml version="1.0" encoding="UTF-8"?>
+                        
+                         <?import javafx.scene.control.TableColumn?>
+                         <?import javafx.scene.control.TableView?>
+                        
+                         <TableView hgap="8.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
+                                  minHeight="-Infinity" minWidth="-Infinity" prefHeight="440.0" prefWidth="800.0"
+                                  xmlns="http://javafx.com/javafx/17.0.12" xmlns:fx="http://javafx.com/fxml/1">
+                            <!-- generic 0: test.module.Student -->
+                            <columns>
+                                <TableColumn fx:id="nameColumn" fx:prefWidth="100.0" text="Name" onEditCommit="#edit">
+                                    <!-- generic 0: test.module.Student -->
+                                    <!-- generic 1: java.lang.String -->
+                                </TableColumn>
+                                <TableColumn fx:id="ageColumn" fx:prefWidth="100.0" text="Age">
+                                    <!-- generic 1: test.data.String -->
+                                    <!-- generic 0: test.module.Student -->
+                                </TableColumn>
+                            </columns>
+                        </TableView>
+                        """.strip();
+
+                Path fxmlFile = classUnderTest.fxmlDirectory.resolve("MyTableView.fxml");
+                filesMockedStatic.when(() -> Files.walk(Mockito.any()))
+                        .thenReturn(Stream.of(fxmlFile));
+                filesMockedStatic.when(() -> Files.isRegularFile(fxmlFile))
+                        .thenReturn(true);
+                filesMockedStatic.when(() -> Files.lines(Mockito.any(), Mockito.any()))
+                        .thenReturn(tableViewFxml.lines());
+                filesMockedStatic.when(() -> Files.newInputStream(Mockito.any()))
+                        .thenReturn(new ByteArrayInputStream(tableViewFxml.getBytes(StandardCharsets.UTF_8)));
+
+                FXMLParameterized fxmlParameterized = new FXMLParameterized("MyTableView");
+                fxmlParameterized.setInterfaces(List.of(
+                        new InterfacesWithMethod(),
+                        new InterfacesWithMethod(
+                                "java.util.functional.Consumer",
+                                List.of("java.lang.Integer"),
+                                Set.of("accept", "andThen")
+                        )
+                ));
+                assertThat(fxmlParameterized.toString())
+                        .satisfiesAnyOf(
+                                toString -> assertThat(toString)
+                                        .isEqualTo("""
+                                                FXMLParameterized[className='MyTableView', \
+                                                interfaces=[InterfacesWithMethod[interfaceName='null', generics=null, \
+                                                methodNames=null], \
+                                                InterfacesWithMethod[interfaceName='java.util.functional.Consumer', \
+                                                generics=[java.lang.Integer], methodNames=[accept, andThen]]]]\
+                                                """),
+                                toString -> assertThat(toString)
+                                        .isEqualTo("""
+                                                FXMLParameterized[className='MyTableView', \
+                                                interfaces=[InterfacesWithMethod[interfaceName='null', generics=null, \
+                                                methodNames=null], \
+                                                InterfacesWithMethod[interfaceName='java.util.functional.Consumer', \
+                                                generics=[java.lang.Integer], methodNames=[andThen, accept]]]]\
+                                                """)
+                        );
+                classUnderTest.fxmlParameterizations = List.of(fxmlParameterized);
+
+                // When
+                assertThatNoException()
+                        .isThrownBy(classUnderTest::execute);
+
+                // Then
+                ArgumentCaptor<String> sourceCodeCaptor = ArgumentCaptor.forClass(String.class);
+
+                filesMockedStatic.verify(() -> Files.writeString(
+                        Mockito.any(), sourceCodeCaptor.capture(), Mockito.eq(StandardCharsets.UTF_8)
+                ), Mockito.times(1));
+
+                assertThat(sourceCodeCaptor.getValue())
+                        .isEqualToIgnoringNewLines("""
+                                package test.package.generated;
+                                
+                                import java.lang.Integer;
+                                import java.lang.String;
+                                import java.util.ResourceBundle;
+                                import java.util.functional.Consumer;
+                                import javafx.event.EventHandler;
+                                import javafx.scene.control.TableColumn.CellEditEvent;
+                                import javafx.scene.control.TableColumn;
+                                import javafx.scene.control.TableView;
+                                import javax.annotation.processing.Generated;
+                                import test.module.Student;
+                                
+                                
+                                @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
+                                public abstract class MyTableView
+                                        implements Consumer<Integer> {
+                                    private static final ResourceBundle RESOURCE_BUNDLE = test.project.MyClass.RESOURCE_BUNDLE;
+                                
+                                    private final TableView<Student> $internalVariable$000;
+                                    protected final TableColumn<Student, test.data.String> ageColumn;
+                                    protected final TableColumn<Student, String> nameColumn;
+                                
+                                    protected MyTableView() {
+                                        nameColumn = new TableColumn<>();
+                                        ageColumn = new TableColumn<>();
+                                        $internalVariable$000 = new TableView<>();
+                                
+                                        super();
+                                
+                                        $internalVariable$000.setMaxHeight(1.7976931348623157E308);
+                                        $internalVariable$000.setMaxWidth(1.7976931348623157E308);
+                                        $internalVariable$000.setMinHeight(Double.NEGATIVE_INFINITY);
+                                        $internalVariable$000.setMinWidth(Double.NEGATIVE_INFINITY);
+                                        $internalVariable$000.setPrefHeight(440.0);
+                                        $internalVariable$000.setPrefWidth(800.0);
+                                        nameColumn.setOnEditCommit(this::edit);
+                                        nameColumn.setText("Name");
+                                        ageColumn.setText("Age");
+                                        $internalVariable$000.getColumns().addAll(nameColumn, ageColumn);
                                     }
                                 
                                     protected abstract void edit(CellEditEvent<Student, String> param0);
