@@ -32,11 +32,13 @@ import org.mockito.Mockito;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.in;
 
 class FXMLSourceCodeBuilderTest {
     private Log mockLog;
@@ -74,6 +76,12 @@ class FXMLSourceCodeBuilderTest {
         }
 
         public void handleAction(ActionEvent event) {
+        }
+
+        private void handleActionReflectiveAccess(ActionEvent event) {
+        }
+
+        public void handleActionNoArgs() {
         }
     }
 
@@ -541,6 +549,77 @@ class FXMLSourceCodeBuilderTest {
         }
 
         @Test
+        void addMethodWithControllerMethodAcceptingEventParameterReflection() {
+            FXMLController fxmlController = new FXMLController(
+                    TestController.class.getSimpleName(),
+                    TestController.class,
+                    List.of(),
+                    List.of(new ControllerMethod(
+                            Visibility.PRIVATE,
+                            "handleActionReflectiveAccess",
+                            void.class,
+                            List.of(ActionEvent.class)
+                    ))
+            );
+
+            FXMLMethod method = new FXMLMethod(
+                    "handleActionReflectiveAccess",
+                    List.of(ActionEvent.class),
+                    void.class,
+                    Map.of()
+            );
+
+            String result = builder
+                    .setPackage("com.example")
+                    .openClass("TestClass", null, null)
+                    .setFXMLController(fxmlController)
+                    .addMethod(method)
+                    .build();
+
+            assertThat(result)
+                    .contains("private final java.lang.reflect.Method $reflectionMethod$0;")
+                    .contains("// Initialize reflection-based method handlers")
+                    .contains("$reflectionMethod$0 = TestController.class.getDeclaredMethod(\"handleActionReflectiveAccess\", javafx.event.ActionEvent.class);")
+                    .contains("$reflectionMethod$0.setAccessible(true);")
+                    .contains("try {")
+                    .contains("} catch (Throwable e) {")
+                    .contains("$reflectionMethod$0.invoke($internalController$, param0);");
+        }
+
+        @Test
+        void addMethodWithControllerWithEventParameterButNotPassed() {
+            FXMLController fxmlController = new FXMLController(
+                    TestController.class.getSimpleName(),
+                    TestController.class,
+                    List.of(),
+                    List.of(new ControllerMethod(
+                            Visibility.PUBLIC,
+                            "handleActionNoArgs",
+                            void.class,
+                            List.of()
+                    ))
+            );
+
+            FXMLMethod method = new FXMLMethod(
+                    "handleActionNoArgs",
+                    List.of(ActionEvent.class),
+                    void.class,
+                    Map.of()
+            );
+
+            String result = builder
+                    .setPackage("com.example")
+                    .openClass("TestClass", null, null)
+                    .setFXMLController(fxmlController)
+                    .addMethod(method)
+                    .build();
+
+            assertThat(result)
+                    .contains("protected void handleActionNoArgs(ActionEvent param0) {")
+                    .contains("$internalController$.handleActionNoArgs();");
+        }
+
+        @Test
         void addMethodWithIncompatibleReturnTypeCreatesAbstractMethod() {
             FXMLController fxmlController = new FXMLController(
                     TestController.class.getSimpleName(),
@@ -743,10 +822,11 @@ class FXMLSourceCodeBuilderTest {
 
         @Test
         void openClassWithInterfacesCreatesAbstractClass() {
-            Map<String, List<String>> interfaces = Map.of(
+            Map<String, List<String>> interfaces = new HashMap<>(Map.of(
                     "Runnable", List.of(),
                     "Comparable", List.of("String")
-            );
+            ));
+            interfaces.put("AutoCloseable", null);
 
             String result = builder
                     .openClass("TestClass", null, interfaces)
@@ -754,7 +834,10 @@ class FXMLSourceCodeBuilderTest {
 
             assertThat(result)
                     .contains("public abstract class TestClass")
-                    .contains("implements");
+                    .contains("implements")
+                    .contains("Runnable")
+                    .contains("AutoCloseable")
+                    .contains("Comparable<String>");
         }
 
         @Test

@@ -632,7 +632,7 @@ public class FXMLSourceCodeBuilder {
                     .append(".")
                     .append(method.name())
                     .append("(");
-            handlerParameterSequence(builder, method).append(");");
+            handlerParameterSequence(builder, method).append(");\n");
         } else {
             log.debug("Calling non-public method %s on %s using reflection".formatted(method.name(), controller.className()));
             String reflectionMethodName = getNewReflectionMethodName();
@@ -657,7 +657,8 @@ public class FXMLSourceCodeBuilder {
 
             builder.append(indent("try {\n", 2));
             addReturnIfNeeded(builder, isVoid, 3)
-                    .append("declaredMethod.invoke(%s, ".formatted(INTERNAL_CONTROLLER_FIELD));
+                    .append(reflectionMethodName)
+                    .append(".invoke(%s, ".formatted(INTERNAL_CONTROLLER_FIELD));
             handlerParameterSequence(builder, method)
                     .append(");\n")
                     .append(indent("} catch (Throwable e) {\n", 2))
