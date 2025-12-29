@@ -271,20 +271,20 @@ public class FXMLToSourceCodeMojoTest {
                                 
                                 import java.lang.Integer;
                                 import java.lang.String;
+                                import java.util.ResourceBundle;
                                 import java.util.functional.Consumer;
                                 import javafx.event.EventHandler;
-                                import javafx.scene.control.TableColumn;
                                 import javafx.scene.control.TableColumn.CellEditEvent;
+                                import javafx.scene.control.TableColumn;
                                 import javafx.scene.control.TableView;
-                                import test.module.Student;
-                                import java.util.ResourceBundle;
                                 import javax.annotation.processing.Generated;
+                                import test.module.Student;
                                 
                                 
                                 @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
                                 public abstract class MyTableView
-                                    extends TableView<Student>
-                                    implements Consumer<Integer> {
+                                        extends TableView<Student>
+                                        implements Consumer<Integer> {
                                     private static final ResourceBundle RESOURCE_BUNDLE = test.project.MyClass.RESOURCE_BUNDLE;
                                 
                                     protected final TableColumn<Student, test.data.String> ageColumn;
@@ -395,19 +395,19 @@ public class FXMLToSourceCodeMojoTest {
                                 package test.package.generated;
                                 
                                 import java.lang.Integer;
+                                import java.util.ResourceBundle;
                                 import java.util.functional.Consumer;
                                 import javafx.event.EventHandler;
-                                import javafx.scene.control.TableColumn;
                                 import javafx.scene.control.TableColumn.CellEditEvent;
+                                import javafx.scene.control.TableColumn;
                                 import javafx.scene.control.TableView;
-                                import java.util.ResourceBundle;
                                 import javax.annotation.processing.Generated;
                                 
                                 
                                 @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
                                 public abstract class MyTableView
-                                    extends TableView
-                                    implements Consumer<Integer> {
+                                        extends TableView
+                                        implements Consumer<Integer> {
                                     private static final ResourceBundle RESOURCE_BUNDLE = test.project.MyClass.RESOURCE_BUNDLE;
                                 
                                     protected final TableColumn ageColumn;
@@ -571,12 +571,12 @@ public class FXMLToSourceCodeMojoTest {
                                 
                                 
                                 @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-01-01T00:00Z")
-                                public abstract class TestClass {
+                                public class TestClass {
                                     private static final ResourceBundle RESOURCE_BUNDLE = test.project.MyClass.RESOURCE_BUNDLE;
                                 
                                     private final String $internalVariable$000;
                                 
-                                    protected TestClass() {
+                                    public TestClass() {
                                         $internalVariable$000 = "Hello";
                                 
                                         super();
@@ -819,15 +819,15 @@ public class FXMLToSourceCodeMojoTest {
                         .isEqualToIgnoringNewLines("""
                                 package test.package.generated;
                                 
+                                import java.util.ResourceBundle;
                                 import javafx.scene.layout.BorderPane;
                                 import javafx.test.MyButton;
-                                import java.util.ResourceBundle;
                                 import javax.annotation.processing.Generated;
                                 
                                 
                                 @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-01-01T00:00Z")
                                 public abstract class TestClass
-                                    extends BorderPane {
+                                        extends BorderPane {
                                     private static final ResourceBundle RESOURCE_BUNDLE = test.project.MyClass.RESOURCE_BUNDLE;
                                 
                                     protected final MyButton button;

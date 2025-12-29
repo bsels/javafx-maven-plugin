@@ -25,8 +25,7 @@ public record CheckAndCast<I, O>(Class<O> clazz) implements Gatherer<I, Void, O>
     ///
     /// @param <I>   the input type that will be checked and potentially cast
     /// @param <O>   the target type to which elements will be cast if they match
-    /// @param clazz the `Class` object representing the target type to cast elements to;
-    ///                                        must not be `null`
+    /// @param clazz the `Class` object representing the target type to cast elements to; must not be `null`
     /// @return a new `CheckAndCast` instance that checks and casts elements to the specified target class
     /// @throws NullPointerException if `clazz` is `null`
     public static <I, O> CheckAndCast<I, O> of(Class<O> clazz) {

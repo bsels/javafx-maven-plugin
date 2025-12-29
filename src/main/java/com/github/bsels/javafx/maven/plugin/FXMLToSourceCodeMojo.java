@@ -8,7 +8,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.ProcessedFXML;
 import com.github.bsels.javafx.maven.plugin.in.memory.compiler.OptimisticInMemoryCompiler;
 import com.github.bsels.javafx.maven.plugin.io.FXMLReader;
 import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
-import com.github.bsels.javafx.maven.plugin.io.SourceCodeBuilder;
+import com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder;
 import com.github.bsels.javafx.maven.plugin.parameters.FXMLParameterized;
 import com.github.bsels.javafx.maven.plugin.parameters.InterfacesWithMethod;
 import com.github.bsels.javafx.maven.plugin.utils.FXMLProcessor;
@@ -400,7 +400,7 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     private String convertFXMLToSourceCode(ProcessedFXML processedFXML, FXMLParameterized fxmlParameterized) {
         getLog().info("Generating FXML source code for %s".formatted(processedFXML.className()));
 
-        SourceCodeBuilder sourceCodeBuilder = new SourceCodeBuilder(getLog())
+        FXMLSourceCodeBuilder sourceCodeBuilder = new FXMLSourceCodeBuilder(getLog())
                 .setPackage(packageName);
         Set<String> imports = new HashSet<>(processedFXML.imports());
         Map<String, List<String>> interfacesMap = Optional.ofNullable(fxmlParameterized.getInterfaces())
@@ -433,10 +433,10 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
 
         if (processedFXML.root() instanceof FXMLObjectNode(
                 _, String identifier, Class<?> rootClass, _, _, List<String> generics
-        ) && SourceCodeBuilder.THIS.equals(identifier)) {
+        ) && FXMLSourceCodeBuilder.THIS.equals(identifier)) {
             sourceCodeBuilder.openClass(
                     processedFXML.className(),
-                    new SourceCodeBuilder.ParentClass(rootClass.getSimpleName(), generics),
+                    new FXMLSourceCodeBuilder.ParentClass(rootClass.getSimpleName(), generics),
                     interfacesMap
             );
         } else {
@@ -446,9 +446,9 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         // Add fields
         processedFXML.fields()
                 .stream()
-                .filter(field -> !SourceCodeBuilder.THIS.equals(field.name()))
+                .filter(field -> !FXMLSourceCodeBuilder.THIS.equals(field.name()))
                 .sorted(Comparator.comparing(FXMLField::name))
-                .reduce(sourceCodeBuilder, SourceCodeBuilder::addField, Utils.getFirstLambda())
+                .reduce(sourceCodeBuilder, FXMLSourceCodeBuilder::addField, Utils.getFirstLambda())
                 // Process node
                 .handleFXMLNode(processedFXML.root());
 
@@ -458,7 +458,7 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
                 .stream()
                 .filter(method -> !interfaceMethods.contains(method.name()))
                 .sorted(Comparator.comparing(FXMLMethod::name))
-                .reduce(sourceCodeBuilder, SourceCodeBuilder::addMethod, Utils.getFirstLambda())
+                .reduce(sourceCodeBuilder, FXMLSourceCodeBuilder::addMethod, Utils.getFirstLambda())
                 // Create a string representation of the class
                 .build();
     }
