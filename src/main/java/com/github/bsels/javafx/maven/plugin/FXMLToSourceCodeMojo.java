@@ -453,7 +453,6 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
                 .handleFXMLNode(processedFXML.root());
 
         // Add methods
-        // TODO: Check interface methods in FXML controller
         return processedFXML.methods()
                 .stream()
                 .filter(method -> !interfaceMethods.contains(method.name()))

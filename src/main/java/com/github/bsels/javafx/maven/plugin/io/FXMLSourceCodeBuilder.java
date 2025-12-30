@@ -53,7 +53,7 @@ import static com.github.bsels.javafx.maven.plugin.utils.TypeEncoder.encodeTypeV
 /// and resource bundles in a structured manner.
 /// This class is designed to manage the generation of Java code, ensuring correctness in structure and syntax.
 /// It supports method chaining for a more streamlined API.
-public class FXMLSourceCodeBuilder {
+public final class FXMLSourceCodeBuilder {
     /// A constant string representing the literal value "this".
     /// This variable is typically used as a fixed identifier or marker and is declared as public, static,
     /// and final to ensure its value remains constant throughout the application.
