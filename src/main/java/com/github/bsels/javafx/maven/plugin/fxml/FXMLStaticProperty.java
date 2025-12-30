@@ -14,6 +14,12 @@ import java.util.Objects;
 /// lifecycle.
 ///
 /// Validations ensure all provided values are non-null.
+///
+/// @param name the name of the static property; must not be null
+/// @param staticClass the class containing the static property definition; must not be null
+/// @param staticSetter the name of the setter method for the static property; must not be null
+/// @param type the type of the static property; must not be null
+/// @param value the value of the static property; must not be null
 public record FXMLStaticProperty(String name, Class<?> staticClass, String staticSetter, Type type, String value)
         implements FXMLProperty {
 

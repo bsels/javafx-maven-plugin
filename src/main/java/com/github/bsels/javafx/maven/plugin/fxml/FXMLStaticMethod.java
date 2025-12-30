@@ -11,6 +11,10 @@ import java.util.Objects;
 ///
 /// This record serves as both an FXMLNode and an FXMLParentNode, allowing it to
 /// encapsulate child nodes and participate in a tree structure typical in FXML representations.
+///
+/// @param clazz the class associated with the static method; must not be null
+/// @param method the name of the static method; must not be null
+/// @param children the list of child nodes under this static method; must not be null
 public record FXMLStaticMethod(
         Class<?> clazz, String method, List<FXMLNode> children
 ) implements FXMLNode, FXMLParentNode {

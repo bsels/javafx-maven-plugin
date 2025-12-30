@@ -1,16 +1,16 @@
 package com.github.bsels.javafx.maven.plugin;
 
-import com.github.bsels.javafx.maven.plugin.fxml.ProcessedFXML;
-import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
-import com.github.bsels.javafx.maven.plugin.parameters.FXMLParameterized;
-import com.github.bsels.javafx.maven.plugin.parameters.InterfacesWithMethod;
-import com.github.bsels.javafx.maven.plugin.utils.ObjectMapperProvider;
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.github.bsels.javafx.maven.plugin.fxml.ProcessedFXML;
+import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
+import com.github.bsels.javafx.maven.plugin.parameters.FXMLParameterized;
+import com.github.bsels.javafx.maven.plugin.parameters.InterfacesWithMethod;
+import com.github.bsels.javafx.maven.plugin.utils.ObjectMapperProvider;
 import javafx.scene.control.TableColumn;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -31,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.OpenOption;
@@ -56,12 +57,13 @@ public class FXMLToSourceCodeMojoTest {
     MavenProject mockProject;
 
     private MockedStatic<Files> filesMockedStatic;
-
     private FXMLToSourceCodeMojo classUnderTest;
+    private Path rootTestFolderPath;
+    private Path myButtonJavaPath;
 
     @BeforeEach
-    void setUp() {
-        filesMockedStatic = Mockito.mockStatic(Files.class);
+    void setUp() throws URISyntaxException {
+        filesMockedStatic = Mockito.mockStatic(Files.class, Mockito.CALLS_REAL_METHODS);
 
         classUnderTest = new FXMLToSourceCodeMojo();
         classUnderTest.resourceBundleObject = TEST_PROJECT_MY_CLASS_RESOURCE_BUNDLE;
@@ -71,8 +73,14 @@ public class FXMLToSourceCodeMojoTest {
         classUnderTest.debugInternalModel = false;
         classUnderTest.fxmlParameterizations = null;
         classUnderTest.project = mockProject;
-
-        System.setProperty("java.home", "/usr/lib/jvm/java-17-openjdk-amd64");
+        myButtonJavaPath = Path.of(
+                Thread.currentThread()
+                        .getContextClassLoader()
+                        .getResource("test-source/javafx/test/MyButton.java")
+                        .toURI()
+        );
+        rootTestFolderPath = myButtonJavaPath.getParent().getParent().getParent()
+                .toAbsolutePath();
     }
 
     @AfterEach
@@ -148,6 +156,10 @@ public class FXMLToSourceCodeMojoTest {
         @NullAndEmptySource
         @ValueSource(strings = TEST_PACKAGE_GENERATED)
         void creatingOutputDirectoryFailedThrowMojoExecutionException(String packageName) {
+            // Custom settings
+            filesMockedStatic.close();
+            filesMockedStatic = Mockito.mockStatic(Files.class);
+
             // Given
             classUnderTest.packageName = packageName;
             filesMockedStatic.when(() -> Files.createDirectories(Mockito.any()))
@@ -159,7 +171,7 @@ public class FXMLToSourceCodeMojoTest {
                     .hasRootCauseInstanceOf(IOException.class);
 
             final Path generatedSourceDirectory;
-            if (packageName != null && packageName.length() > 0) {
+            if (packageName != null && !packageName.isEmpty()) {
                 generatedSourceDirectory = classUnderTest.generatedSourceDirectory.resolve(packageName.replace('.', '/'));
             } else {
                 generatedSourceDirectory = classUnderTest.generatedSourceDirectory;
@@ -171,7 +183,7 @@ public class FXMLToSourceCodeMojoTest {
         }
 
         @Test
-        void handleTableViewValidSourceCode() {
+        void handleTableViewAsRootValidSourceCode() {
             // Given
             ZonedDateTime now = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
             try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
@@ -259,20 +271,20 @@ public class FXMLToSourceCodeMojoTest {
                                 
                                 import java.lang.Integer;
                                 import java.lang.String;
+                                import java.util.ResourceBundle;
                                 import java.util.functional.Consumer;
                                 import javafx.event.EventHandler;
-                                import javafx.scene.control.TableColumn;
                                 import javafx.scene.control.TableColumn.CellEditEvent;
+                                import javafx.scene.control.TableColumn;
                                 import javafx.scene.control.TableView;
-                                import test.module.Student;
-                                import java.util.ResourceBundle;
                                 import javax.annotation.processing.Generated;
+                                import test.module.Student;
                                 
                                 
                                 @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
                                 public abstract class MyTableView
-                                    extends TableView<Student>
-                                    implements Consumer<Integer> {
+                                        extends TableView<Student>
+                                        implements Consumer<Integer> {
                                     private static final ResourceBundle RESOURCE_BUNDLE = test.project.MyClass.RESOURCE_BUNDLE;
                                 
                                     protected final TableColumn<Student, test.data.String> ageColumn;
@@ -294,6 +306,138 @@ public class FXMLToSourceCodeMojoTest {
                                         nameColumn.setText("Name");
                                         ageColumn.setText("Age");
                                         this.getColumns().addAll(nameColumn, ageColumn);
+                                    }
+                                
+                                    protected abstract void edit(CellEditEvent<Student, String> param0);
+                                }
+                                """.formatted(now));
+            }
+        }
+
+        @Test
+        void handleTableViewAsNonRootValidSourceCode() {
+            // Given
+            ZonedDateTime now = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC))
+                        .thenReturn(now);
+
+                String tableViewFxml = """
+                         <?xml version="1.0" encoding="UTF-8"?>
+                        
+                         <?import javafx.scene.control.TableColumn?>
+                         <?import javafx.scene.control.TableView?>
+                        
+                         <TableView hgap="8.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
+                                  minHeight="-Infinity" minWidth="-Infinity" prefHeight="440.0" prefWidth="800.0"
+                                  xmlns="http://javafx.com/javafx/17.0.12" xmlns:fx="http://javafx.com/fxml/1">
+                            <!-- generic 0: test.module.Student -->
+                            <columns>
+                                <TableColumn fx:id="nameColumn" fx:prefWidth="100.0" text="Name" onEditCommit="#edit">
+                                    <!-- generic 0: test.module.Student -->
+                                    <!-- generic 1: java.lang.String -->
+                                </TableColumn>
+                                <TableColumn fx:id="ageColumn" fx:prefWidth="100.0" text="Age">
+                                    <!-- generic 1: test.data.String -->
+                                    <!-- generic 0: test.module.Student -->
+                                </TableColumn>
+                            </columns>
+                        </TableView>
+                        """.strip();
+
+                Path fxmlFile = classUnderTest.fxmlDirectory.resolve("MyTableView.fxml");
+                filesMockedStatic.when(() -> Files.walk(Mockito.any()))
+                        .thenReturn(Stream.of(fxmlFile));
+                filesMockedStatic.when(() -> Files.isRegularFile(fxmlFile))
+                        .thenReturn(true);
+                filesMockedStatic.when(() -> Files.lines(Mockito.any(), Mockito.any()))
+                        .thenReturn(tableViewFxml.lines());
+                filesMockedStatic.when(() -> Files.newInputStream(Mockito.any()))
+                        .thenReturn(new ByteArrayInputStream(tableViewFxml.getBytes(StandardCharsets.UTF_8)));
+
+                FXMLParameterized fxmlParameterized = new FXMLParameterized("MyTableView");
+                fxmlParameterized.setInterfaces(List.of(
+                        new InterfacesWithMethod(),
+                        new InterfacesWithMethod(
+                                "java.util.functional.Consumer",
+                                List.of("java.lang.Integer"),
+                                Set.of("accept", "andThen")
+                        )
+                ));
+                assertThat(fxmlParameterized.toString())
+                        .satisfiesAnyOf(
+                                toString -> assertThat(toString)
+                                        .isEqualTo("""
+                                                FXMLParameterized[className='MyTableView', \
+                                                interfaces=[InterfacesWithMethod[interfaceName='null', generics=null, \
+                                                methodNames=null], \
+                                                InterfacesWithMethod[interfaceName='java.util.functional.Consumer', \
+                                                generics=[java.lang.Integer], methodNames=[accept, andThen]]]]\
+                                                """),
+                                toString -> assertThat(toString)
+                                        .isEqualTo("""
+                                                FXMLParameterized[className='MyTableView', \
+                                                interfaces=[InterfacesWithMethod[interfaceName='null', generics=null, \
+                                                methodNames=null], \
+                                                InterfacesWithMethod[interfaceName='java.util.functional.Consumer', \
+                                                generics=[java.lang.Integer], methodNames=[andThen, accept]]]]\
+                                                """)
+                        );
+                classUnderTest.fxmlParameterizations = List.of(fxmlParameterized);
+
+                // When
+                assertThatNoException()
+                        .isThrownBy(classUnderTest::execute);
+
+                // Then
+                ArgumentCaptor<String> sourceCodeCaptor = ArgumentCaptor.forClass(String.class);
+
+                filesMockedStatic.verify(() -> Files.writeString(
+                        Mockito.any(), sourceCodeCaptor.capture(), Mockito.eq(StandardCharsets.UTF_8)
+                ), Mockito.times(1));
+
+                assertThat(sourceCodeCaptor.getValue())
+                        .isEqualToIgnoringNewLines("""
+                                package test.package.generated;
+                                
+                                import java.lang.Integer;
+                                import java.lang.String;
+                                import java.util.ResourceBundle;
+                                import java.util.functional.Consumer;
+                                import javafx.event.EventHandler;
+                                import javafx.scene.control.TableColumn.CellEditEvent;
+                                import javafx.scene.control.TableColumn;
+                                import javafx.scene.control.TableView;
+                                import javax.annotation.processing.Generated;
+                                import test.module.Student;
+                                
+                                
+                                @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
+                                public abstract class MyTableView
+                                        implements Consumer<Integer> {
+                                    private static final ResourceBundle RESOURCE_BUNDLE = test.project.MyClass.RESOURCE_BUNDLE;
+                                
+                                    private final TableView<Student> $internalVariable$000;
+                                    protected final TableColumn<Student, test.data.String> ageColumn;
+                                    protected final TableColumn<Student, String> nameColumn;
+                                
+                                    protected MyTableView() {
+                                        nameColumn = new TableColumn<>();
+                                        ageColumn = new TableColumn<>();
+                                        $internalVariable$000 = new TableView<>();
+                                
+                                        super();
+                                
+                                        $internalVariable$000.setMaxHeight(1.7976931348623157E308);
+                                        $internalVariable$000.setMaxWidth(1.7976931348623157E308);
+                                        $internalVariable$000.setMinHeight(Double.NEGATIVE_INFINITY);
+                                        $internalVariable$000.setMinWidth(Double.NEGATIVE_INFINITY);
+                                        $internalVariable$000.setPrefHeight(440.0);
+                                        $internalVariable$000.setPrefWidth(800.0);
+                                        nameColumn.setOnEditCommit(this::edit);
+                                        nameColumn.setText("Name");
+                                        ageColumn.setText("Age");
+                                        $internalVariable$000.getColumns().addAll(nameColumn, ageColumn);
                                     }
                                 
                                     protected abstract void edit(CellEditEvent<Student, String> param0);
@@ -383,19 +527,19 @@ public class FXMLToSourceCodeMojoTest {
                                 package test.package.generated;
                                 
                                 import java.lang.Integer;
+                                import java.util.ResourceBundle;
                                 import java.util.functional.Consumer;
                                 import javafx.event.EventHandler;
-                                import javafx.scene.control.TableColumn;
                                 import javafx.scene.control.TableColumn.CellEditEvent;
+                                import javafx.scene.control.TableColumn;
                                 import javafx.scene.control.TableView;
-                                import java.util.ResourceBundle;
                                 import javax.annotation.processing.Generated;
                                 
                                 
                                 @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
                                 public abstract class MyTableView
-                                    extends TableView
-                                    implements Consumer<Integer> {
+                                        extends TableView
+                                        implements Consumer<Integer> {
                                     private static final ResourceBundle RESOURCE_BUNDLE = test.project.MyClass.RESOURCE_BUNDLE;
                                 
                                     protected final TableColumn ageColumn;
@@ -755,6 +899,82 @@ public class FXMLToSourceCodeMojoTest {
             // When, Then
             assertThatNoException()
                     .isThrownBy(classUnderTest::execute);
+        }
+
+        @Test
+        void includeSourceCodeInClassDiscovery() {
+            // Given
+            classUnderTest.includeSourceFilesInClassDiscovery = true;
+            Mockito.when(mockProject.getCompileSourceRoots())
+                    .thenReturn(List.of(rootTestFolderPath.toString()));
+
+            ZonedDateTime now = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC))
+                        .thenReturn(now);
+
+                String fxml = """
+                        <?xml version="1.0" encoding="UTF-8"?>
+                        <?import javafx.test.MyButton?>
+                        <?import javafx.scene.layout.BorderPane?>
+                        <fx:root type="BorderPane" xmlns="http://javafx.com/javafx/11.0.1"
+                                 xmlns:fx="http://javafx.com/fxml/1">
+                            <center>
+                                <MyButton fx:id="button" text="Hello" />
+                            </center>
+                        </fx:root>
+                        """.strip();
+
+                Path fxmlFile = classUnderTest.fxmlDirectory.resolve("TestClass.fxml");
+                filesMockedStatic.when(() -> Files.walk(classUnderTest.fxmlDirectory))
+                        .thenReturn(Stream.of(fxmlFile));
+                filesMockedStatic.when(() -> Files.isRegularFile(fxmlFile))
+                        .thenReturn(true);
+                filesMockedStatic.when(() -> Files.lines(Mockito.eq(fxmlFile), Mockito.any()))
+                        .thenReturn(fxml.lines());
+                filesMockedStatic.when(() -> Files.newInputStream(fxmlFile))
+                        .thenReturn(new ByteArrayInputStream(fxml.getBytes(StandardCharsets.UTF_8)));
+                classUnderTest.debugInternalModel = true;
+
+                // When
+                assertThatNoException()
+                        .isThrownBy(classUnderTest::execute);
+
+                // Then
+                ArgumentCaptor<String> sourceCodeCaptor = ArgumentCaptor.forClass(String.class);
+
+                filesMockedStatic.verify(() -> Files.writeString(
+                        Mockito.any(), sourceCodeCaptor.capture(), Mockito.eq(StandardCharsets.UTF_8)
+                ), Mockito.times(1));
+
+                assertThat(sourceCodeCaptor.getValue())
+                        .isEqualToIgnoringNewLines("""
+                                package test.package.generated;
+                                
+                                import java.util.ResourceBundle;
+                                import javafx.scene.layout.BorderPane;
+                                import javafx.test.MyButton;
+                                import javax.annotation.processing.Generated;
+                                
+                                
+                                @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-01-01T00:00Z")
+                                public class TestClass
+                                        extends BorderPane {
+                                    private static final ResourceBundle RESOURCE_BUNDLE = test.project.MyClass.RESOURCE_BUNDLE;
+                                
+                                    protected final MyButton button;
+                                
+                                    public TestClass() {
+                                        button = new MyButton();
+                                
+                                        super();
+                                
+                                        button.setText("Hello");
+                                        this.setCenter(button);
+                                    }
+                                }
+                                """);
+            }
         }
     }
 }

@@ -3,6 +3,7 @@ package com.github.bsels.javafx.maven.plugin.utils;
 import com.github.bsels.javafx.maven.plugin.CheckAndCast;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLConstantNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLConstructorProperty;
+import com.github.bsels.javafx.maven.plugin.fxml.FXMLController;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLField;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLNode;
@@ -15,6 +16,9 @@ import com.github.bsels.javafx.maven.plugin.fxml.FXMLStaticProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLValueNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLWrapperNode;
 import com.github.bsels.javafx.maven.plugin.fxml.ProcessedFXML;
+import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField;
+import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerMethod;
+import com.github.bsels.javafx.maven.plugin.fxml.introspect.Visibility;
 import com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder;
 import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import com.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
@@ -24,6 +28,7 @@ import javafx.scene.layout.ConstraintsBase;
 import org.apache.maven.plugin.logging.Log;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
@@ -42,6 +47,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiPredicate;
+import java.util.function.Function;
+import java.util.function.IntPredicate;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
@@ -65,6 +72,8 @@ import java.util.stream.Stream;
 /// - This class operates on parsed FXML structures defined by models such as [ParsedFXML] and [FXMLNode].
 /// - Private methods encapsulate the logic for handling node conversion, optimization, property extraction,
 ///   and static property resolution.
+///
+/// @param log the logging system used for internal diagnostic and process logging. Must not be null.
 public record FXMLProcessor(Log log) {
     /// A compiled regular expression pattern used to match and capture generic type definitions.
     ///
@@ -90,24 +99,108 @@ public record FXMLProcessor(Log log) {
     /// for further use in FXML-related operations.
     ///
     /// @param parsedFXML the parsed FXML structure to process. This includes the import statements, root XML structure, and generated class name. Must not be null.
-    /// @return a [ProcessedFXML] object containing the processed import statements, fields, methods,
-    /// root node representation, and class name.
+    /// @return a [ProcessedFXML] object containing the processed import statements, fields, methods, root node representation, and class name.
     public ProcessedFXML process(ParsedFXML parsedFXML) {
         AtomicInteger internalVariableCounter = new AtomicInteger();
         List<String> imports = new ArrayList<>(parsedFXML.imports());
-        FXMLNode root = convert(imports, parsedFXML.root(), internalVariableCounter);
+        ParsedXMLStructure fxmlRootStructure = parsedFXML.root();
+        FXMLNode root = convert(imports, fxmlRootStructure, internalVariableCounter);
         root = deduplicateConstants(root);
         root = deduplicateValueNodes(root);
         root = deduplicateObjectNodes(root);
         List<FXMLField> fields = extractFields(root).distinct().toList();
         List<FXMLMethod> methods = extractMethods(imports, root).distinct().toList();
+        Optional<FXMLController> controllerOptional = inspectControllerClass(imports, fxmlRootStructure);
         return new ProcessedFXML(
                 Set.copyOf(imports),
                 fields,
                 methods,
                 root,
-                parsedFXML.className()
+                parsedFXML.className(),
+                controllerOptional
         );
+    }
+
+    /// Inspects the controller class based on the provided imports and parsed XML structure
+    /// and returns an [Optional] containing an [FXMLController] if the controller is valid.
+    ///
+    /// @param imports   a list of imported class names to resolve the controller class
+    /// @param structure the parsed XML structure containing properties and other details
+    /// @return an [Optional] containing the [FXMLController] if a valid controller is found, otherwise [Optional#empty()]
+    private Optional<FXMLController> inspectControllerClass(List<String> imports, ParsedXMLStructure structure) {
+        Map<String, String> properties = structure.properties();
+        if (!properties.containsKey("fx:controller")) {
+            return Optional.empty();
+        }
+        Class<?> controllerClass = Utils.findType(imports, structure.properties().get("fx:controller"));
+        if (Modifier.isAbstract(controllerClass.getModifiers())) {
+            throw new IllegalArgumentException("Controller class '%s' is abstract".formatted(controllerClass.getName()));
+        }
+        IntPredicate isFinal = Modifier::isFinal;
+        List<ControllerField> fields = iterateClass(
+                controllerClass,
+                Class::getDeclaredFields,
+                field -> new ControllerField(
+                        getVisibility(field.getModifiers()),
+                        field.getName(),
+                        field.getGenericType()
+                ),
+                isFinal.negate()
+        ).toList();
+        List<ControllerMethod> methods = iterateClass(
+                controllerClass,
+                Class::getDeclaredMethods,
+                method -> new ControllerMethod(
+                        getVisibility(method.getModifiers()),
+                        method.getName(),
+                        method.getGenericReturnType(),
+                        List.of(method.getGenericParameterTypes())),
+                _ -> true
+        ).toList();
+        return Optional.of(new FXMLController(controllerClass.getName(), controllerClass, fields, methods));
+    }
+
+    /// Iterates through the given class and its superclasses (if any) to apply specific operations
+    /// on class members using the provided mapper and filters.
+    ///
+    /// @param <I>              The type of class members, which must extend Member.
+    /// @param <O>              The type of the output produced by the mapper function.
+    /// @param clazz            The class to iterate and retrieve members from. If null, the operation will not proceed.
+    /// @param elements         A function to extract an array of members from the given class.
+    /// @param mapper           A function to map individual members to a desired output type.
+    /// @param additionalFilter A predicate to filter members based on their modifiers.
+    /// @return A Stream of the mapped outputs for members that satisfy the given filters.
+    private <I extends Member, O> Stream<O> iterateClass(
+            Class<?> clazz,
+            Function<Class<?>, I[]> elements,
+            Function<I, O> mapper,
+            IntPredicate additionalFilter
+    ) {
+        return Optional.ofNullable(clazz)
+                .stream()
+                .flatMap(c -> Stream.concat(
+                        Stream.of(elements.apply(c))
+                                .filter(element -> !Modifier.isStatic(element.getModifiers())
+                                        && additionalFilter.test(element.getModifiers()))
+                                .map(mapper),
+                        iterateClass(c.getSuperclass(), elements, mapper, additionalFilter)
+                ));
+    }
+
+    /// Determines the visibility type of member based on its modifier flags.
+    ///
+    /// @param modifiers the integer value representing the modifier flags of a member
+    /// @return the Visibility enumeration value corresponding to the member's visibility
+    private Visibility getVisibility(int modifiers) {
+        if (Modifier.isPrivate(modifiers)) {
+            return Visibility.PRIVATE;
+        } else if (Modifier.isProtected(modifiers)) {
+            return Visibility.PROTECTED;
+        } else if (Modifier.isPublic(modifiers)) {
+            return Visibility.PUBLIC;
+        } else {
+            return Visibility.PACKAGE_PRIVATE;
+        }
     }
 
     /// Deduplicates object nodes within the given [FXMLNode] by combining identical nodes.
@@ -436,8 +529,7 @@ public record FXMLProcessor(Log log) {
     /// @param imports  the list of import statements used to resolve types referenced in property definitions
     /// @param clazz    the class associated with the FXML being processed, used to find matching setter methods or constructors
     /// @param property a map entry representing a property, where the key is the property name and the value is the property value to be set
-    /// @return an Optional containing the resolved property as an FXMLProperty object if successful,
-    /// or an empty Optional if no valid property was found
+    /// @return an Optional containing the resolved property as an FXMLProperty object if successful, or an empty Optional if no valid property was found
     private Optional<FXMLProperty> getObjectOrConstructorProperty(List<String> imports, Class<?> clazz, Map.Entry<String, String> property) {
         String propertyName = property.getKey();
         String propertyValue = property.getValue();
@@ -481,9 +573,8 @@ public record FXMLProcessor(Log log) {
     ///
     /// @param imports  the list of import statements used to resolve the types referenced in property definitions
     /// @param property a map entry representing the static property, where the key is the full property name
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 (including class and property name delimited by a dot ".") and the value is the property value to set
-    /// @return an [Optional] containing the resolved property as an [FXMLStaticProperty] object if successful,
-    /// or an empty `Optional` if no valid static setter was found or if there were multiple matching setters
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 (including class and property name delimited by a dot ".") and the value is the property value to set
+    /// @return an [Optional] containing the resolved property as an [FXMLStaticProperty] object if successful, or an empty `Optional` if no valid static setter was found or if there were multiple matching setters
     private Optional<FXMLProperty> getStaticProperty(List<String> imports, Map.Entry<String, String> property) {
         String propertyName = property.getKey();
         String propertyValue = property.getValue();
@@ -519,8 +610,7 @@ public record FXMLProcessor(Log log) {
     /// @param clazz         The class to inspect for constructors with the desired named property.
     /// @param propertyName  The name of the property to locate among constructor parameters.
     /// @param propertyValue The value for the located property to associate with the resulting FXMLProperty.
-    /// @return An [Optional<FXMLProperty>] representing the found named property.
-    /// Returns an empty Optional if no matching property is found or if ambiguities exist.
+    /// @return An [Optional<FXMLProperty>] representing the found named property. Returns an empty Optional if no matching property is found or if ambiguities exist.
     private Optional<FXMLProperty> getNamedConstructorProperty(
             Class<?> clazz,
             String propertyName,
@@ -621,7 +711,7 @@ public record FXMLProcessor(Log log) {
 
     /// Computes a mapping of named generic type parameters for a given class to their corresponding type arguments.
     ///
-    /// @param clazz the class for which the generic type mapping is to be computed
+    /// @param clazz    the class for which the generic type mapping is to be computed
     /// @param generics a list of type arguments corresponding to the class's type parameters
     /// @return a map where the keys are the names of the class's type parameters and the values are the provided type arguments
     /// @throws IllegalStateException if the number of generics provided does not match the number of the class's type parameters
@@ -651,8 +741,7 @@ public record FXMLProcessor(Log log) {
     /// Retrieves a stream of child [FXMLNode] objects from a given [FXMLNode].
     ///
     /// @param node the [FXMLNode] whose children are to be retrieved. It can be an instance of [FXMLObjectNode], [FXMLWrapperNode], or [FXMLValueNode].
-    /// @return a [Stream] of [FXMLNode] objects representing the children of the given node.
-    /// If the node has no children or is of type [FXMLValueNode], an empty stream is returned.
+    /// @return a [Stream] of [FXMLNode] objects representing the children of the given node. If the node has no children or is of type [FXMLValueNode], an empty stream is returned.
     private Stream<FXMLNode> getChildrenStream(FXMLNode node) {
         return (switch (node) {
             case FXMLParentNode parentNode -> parentNode.children();
@@ -684,8 +773,7 @@ public record FXMLProcessor(Log log) {
     /// @param imports       a list of imports required for fully qualifying the types used in the constructed [FXMLMethod]. The method may add additional imports to this list as needed.
     /// @param property      the `FXMLObjectProperty` defining the interface type and associated details to construct the [FXMLMethod].
     /// @param namedGenerics the list of generic types associated with the functional interface type. This is used to resolve the generic type arguments for the method.
-    /// @return an [FXMLMethod] instance representing the processed method signature of the provided
-    /// functional interface, including parameter and return types.
+    /// @return an [FXMLMethod] instance representing the processed method signature of the provided functional interface, including parameter and return types.
     /// @throws UnsupportedOperationException if the property type does not represent a functional interface.
     private FXMLMethod constructFXMLMethod(
             List<String> imports,

@@ -13,11 +13,14 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -44,6 +47,20 @@ public final class Utils {
     /// pipelines within the [FXMLProcessor].
     private static final Gatherer<? super Optional<?>, Void, ?> OPTIONAL = Gatherer.of(
             (_, optional, downstream) -> optional.map(downstream::push).orElse(true)
+    );
+
+    /// A constant list containing sets of primitive types and their corresponding wrapper classes.
+    /// Each set within the list groups a primitive type with its wrapper equivalent, facilitating lookups
+    /// or type comparisons where both primitive and wrapper representations are relevant.
+    private static final List<Set<Class<?>>> PRIMITIVE_TYPE_AND_WRAPPER = List.of(
+            Set.of(boolean.class, Boolean.class),
+            Set.of(byte.class, Byte.class),
+            Set.of(short.class, Short.class),
+            Set.of(int.class, Integer.class),
+            Set.of(long.class, Long.class),
+            Set.of(float.class, Float.class),
+            Set.of(double.class, Double.class),
+            Set.of(char.class, Character.class)
     );
 
     /// Utility class providing helper methods for generating method names based on field names.
@@ -185,7 +202,7 @@ public final class Utils {
     /// @param typeName the name of the type to be resolved; may be a simple name or fully qualified name
     /// @return the resolved [Class<?>] object corresponding to the typeName
     /// @throws InternalClassNotFoundException if the type cannot be resolved or if multiple types are found
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 for a given name in wildcard imports
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               for a given name in wildcard imports
     public static Class<?> findType(List<String> imports, String typeName) {
         if (typeName.contains(".")) {
             return findTypeForName(typeName)
@@ -315,7 +332,20 @@ public final class Utils {
     /// @param classes the target classes to check assignability against
     /// @return a predicate that evaluates whether a class is assignable to any of the given target classes
     public static Predicate<Class<?>> isAssignableTo(Class<?>... classes) {
-        return predicateClass -> Stream.of(classes).anyMatch(clazz -> clazz.isAssignableFrom(predicateClass));
+        return predicateClass -> Stream.of(classes).anyMatch(clazz -> isAssignableFrom(clazz, predicateClass));
+    }
+
+    /// Checks if a class or interface represented by the `variable` parameter is either the same as or is a superclass
+    /// or superinterface of the class or interface represented by the `expression` parameter.
+    /// Additionally, handles primitive and wrapper class compatibility.
+    ///
+    /// @param variable   the class or interface to be checked as the potential assignable target
+    /// @param expression the class or interface to be checked for assignability to `variable`
+    /// @return `true` if `expression` is assignable to `variable`, or if both belong to compatible primitive-wrapper pairs; otherwise `false`
+    public static boolean isAssignableFrom(Class<?> variable, Class<?> expression) {
+        return PRIMITIVE_TYPE_AND_WRAPPER.stream()
+                .anyMatch(classes -> classes.contains(variable) && classes.contains(expression))
+                || variable.isAssignableFrom(expression);
     }
 
     /// Searches and validates a getter method in the specified class that matches the provided identifier,
@@ -328,7 +358,7 @@ public final class Utils {
     /// @return the return type of the validated getter method
     /// @throws NoSuchMethodException if the specified getter method does not exist in the class
     /// @throws IllegalStateException if the method's return type is not a collection,
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 or its generic type is incompatible with the given parameter type
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             or its generic type is incompatible with the given parameter type
     public static Class<?> findCollectionGetterWithAllowedReturnType(
             Class<?> clazz,
             String identifier,
@@ -371,7 +401,7 @@ public final class Utils {
     /// @param imports   a collection of fully qualified class names representing the current imports
     /// @param parameter the fully qualified class name of the parameter to be processed
     /// @return a simplified class name if the parameter can be reduced using the import set,
-    /// otherwise the original fully qualified class name of the parameter
+    ///                 otherwise the original fully qualified class name of the parameter
     public static String improveImportForParameter(Collection<String> imports, String parameter) {
         String simpleName = parameter.substring(parameter.lastIndexOf('.') + 1);
         if (imports.contains(parameter)) {
@@ -392,7 +422,7 @@ public final class Utils {
     /// the given map.
     /// For unresolvable or non-variable types, the original [Type] or [Object] is returned as a fallback.
     ///
-    /// @param log a logging instance used for debugging and tracing type resolution
+    /// @param log                     a logging instance used for debugging and tracing type resolution
     /// @param typeParameterNameToType a map containing type parameter names as keys and their corresponding [Type] objects as values
     /// @return a [Function] that maps a [Type] to another [Type] based on the provided type mappings
     public static Function<Type, Type> getTypeMapperFunction(Log log, Map<String, Type> typeParameterNameToType) {
@@ -405,6 +435,19 @@ public final class Utils {
                 return parameterType;
             }
         };
+    }
+
+    /// Converts the path of a given [URL] into an OS-specific file path string.
+    ///
+    /// @param url the [URL] whose path is to be converted to an OS-specific file path string
+    /// @return the OS-specific file path string corresponding to the [URL] path
+    /// @throws RuntimeException if the [URL] cannot be converted to a [URI] or the file path cannot be resolved
+    public static String urlPathToOsPathString(URL url) throws RuntimeException {
+        try {
+            return Path.of(url.toURI()).toString();
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /// Constructs and returns a filter predicate for methods, identifying those that are public, abstract, non-default,
@@ -428,7 +471,7 @@ public final class Utils {
     private static boolean validateParameters(List<Class<?>> parameterTypes, Method method) {
         for (int i = 0; i < parameterTypes.size(); i++) {
             Class<?> parameterType = method.getParameterTypes()[i];
-            if (!parameterType.isAssignableFrom(parameterTypes.get(i))) {
+            if (!isAssignableFrom(parameterType, parameterTypes.get(i))) {
                 return false;
             }
         }

@@ -10,6 +10,13 @@ import java.util.Objects;
 /// It is a part of the FXML node hierarchy, implementing [FXMLNode], [FXMLIdentifiableNode], and [FXMLParentNode].
 ///
 /// This class is immutable and ensures the integrity of its data by creating defensive copies of properties and child lists.
+///
+/// @param internal a boolean indicating whether this node is internal
+/// @param identifier the unique identifier for the object node; must not be null
+/// @param clazz the class associated with the object node; must not be null
+/// @param properties the list of properties for the object node; must not be null
+/// @param children the list of child nodes for this object node; must not be null
+/// @param generics a list of generic types associated with the object node; must not be null
 public record FXMLObjectNode(
         boolean internal,
         String identifier,

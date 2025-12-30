@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -48,6 +49,7 @@ public final class ObjectMapperProvider {
     public static ObjectMapper getObjectMapper() {
         OBJECT_MAPPER = Optional.ofNullable(OBJECT_MAPPER)
                 .orElseGet(() -> new ObjectMapper()
+                        .registerModule(new Jdk8Module())
                         .registerModule(
                                 new SimpleModule()
                                         .addSerializer(Type.class, new JsonSerializer<>() {

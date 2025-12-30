@@ -8,24 +8,34 @@ import java.util.stream.Gatherer;
 /// and then casts them to that type before passing them downstream. This class is implemented
 /// as a record and conforms to the `Gatherer` interface.
 ///
-/// @param <I> the input type to check and potentially cast
-/// @param <O> the target type to cast input elements to
+/// @param <I>   the input type to check and potentially cast
+/// @param <O>   the target type to cast input elements to
+/// @param clazz the `Class` object representing the target type to cast elements to; must not be `null`
 public record CheckAndCast<I, O>(Class<O> clazz) implements Gatherer<I, Void, O> {
 
     /// Constructs a new `CheckAndCast` instance.
     ///
-    /// @param clazz the `Class` object representing the target type to cast elements to;
-    ///                           must not be `null`
+    /// @param clazz the `Class` object representing the target type to cast elements to; must not be `null`
     /// @throws NullPointerException if `clazz` is `null`
     public CheckAndCast {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
     }
 
+    /// Creates an instance of `CheckAndCast` for the specified target class type.
+    ///
+    /// @param <I>   the input type that will be checked and potentially cast
+    /// @param <O>   the target type to which elements will be cast if they match
+    /// @param clazz the `Class` object representing the target type to cast elements to; must not be `null`
+    /// @return a new `CheckAndCast` instance that checks and casts elements to the specified target class
+    /// @throws NullPointerException if `clazz` is `null`
+    public static <I, O> CheckAndCast<I, O> of(Class<O> clazz) {
+        return new CheckAndCast<>(clazz);
+    }
+
     /// Returns an [Integrator] that processes elements by checking if they are instances of the
     /// target class and casting them to the target type, if applicable.
     ///
-    /// @return an [Integrator] that checks the input element type, casts it if possible, and pushes
-    ///         it downstream.
+    /// @return an [Integrator] that checks the input element type, casts it if possible, and pushes it downstream.
     @Override
     public Integrator<Void, I, O> integrator() {
         return this::integrate;
@@ -43,17 +53,5 @@ public record CheckAndCast<I, O>(Class<O> clazz) implements Gatherer<I, Void, O>
             return downstream.push(clazz.cast(element));
         }
         return true;
-    }
-
-    /// Creates an instance of `CheckAndCast` for the specified target class type.
-    ///
-    /// @param <I>   the input type that will be checked and potentially cast
-    /// @param <O>   the target type to which elements will be cast if they match
-    /// @param clazz the `Class` object representing the target type to cast elements to;
-    ///                           must not be `null`
-    /// @return a new `CheckAndCast` instance that checks and casts elements to the specified target class
-    /// @throws NullPointerException if `clazz` is `null`
-    public static <I, O> CheckAndCast<I, O> of(Class<O> clazz) {
-        return new CheckAndCast<>(clazz);
     }
 }
