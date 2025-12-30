@@ -7,8 +7,8 @@ import com.github.bsels.javafx.maven.plugin.fxml.FXMLObjectNode;
 import com.github.bsels.javafx.maven.plugin.fxml.ProcessedFXML;
 import com.github.bsels.javafx.maven.plugin.in.memory.compiler.OptimisticInMemoryCompiler;
 import com.github.bsels.javafx.maven.plugin.io.FXMLReader;
-import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder;
+import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import com.github.bsels.javafx.maven.plugin.parameters.FXMLParameterized;
 import com.github.bsels.javafx.maven.plugin.parameters.InterfacesWithMethod;
 import com.github.bsels.javafx.maven.plugin.utils.FXMLProcessor;
@@ -359,7 +359,7 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
             ClassLoader currentClassLoader = Thread.currentThread().getContextClassLoader();
             ClassLoader classLoader = URLClassLoader.newInstance(urls.toArray(URL[]::new), currentClassLoader);
             if (includeSourceFilesInClassDiscovery) {
-                UnaryOperator<ClassLoader> extendClassLoader = getSourceFilesClassLoaderExtender();
+                UnaryOperator<ClassLoader> extendClassLoader = getSourceFilesClassLoaderExtender(urls);
                 classLoader = extendClassLoader.apply(classLoader);
             }
             Thread.currentThread().setContextClassLoader(classLoader);
@@ -377,16 +377,17 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     /// The returned operator, when applied to a class loader, updates it to include the compiled classes from
     /// the provided source folders.
     ///
+    /// @param classpath The classpath to use in the compiler
     /// @return a [UnaryOperator] that adding compiled Java source files to the given [ClassLoader].
     /// @throws IOException if an I/O error occurs while attempting to compile source files or access directories.
-    private UnaryOperator<ClassLoader> getSourceFilesClassLoaderExtender() throws IOException {
+    private UnaryOperator<ClassLoader> getSourceFilesClassLoaderExtender(List<URL> classpath) throws IOException {
         Log log = getLog();
         log.info("Including source files in class discovery");
         List<Path> sourceFolders = project.getCompileSourceRoots()
                 .stream()
                 .map(Path::of)
                 .toList();
-        OptimisticInMemoryCompiler optimisticInMemoryCompiler = new OptimisticInMemoryCompiler();
+        OptimisticInMemoryCompiler optimisticInMemoryCompiler = new OptimisticInMemoryCompiler(classpath);
         return optimisticInMemoryCompiler.optimisticCompileIntoClassLoader(log, sourceFolders);
     }
 

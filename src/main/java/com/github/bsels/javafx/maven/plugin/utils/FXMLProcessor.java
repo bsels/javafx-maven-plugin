@@ -136,7 +136,6 @@ public record FXMLProcessor(Log log) {
         if (Modifier.isAbstract(controllerClass.getModifiers())) {
             throw new IllegalArgumentException("Controller class '%s' is abstract".formatted(controllerClass.getName()));
         }
-        String className = Utils.improveImportForParameter(imports, controllerClass.getName());
         IntPredicate isFinal = Modifier::isFinal;
         List<ControllerField> fields = iterateClass(
                 controllerClass,
@@ -158,7 +157,7 @@ public record FXMLProcessor(Log log) {
                         List.of(method.getGenericParameterTypes())),
                 _ -> true
         ).toList();
-        return Optional.of(new FXMLController(className, controllerClass, fields, methods));
+        return Optional.of(new FXMLController(controllerClass.getName(), controllerClass, fields, methods));
     }
 
     /// Iterates through the given class and its superclasses (if any) to apply specific operations

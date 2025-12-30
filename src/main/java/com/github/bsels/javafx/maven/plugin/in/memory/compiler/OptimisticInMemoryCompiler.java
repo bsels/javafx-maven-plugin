@@ -1,5 +1,6 @@
 package com.github.bsels.javafx.maven.plugin.in.memory.compiler;
 
+import com.github.bsels.javafx.maven.plugin.utils.Utils;
 import org.apache.maven.plugin.logging.Log;
 
 import javax.tools.Diagnostic;
@@ -8,7 +9,9 @@ import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
+import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -39,6 +42,18 @@ public final class OptimisticInMemoryCompiler {
     /// executable bytecode.
     private static final String PACKAGE_INFO_JAVA = "package-info.java";
 
+    /// A collection of options that may influence the behavior of the in-memory compilation process.
+    ///
+    /// This list contains strings representing various configuration options
+    /// or compiler arguments that can be applied during the compilation of Java source files.
+    /// These options are passed to the underlying Java compiler and may include flags, optimization settings,
+    /// or other compiler-specific parameters.
+    ///
+    /// The options do not include file-specific or error-related filters,
+    /// as those are handled separately within the compilation workflow.
+    /// It is intended to be immutable and is initialized during the creation of an [OptimisticInMemoryCompiler] instance.
+    private final List<String> options;
+
     /// Constructs a new instance of [OptimisticInMemoryCompiler].
     ///
     /// This class facilitates the compilation of Java source files using an in-memory approach.
@@ -51,8 +66,19 @@ public final class OptimisticInMemoryCompiler {
     /// and "package-info.java" from consideration.
     ///
     /// This constructor initializes the compiler without additional configuration.
-    public OptimisticInMemoryCompiler() {
+    ///
+    /// @param classpath The classpath that needs to be added to the compiler
+    public OptimisticInMemoryCompiler(List<URL> classpath) {
+        classpath = Objects.requireNonNullElseGet(classpath, List::of);
         super();
+        if (!classpath.isEmpty()) {
+            options = List.of(
+                    "-cp",
+                    String.join(File.pathSeparator, classpath.stream().map(Utils::urlPathToOsPathString).toList())
+            );
+        } else {
+            options = List.of();
+        }
     }
 
     /// Attempts to compile Java source files located in the specified source folders using
@@ -60,7 +86,7 @@ public final class OptimisticInMemoryCompiler {
     /// The method iterates through the compilation process and filters out files with compilation errors,
     /// until either all files are successfully compiled or no compilable files remain.
     ///
-    /// @param logger the logger to use for logging compilation progress and errors. Must not be null.
+    /// @param logger        the logger to use for logging compilation progress and errors. Must not be null.
     /// @param sourceFolders a list of paths representing the directories containing Java source files to be compiled. Each folder in the list is scanned for `.java` files, excluding files named "module-info.java" or "package-info.java". Must not be null or empty.
     /// @return a map where the keys are the fully qualified names of the successfully compiled classes, and the values are their corresponding `InMemoryCompiledClass` instances containing the compiled bytecode, or an empty map if no files were successfully compiled.
     /// @throws IOException if an I/O error occurs while accessing the source folders or their contents.
@@ -82,11 +108,11 @@ public final class OptimisticInMemoryCompiler {
                 Iterable<? extends JavaFileObject> compilationUnits = standardJavaFileManager.getJavaFileObjectsFromPaths(sourceFiles);
                 DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
                 JavaCompiler.CompilationTask javaCompilerTask = javaCompiler.getTask(
-                        null, javaFileManager, diagnostics, null, null, compilationUnits
+                        null, javaFileManager, diagnostics, options, null, compilationUnits
                 );
                 validCompilation = javaCompilerTask.call();
                 if (!validCompilation) {
-                    Set<Path> failedFiles = getFailedFilesFromDiagnostics(diagnostics);
+                    Set<Path> failedFiles = getFailedFilesFromDiagnostics(logger, diagnostics);
                     sourceFiles = sourceFiles.stream()
                             .filter(Predicate.not(failedFiles::contains))
                             .toList();
@@ -103,7 +129,7 @@ public final class OptimisticInMemoryCompiler {
     /// This method compiles source files iteratively, removing files with errors until all compilable files
     /// are successfully processed or no further files can be compiled.
     ///
-    /// @param logger the logger to use for logging compilation progress and errors. Must not be null.
+    /// @param logger        the logger to use for logging compilation progress and errors. Must not be null.
     /// @param sourceFolders a list of paths representing the source directories containing Java source files to be compiled. Each directory is scanned for `.java` files, excluding "module-info.java" and "package-info.java". Must not be null or empty.
     /// @return a unary operator that takes a class loader, defines the compiled classes into it, and returns the updated class loader.
     /// @throws IOException if an I/O error occurs while accessing the source directories or processing their contents.
@@ -117,13 +143,14 @@ public final class OptimisticInMemoryCompiler {
     ///
     /// @param diagnostics a `DiagnosticCollector<JavaFileObject>` instance that contains the diagnostic information of a compilation process. Must not be null. Each diagnostic may provide details such as its severity and the associated source file.
     /// @return a `Set<Path>` containing the file paths of source files associated with error or other severe diagnostics. Returns an empty set if there are no such diagnostics or if their sources are unavailable.
-    private Set<Path> getFailedFilesFromDiagnostics(DiagnosticCollector<JavaFileObject> diagnostics) {
+    private Set<Path> getFailedFilesFromDiagnostics(Log logger, DiagnosticCollector<JavaFileObject> diagnostics) {
         return diagnostics.getDiagnostics()
                 .stream()
                 .filter(diagnostic -> switch (diagnostic.getKind()) {
                     case NOTE, MANDATORY_WARNING, WARNING -> false;
                     case OTHER, ERROR -> true;
                 })
+                .peek(diagnostic -> logger.debug(diagnostic.toString()))
                 .map(Diagnostic::getSource)
                 .map(JavaFileObject::toUri)
                 .map(Path::of)

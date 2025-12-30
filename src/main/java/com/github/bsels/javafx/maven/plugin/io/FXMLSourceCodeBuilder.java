@@ -693,7 +693,11 @@ public final class FXMLSourceCodeBuilder {
             builder.append(indent("try {\n", 2));
             addReturnIfNeeded(builder, isVoid, 3)
                     .append(reflectionMethodName)
-                    .append(".invoke(%s, ".formatted(INTERNAL_CONTROLLER_FIELD));
+                    .append(".invoke(")
+                    .append(INTERNAL_CONTROLLER_FIELD);
+            if (!method.parameterTypes().isEmpty()) {
+                builder.append(", ");
+            }
             handlerParameterSequence(builder, method)
                     .append(");\n")
                     .append(indent("} catch (Throwable e) {\n", 2))

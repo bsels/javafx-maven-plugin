@@ -13,7 +13,9 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -433,6 +435,19 @@ public final class Utils {
                 return parameterType;
             }
         };
+    }
+
+    /// Converts the path of a given [URL] into an OS-specific file path string.
+    ///
+    /// @param url the [URL] whose path is to be converted to an OS-specific file path string
+    /// @return the OS-specific file path string corresponding to the [URL] path
+    /// @throws RuntimeException if the [URL] cannot be converted to a [URI] or the file path cannot be resolved
+    public static String urlPathToOsPathString(URL url) throws RuntimeException {
+        try {
+            return Path.of(url.toURI()).toString();
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /// Constructs and returns a filter predicate for methods, identifying those that are public, abstract, non-default,

@@ -61,7 +61,7 @@ public class OptimisticInMemoryCompilerTest {
 
     @BeforeEach
     public void setUp() throws URISyntaxException {
-        classUnderTest = new OptimisticInMemoryCompiler();
+        classUnderTest = new OptimisticInMemoryCompiler(List.of());
         rootTestFolderPath = Path.of(
                 Thread.currentThread()
                         .getContextClassLoader()
@@ -176,11 +176,11 @@ public class OptimisticInMemoryCompilerTest {
         void processDiagnosticsFromCollector_OnlyKeepOtherAndErrorPaths() throws NoSuchMethodException,
                 InvocationTargetException, IllegalAccessException {
             // Arrange
-            Method method = OptimisticInMemoryCompiler.class.getDeclaredMethod("getFailedFilesFromDiagnostics", DiagnosticCollector.class);
+            Method method = OptimisticInMemoryCompiler.class.getDeclaredMethod("getFailedFilesFromDiagnostics", Log.class, DiagnosticCollector.class);
             method.setAccessible(true);
 
             // Act
-            Set<Path> actual = (Set<Path>) method.invoke(classUnderTest, diagnosticCollectorMock);
+            Set<Path> actual = (Set<Path>) method.invoke(classUnderTest, log, diagnosticCollectorMock);
 
             // Assert
             assertThat(actual)
