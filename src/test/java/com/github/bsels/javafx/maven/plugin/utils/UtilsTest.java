@@ -6,6 +6,8 @@ import org.apache.maven.monitor.logging.DefaultLog;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
@@ -1016,6 +1018,150 @@ class UtilsTest {
                     return null;
                 }
             }
+        }
+    }
+
+    @Nested
+    class IsAssignableFromTest {
+
+        @ParameterizedTest
+        @CsvSource({
+                // Primitive to wrapper (happy paths)
+                "int, java.lang.Integer",
+                "long, java.lang.Long",
+                "short, java.lang.Short",
+                "byte, java.lang.Byte",
+                "float, java.lang.Float",
+                "double, java.lang.Double",
+                "boolean, java.lang.Boolean",
+                "char, java.lang.Character",
+                // Wrapper to primitive (happy paths)
+                "java.lang.Integer, int",
+                "java.lang.Long, long",
+                "java.lang.Short, short",
+                "java.lang.Byte, byte",
+                "java.lang.Float, float",
+                "java.lang.Double, double",
+                "java.lang.Boolean, boolean",
+                "java.lang.Character, char",
+                // Primitive to primitive (same type)
+                "int, int",
+                "long, long",
+                "short, short",
+                "byte, byte",
+                "float, float",
+                "double, double",
+                "boolean, boolean",
+                "char, char",
+                // Wrapper to wrapper (same type)
+                "java.lang.Integer, java.lang.Integer",
+                "java.lang.Long, java.lang.Long",
+                "java.lang.Short, java.lang.Short",
+                "java.lang.Byte, java.lang.Byte",
+                "java.lang.Float, java.lang.Float",
+                "java.lang.Double, java.lang.Double",
+                "java.lang.Boolean, java.lang.Boolean",
+                "java.lang.Character, java.lang.Character",
+                // Standard class hierarchy (happy paths)
+                "java.lang.Object, java.lang.String",
+                "java.lang.Number, java.lang.Integer",
+                "java.lang.Number, java.lang.Double",
+                "java.util.Collection, java.util.List",
+                "java.util.List, java.util.ArrayList",
+                "java.lang.CharSequence, java.lang.String"
+        })
+        void shouldReturnTrueForAssignableTypes(String variableClassName, String expressionClassName) throws ClassNotFoundException {
+            // Given
+            Class<?> variable = getClassForName(variableClassName);
+            Class<?> expression = getClassForName(expressionClassName);
+
+            // When
+            boolean result = Utils.isAssignableFrom(variable, expression);
+
+            // Then
+            assertThat(result).isTrue();
+        }
+
+        @ParameterizedTest
+        @CsvSource({
+                // Primitive to different primitive (unhappy paths)
+                "int, long",
+                "int, short",
+                "int, byte",
+                "long, int",
+                "short, int",
+                "byte, int",
+                "float, double",
+                "double, float",
+                "boolean, int",
+                "int, boolean",
+                "char, int",
+                "int, char",
+                // Primitive to different wrapper (unhappy paths)
+                "int, java.lang.Long",
+                "int, java.lang.Short",
+                "int, java.lang.Byte",
+                "long, java.lang.Integer",
+                "short, java.lang.Integer",
+                "byte, java.lang.Integer",
+                "float, java.lang.Double",
+                "double, java.lang.Float",
+                "boolean, java.lang.Integer",
+                "char, java.lang.Integer",
+                // Wrapper to different primitive (unhappy paths)
+                "java.lang.Integer, long",
+                "java.lang.Integer, short",
+                "java.lang.Integer, byte",
+                "java.lang.Long, int",
+                "java.lang.Short, int",
+                "java.lang.Byte, int",
+                "java.lang.Float, double",
+                "java.lang.Double, float",
+                "java.lang.Boolean, int",
+                "java.lang.Character, int",
+                // Wrapper to different wrapper (unhappy paths)
+                "java.lang.Integer, java.lang.Long",
+                "java.lang.Integer, java.lang.Short",
+                "java.lang.Integer, java.lang.Byte",
+                "java.lang.Long, java.lang.Integer",
+                "java.lang.Short, java.lang.Integer",
+                "java.lang.Byte, java.lang.Integer",
+                "java.lang.Float, java.lang.Double",
+                "java.lang.Double, java.lang.Float",
+                "java.lang.Boolean, java.lang.Integer",
+                "java.lang.Character, java.lang.Integer",
+                // Incompatible class hierarchies (unhappy paths)
+                "java.lang.String, java.lang.Integer",
+                "java.lang.Integer, java.lang.String",
+                "java.util.List, java.util.Set",
+                "java.util.ArrayList, java.util.LinkedList",
+                "java.lang.Number, java.lang.String",
+                "java.lang.String, java.lang.Number"
+        })
+        void shouldReturnFalseForNonAssignableTypes(String variableClassName, String expressionClassName) throws ClassNotFoundException {
+            // Given
+            Class<?> variable = getClassForName(variableClassName);
+            Class<?> expression = getClassForName(expressionClassName);
+
+            // When
+            boolean result = Utils.isAssignableFrom(variable, expression);
+
+            // Then
+            assertThat(result).isFalse();
+        }
+
+        private Class<?> getClassForName(String className) throws ClassNotFoundException {
+            return switch (className) {
+                case "int" -> int.class;
+                case "long" -> long.class;
+                case "short" -> short.class;
+                case "byte" -> byte.class;
+                case "float" -> float.class;
+                case "double" -> double.class;
+                case "boolean" -> boolean.class;
+                case "char" -> char.class;
+                default -> Class.forName(className);
+            };
         }
     }
 
