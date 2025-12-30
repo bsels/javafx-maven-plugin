@@ -15,6 +15,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.FXMLStaticMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLStaticProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLValueNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLWrapperNode;
+import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField;
 import com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.introspect.Visibility;
 import com.github.bsels.javafx.maven.plugin.utils.TypeEncoder;
@@ -196,7 +197,7 @@ public final class FXMLSourceCodeBuilder {
     public FXMLSourceCodeBuilder addImports(Collection<String> importClasses) throws NullPointerException {
         Objects.requireNonNull(importClasses, "`importClasses` must not be null");
         return importClasses.stream()
-                        .reduce(this, FXMLSourceCodeBuilder::addImport, Utils.getFirstLambda());
+                .reduce(this, FXMLSourceCodeBuilder::addImport, Utils.getFirstLambda());
     }
 
     /// Sets the resource bundle to the source code being built.
@@ -268,6 +269,13 @@ public final class FXMLSourceCodeBuilder {
             builder.append("private");
         } else {
             builder.append("protected");
+            Optional.ofNullable(controller)
+                    .stream()
+                    .map(FXMLController::instanceFields)
+                    .flatMap(Collection::stream)
+                    .filter(f -> f.name().equals(field.name()))
+                    .findFirst()
+                    .ifPresent(controllerField -> bindControllerField(controllerField, field));
         }
 
         builder.append(" final ").append(field.clazz().getSimpleName());
@@ -410,6 +418,32 @@ public final class FXMLSourceCodeBuilder {
         methods.forEach(builder::append);
         builder.append("}\n");
         return builder.toString();
+    }
+
+    /// Binds a specified controller field to the corresponding FXML field.
+    /// Depending on the visibility of the controller field,
+    /// it uses direct assignment or reflection to establish the binding.
+    ///
+    /// @param controllerField the [ControllerField] instance representing the controller field to bind
+    /// @param field           the [FXMLField] instance representing the FXML field to bind to the controller field
+    private void bindControllerField(ControllerField controllerField, FXMLField field) {
+        if (canCallControllerWithoutReflection(controllerField.visibility())) {
+            constructorBody.add("%s.%s = %s;".formatted(INTERNAL_CONTROLLER_FIELD, controllerField.name(), field.name()));
+        } else {
+            String body = """
+                    try {
+                        java.lang.reflect.Field field = %1$s.getClass().getDeclaredField("%2$s");
+                        field.setAccessible(true);
+                        field.set(%1$s, %3$s);
+                    } catch (Throwable e) {
+                        throw new RuntimeException(e);
+                    }
+                    """.formatted(INTERNAL_CONTROLLER_FIELD, controllerField.name(), field.name());
+            constructorBody.add(
+                    body.lines()
+                            .collect(Collectors.joining("\n        "))
+            );
+        }
     }
 
     /// Constructs and initializes objects based on the provided [FXMLNode] structure.
