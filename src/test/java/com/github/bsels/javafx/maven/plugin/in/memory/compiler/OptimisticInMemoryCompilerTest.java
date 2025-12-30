@@ -16,9 +16,12 @@ import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.MalformedURLException;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
@@ -58,9 +61,10 @@ public class OptimisticInMemoryCompilerTest {
     private Log log;
     private OptimisticInMemoryCompiler classUnderTest;
     private Path rootTestFolderPath;
+    private Field optionsField;
 
     @BeforeEach
-    public void setUp() throws URISyntaxException {
+    public void setUp() throws URISyntaxException, NoSuchFieldException {
         classUnderTest = new OptimisticInMemoryCompiler(List.of());
         rootTestFolderPath = Path.of(
                 Thread.currentThread()
@@ -70,6 +74,38 @@ public class OptimisticInMemoryCompilerTest {
         ).getParent();
 
         log = new SystemStreamLog();
+        optionsField = OptimisticInMemoryCompiler.class.getDeclaredField("options");
+        optionsField.setAccessible(true);
+    }
+
+    @Nested
+    class ConstructorTest {
+
+        @ParameterizedTest
+        @NullAndEmptySource
+        @SuppressWarnings("unchecked")
+        void emptyClasspath_NoErrorsAndNoOptions(List<URL> classpath) throws IllegalAccessException {
+            OptimisticInMemoryCompiler classUnderTest = new OptimisticInMemoryCompiler(classpath);
+
+            assertThat((List<String>) optionsField.get(classUnderTest))
+                    .isNotNull()
+                    .isEmpty();
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void withSourcesInClasspath_OptionsContainSources() throws IllegalAccessException, MalformedURLException {
+            Path classpathJar = Path.of("/tmp/test.jar");
+
+            OptimisticInMemoryCompiler classUnderTest = new OptimisticInMemoryCompiler(List.of(classpathJar.toUri().toURL()));
+
+            assertThat((List<String>) optionsField.get(classUnderTest))
+                    .isNotNull()
+                    .isNotEmpty()
+                    .hasSize(2)
+                    .containsExactly("-cp", classpathJar.toString());
+        }
+
     }
 
     @Nested
@@ -142,7 +178,7 @@ public class OptimisticInMemoryCompilerTest {
     class GetFailedFilesFromDiagnosticsTest {
 
         @BeforeEach
-        void setUp() throws URISyntaxException {
+        void setUp() throws URISyntaxException, NoSuchFieldException {
             OptimisticInMemoryCompilerTest.this.setUp();
 
             Mockito.when(diagnostic0NoteMock.getKind())

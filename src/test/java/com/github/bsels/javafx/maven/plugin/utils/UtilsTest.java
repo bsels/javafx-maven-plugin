@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.Mockito;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
@@ -17,7 +18,12 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -609,13 +615,13 @@ class UtilsTest {
 
         // Helper class for testing static method checks
         static class TestStaticClass {
-            public void instanceMethod() {
-            }
-
             public static void staticMethod(String input) {
             }
 
             public static void staticMethodNoParams() {
+            }
+
+            public void instanceMethod() {
             }
         }
     }
@@ -701,6 +707,9 @@ class UtilsTest {
 
 
         interface TestFunctionalInterface {
+            static void staticMethod() {
+            }
+
             void method();
 
             default void defaultMethod() {
@@ -708,9 +717,6 @@ class UtilsTest {
             }
 
             private void privateMethod() {
-            }
-
-            static void staticMethod() {
             }
         }
 
@@ -1663,6 +1669,10 @@ class UtilsTest {
 
         // Helper classes for testing
         static class TestClassWithSetters {
+            public static void setStaticProperty(String value) {
+                // Static setter - should be excluded
+            }
+
             public void setValue(String value) {
                 // Overloaded setter 1
             }
@@ -1702,10 +1712,6 @@ class UtilsTest {
 
             public void doSomething(String param) {
                 // Not a setter
-            }
-
-            public static void setStaticProperty(String value) {
-                // Static setter - should be excluded
             }
         }
 
@@ -1992,11 +1998,6 @@ class UtilsTest {
         // Helper classes for testing
         static class TestClassWithStaticSettersForNode {
 
-            // Non-static method - should be excluded
-            public void setInstanceProperty(Node node, String value) {
-                // Instance method, not static
-            }
-
             // Valid static setter for Node
             public static void setNodeProperty(Node node, String value) {
                 // Valid static setter
@@ -2047,6 +2048,11 @@ class UtilsTest {
 
             public static void doSomething(Node node, String value) {
                 // Not a setter name
+            }
+
+            // Non-static method - should be excluded
+            public void setInstanceProperty(Node node, String value) {
+                // Instance method, not static
             }
         }
 
@@ -2704,6 +2710,36 @@ class UtilsTest {
                     return new AnnotatedType[0];
                 }
             };
+        }
+    }
+
+    @Nested
+    class UrlPathToOsPathStringTest {
+
+        @Test
+        void urlIsNotUriThrowsRuntimeException() throws URISyntaxException {
+            // Given
+            URISyntaxException syntaxException = new URISyntaxException("invalidUrl", "Invalid URL");
+            URL url = Mockito.mock(URL.class);
+            Mockito.when(url.toURI())
+                    .thenThrow(syntaxException);
+
+            // When & Then
+            assertThatThrownBy(() -> Utils.urlPathToOsPathString(url))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasRootCauseInstanceOf(URISyntaxException.class)
+                    .hasRootCauseMessage("Invalid URL: invalidUrl");
+        }
+
+        @Test
+        void urlIsValidPath() throws MalformedURLException {
+            // Given
+            Path path = Paths.get("testPath").toAbsolutePath();
+            URL urlOfPath = path.toUri().toURL();
+
+            // When & Then
+            assertThat(Utils.urlPathToOsPathString(urlOfPath))
+                    .isEqualTo(path.toString());
         }
     }
 }

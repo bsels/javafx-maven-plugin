@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(MockitoExtension.class)
-class FXMLReaderTest {
+class FXMLReaderTests {
 
     @TempDir
     Path tempDir;
