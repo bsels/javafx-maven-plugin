@@ -365,7 +365,7 @@ public final class FXMLSourceCodeBuilder {
             throw new IllegalStateException("Class definition is not set.");
         }
 
-        boolean isAbstract = isAbstractClass != null ? isAbstractClass : isRoot;
+        boolean isAbstract = isAbstractClass != null ? isAbstractClass : !isRoot;
 
         StringBuilder builder = new StringBuilder();
         if (packageName != null) {

@@ -703,12 +703,12 @@ public class FXMLToSourceCodeMojoTest {
                                 
                                 
                                 @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-01-01T00:00Z")
-                                public class TestClass {
+                                public abstract class TestClass {
                                     private static final ResourceBundle RESOURCE_BUNDLE = test.project.MyClass.RESOURCE_BUNDLE;
                                 
                                     private final String $internalVariable$000;
                                 
-                                    public TestClass() {
+                                    protected TestClass() {
                                         $internalVariable$000 = "Hello";
                                 
                                         super();
@@ -958,13 +958,13 @@ public class FXMLToSourceCodeMojoTest {
                                 
                                 
                                 @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-01-01T00:00Z")
-                                public abstract class TestClass
+                                public class TestClass
                                         extends BorderPane {
                                     private static final ResourceBundle RESOURCE_BUNDLE = test.project.MyClass.RESOURCE_BUNDLE;
                                 
                                     protected final MyButton button;
                                 
-                                    protected TestClass() {
+                                    public TestClass() {
                                         button = new MyButton();
                                 
                                         super();

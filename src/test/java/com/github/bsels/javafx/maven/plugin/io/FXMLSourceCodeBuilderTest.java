@@ -124,7 +124,7 @@ class FXMLSourceCodeBuilderTest {
 
             assertThat(result)
                     .contains("import javax.annotation.processing.Generated;")
-                    .contains("public class TestClass");
+                    .contains("public abstract class TestClass");
         }
     }
 
@@ -324,7 +324,7 @@ class FXMLSourceCodeBuilderTest {
             assertThat(result)
                     .contains("protected void handleClick() {")
                     .contains("$internalController$.handleClick();")
-                    .doesNotContain("abstract");
+                    .contains("abstract");
         }
 
         @Test
@@ -806,7 +806,7 @@ class FXMLSourceCodeBuilderTest {
                     .build();
 
             assertThat(result)
-                    .contains("public class TestClass {")
+                    .contains("public abstract class TestClass {")
                     .doesNotContain("extends")
                     .doesNotContain("implements");
         }
@@ -944,7 +944,7 @@ class FXMLSourceCodeBuilderTest {
                     .handleFXMLNode(rootNode)
                     .build();
 
-            assertThat(result).contains("public abstract class TestClass");
+            assertThat(result).contains("public class TestClass");
         }
 
         @Test
@@ -1020,7 +1020,7 @@ class FXMLSourceCodeBuilderTest {
             try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
                 zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(now);
                 result = builder
-                        .openClass("TestClass", null, null)
+                        .openClass("TestClass", new ParentClass("VBox", List.of()), null)
                         .addField(new FXMLField(String.class, "labelString", false, List.of()))
                         .addField(new FXMLField(Insets.class, "insets", false, List.of()))
                         .addField(new FXMLField(Button.class, "button0", false, List.of()))
@@ -1035,7 +1035,8 @@ class FXMLSourceCodeBuilderTest {
                             
                             
                             @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-12-29T11:12Z")
-                            public abstract class TestClass {
+                            public class TestClass
+                                    extends VBox {
                             
                             
                                 protected final String labelString;
@@ -1043,7 +1044,7 @@ class FXMLSourceCodeBuilderTest {
                                 protected final Button button0;
                                 protected final Button button1;
                             
-                                protected TestClass() {
+                                public TestClass() {
                                     labelString = "Hello World";
                                     insets = new Insets(2.0);
                                     button0 = new Button();
@@ -1445,14 +1446,14 @@ class FXMLSourceCodeBuilderTest {
                             
                             
                             @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-12-29T11:12Z")
-                            public class TestClass {
+                            public abstract class TestClass {
                             
                             
                                 protected final Button myButton;
                                 protected final String myString;
                                 protected final Font font;
                             
-                                public TestClass() {
+                                protected TestClass() {
                                     myString = "Hello World";
                                     font = new Font(0.0);
                                     myButton = new Button();
@@ -1516,10 +1517,10 @@ class FXMLSourceCodeBuilderTest {
                                 
                                 
                                 @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
-                                public abstract class TestController
+                                public class TestController
                                         extends BorderPane {
                                 
-                                    protected TestController() {
+                                    public TestController() {
                                 
                                         super();
                                 
@@ -1529,8 +1530,6 @@ class FXMLSourceCodeBuilderTest {
                                 """.formatted(now));
             }
         }
-
-        // TODO: Call static methods with constant, object node, and/or value node
 
         @Test
         void borderPaneExampleValidSource() {
@@ -1569,12 +1568,12 @@ class FXMLSourceCodeBuilderTest {
                                 
                                 
                                 @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
-                                public abstract class TestController
+                                public class TestController
                                         extends BorderPane {
                                     protected final GridPane gridPane$000;
                                     protected final Insets insets$000;
                                 
-                                    protected TestController() {
+                                    public TestController() {
                                         insets$000 = new Insets(0.0);
                                         gridPane$000 = new GridPane();
                                 
@@ -1625,11 +1624,11 @@ class FXMLSourceCodeBuilderTest {
                                 
                                 
                                 @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
-                                public abstract class TestController
+                                public class TestController
                                         extends BorderPane {
                                     protected final GridPane gridPane$000;
                                 
-                                    protected TestController() {
+                                    public TestController() {
                                         gridPane$000 = new GridPane();
                                 
                                         super();
@@ -1673,10 +1672,10 @@ class FXMLSourceCodeBuilderTest {
                                 
                                 
                                 @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="%s")
-                                public abstract class TestController
+                                public class TestController
                                         extends GridPane {
                                 
-                                    protected TestController() {
+                                    public TestController() {
                                         index0 = 0;
                                         internal = new Button();
                                 
@@ -1741,19 +1740,18 @@ class FXMLSourceCodeBuilderTest {
         }
 
         @Test
-        void buildCreatesConcreteClassByDefault() {
+        void buildCreatesAbstractClassByDefault() {
             String result = builder
                     .openClass("TestClass", null, null)
                     .build();
 
             assertThat(result)
-                    .contains("public class TestClass")
-                    .doesNotContain("abstract")
-                    .contains("public TestClass() {");
+                    .contains("public abstract class TestClass")
+                    .contains("protected TestClass() {");
         }
 
         @Test
-        void buildCreatesAbstractClassWhenIsRootIsSet() {
+        void buildCreatesConcreteClassWhenIsRootIsSetAndNoAbstractMethodsPresent() {
             FXMLObjectNode rootNode = new FXMLObjectNode(
                     false,
                     "this",
@@ -1769,8 +1767,8 @@ class FXMLSourceCodeBuilderTest {
                     .build();
 
             assertThat(result)
-                    .contains("public abstract class TestClass")
-                    .contains("protected TestClass() {");
+                    .contains("public class TestClass")
+                    .contains("public TestClass() {");
         }
 
         @Test
@@ -1804,7 +1802,7 @@ class FXMLSourceCodeBuilderTest {
 
             assertThat(result)
                     .contains("protected final String myField;")
-                    .contains("public TestClass() {");
+                    .contains("protected TestClass() {");
         }
 
         @Test
