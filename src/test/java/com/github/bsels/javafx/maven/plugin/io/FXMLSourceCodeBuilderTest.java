@@ -1910,4 +1910,379 @@ class FXMLSourceCodeBuilderTest {
             assertThat(FXMLSourceCodeBuilder.THIS).isEqualTo("this");
         }
     }
+
+    @Nested
+    class ControllerFieldBindingTests {
+
+        // Test helper class with various field visibilities
+        public static class TestControllerWithFields {
+            public Button publicButton;
+            protected Button protectedButton;
+            Button packagePrivateButton;
+            private Button privateButton;
+        }
+
+        @Test
+        void addFieldWithPublicControllerField_bindsUsingDirectAccess() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithFields.class.getSimpleName(),
+                    TestControllerWithFields.class,
+                    List.of(new com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField(
+                            Visibility.PUBLIC,
+                            "publicButton",
+                            Button.class
+                    )),
+                    List.of()
+            );
+
+            FXMLField field = new FXMLField(
+                    Button.class,
+                    "publicButton",
+                    false,
+                    List.of()
+            );
+
+            // When
+            String result = builder
+                    .setPackage("com.example")
+                    .openClass("TestView", null, null)
+                    .setFXMLController(controller)
+                    .addField(field)
+                    .build();
+
+            // Then
+            assertThat(result)
+                    .contains("protected final Button publicButton;")
+                    .contains("$internalController$.publicButton = publicButton;")
+                    .doesNotContain("java.lang.reflect.Field");
+        }
+
+        @Test
+        void addFieldWithProtectedControllerFieldSamePackage_bindsUsingDirectAccess() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithFields.class.getSimpleName(),
+                    TestControllerWithFields.class,
+                    List.of(new com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField(
+                            Visibility.PROTECTED,
+                            "protectedButton",
+                            Button.class
+                    )),
+                    List.of()
+            );
+
+            FXMLField field = new FXMLField(
+                    Button.class,
+                    "protectedButton",
+                    false,
+                    List.of()
+            );
+
+            // When
+            String result = builder
+                    .setPackage("com.github.bsels.javafx.maven.plugin.io")
+                    .openClass("TestView", null, null)
+                    .setFXMLController(controller)
+                    .addField(field)
+                    .build();
+
+            // Then
+            assertThat(result)
+                    .contains("protected final Button protectedButton;")
+                    .contains("$internalController$.protectedButton = protectedButton;")
+                    .doesNotContain("java.lang.reflect.Field");
+        }
+
+        @Test
+        void addFieldWithProtectedControllerFieldDifferentPackage_bindsUsingReflection() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithFields.class.getSimpleName(),
+                    TestControllerWithFields.class,
+                    List.of(new com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField(
+                            Visibility.PROTECTED,
+                            "protectedButton",
+                            Button.class
+                    )),
+                    List.of()
+            );
+
+            FXMLField field = new FXMLField(
+                    Button.class,
+                    "protectedButton",
+                    false,
+                    List.of()
+            );
+
+            // When
+            String result = builder
+                    .setPackage("com.example.different")
+                    .openClass("TestView", null, null)
+                    .setFXMLController(controller)
+                    .addField(field)
+                    .build();
+
+            // Then
+            assertThat(result)
+                    .contains("protected final Button protectedButton;")
+                    .contains("try {")
+                    .contains("java.lang.reflect.Field field = $internalController$.getClass().getDeclaredField(\"protectedButton\");")
+                    .contains("field.setAccessible(true);")
+                    .contains("field.set($internalController$, protectedButton);")
+                    .contains("} catch (Throwable e) {")
+                    .contains("throw new RuntimeException(e);");
+        }
+
+        @Test
+        void addFieldWithPackagePrivateControllerFieldSamePackage_bindsUsingDirectAccess() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithFields.class.getSimpleName(),
+                    TestControllerWithFields.class,
+                    List.of(new com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField(
+                            Visibility.PACKAGE_PRIVATE,
+                            "packagePrivateButton",
+                            Button.class
+                    )),
+                    List.of()
+            );
+
+            FXMLField field = new FXMLField(
+                    Button.class,
+                    "packagePrivateButton",
+                    false,
+                    List.of()
+            );
+
+            // When
+            String result = builder
+                    .setPackage("com.github.bsels.javafx.maven.plugin.io")
+                    .openClass("TestView", null, null)
+                    .setFXMLController(controller)
+                    .addField(field)
+                    .build();
+
+            // Then
+            assertThat(result)
+                    .contains("protected final Button packagePrivateButton;")
+                    .contains("$internalController$.packagePrivateButton = packagePrivateButton;")
+                    .doesNotContain("java.lang.reflect.Field");
+        }
+
+        @Test
+        void addFieldWithPackagePrivateControllerFieldDifferentPackage_bindsUsingReflection() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithFields.class.getSimpleName(),
+                    TestControllerWithFields.class,
+                    List.of(new com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField(
+                            Visibility.PACKAGE_PRIVATE,
+                            "packagePrivateButton",
+                            Button.class
+                    )),
+                    List.of()
+            );
+
+            FXMLField field = new FXMLField(
+                    Button.class,
+                    "packagePrivateButton",
+                    false,
+                    List.of()
+            );
+
+            // When
+            String result = builder
+                    .setPackage("com.example.different")
+                    .openClass("TestView", null, null)
+                    .setFXMLController(controller)
+                    .addField(field)
+                    .build();
+
+            // Then
+            assertThat(result)
+                    .contains("protected final Button packagePrivateButton;")
+                    .contains("try {")
+                    .contains("java.lang.reflect.Field field = $internalController$.getClass().getDeclaredField(\"packagePrivateButton\");")
+                    .contains("field.setAccessible(true);")
+                    .contains("field.set($internalController$, packagePrivateButton);")
+                    .contains("} catch (Throwable e) {")
+                    .contains("throw new RuntimeException(e);");
+        }
+
+        @Test
+        void addFieldWithPrivateControllerField_bindsUsingReflection() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithFields.class.getSimpleName(),
+                    TestControllerWithFields.class,
+                    List.of(new com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField(
+                            Visibility.PRIVATE,
+                            "privateButton",
+                            Button.class
+                    )),
+                    List.of()
+            );
+
+            FXMLField field = new FXMLField(
+                    Button.class,
+                    "privateButton",
+                    false,
+                    List.of()
+            );
+
+            // When
+            String result = builder
+                    .setPackage("com.example")
+                    .openClass("TestView", null, null)
+                    .setFXMLController(controller)
+                    .addField(field)
+                    .build();
+
+            // Then
+            assertThat(result)
+                    .contains("protected final Button privateButton;")
+                    .contains("try {")
+                    .contains("java.lang.reflect.Field field = $internalController$.getClass().getDeclaredField(\"privateButton\");")
+                    .contains("field.setAccessible(true);")
+                    .contains("field.set($internalController$, privateButton);")
+                    .contains("} catch (Throwable e) {")
+                    .contains("throw new RuntimeException(e);");
+        }
+
+        @Test
+        void addFieldWithInternalField_doesNotBindToController() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithFields.class.getSimpleName(),
+                    TestControllerWithFields.class,
+                    List.of(new com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField(
+                            Visibility.PUBLIC,
+                            "internalField",
+                            Button.class
+                    )),
+                    List.of()
+            );
+
+            FXMLField field = new FXMLField(
+                    Button.class,
+                    "internalField",
+                    true, // internal field
+                    List.of()
+            );
+
+            // When
+            String result = builder
+                    .openClass("TestView", null, null)
+                    .setFXMLController(controller)
+                    .addField(field)
+                    .build();
+
+            // Then
+            assertThat(result)
+                    .contains("private final Button internalField;")
+                    .doesNotContain("$internalController$.internalField")
+                    .doesNotContain("getDeclaredField(\"internalField\")");
+        }
+
+        @Test
+        void addFieldWithoutMatchingControllerField_doesNotBindToController() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithFields.class.getSimpleName(),
+                    TestControllerWithFields.class,
+                    List.of(), // No fields in controller
+                    List.of()
+            );
+
+            FXMLField field = new FXMLField(
+                    Button.class,
+                    "myButton",
+                    false,
+                    List.of()
+            );
+
+            // When
+            String result = builder
+                    .openClass("TestView", null, null)
+                    .setFXMLController(controller)
+                    .addField(field)
+                    .build();
+
+            // Then
+            assertThat(result)
+                    .contains("protected final Button myButton;")
+                    .doesNotContain("$internalController$.myButton")
+                    .doesNotContain("getDeclaredField(\"myButton\")");
+        }
+
+        @Test
+        void addMultipleFieldsWithMixedVisibility_bindsCorrectly() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithFields.class.getSimpleName(),
+                    TestControllerWithFields.class,
+                    List.of(
+                            new com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField(
+                                    Visibility.PUBLIC,
+                                    "publicButton",
+                                    Button.class
+                            ),
+                            new com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField(
+                                    Visibility.PRIVATE,
+                                    "privateButton",
+                                    Button.class
+                            )
+                    ),
+                    List.of()
+            );
+
+            FXMLField publicField = new FXMLField(Button.class, "publicButton", false, List.of());
+            FXMLField privateField = new FXMLField(Button.class, "privateButton", false, List.of());
+
+            // When
+            String result = builder
+                    .setPackage("com.example")
+                    .openClass("TestView", null, null)
+                    .setFXMLController(controller)
+                    .addField(publicField)
+                    .addField(privateField)
+                    .build();
+
+            // Then
+            assertThat(result)
+                    .contains("$internalController$.publicButton = publicButton;")
+                    .contains("java.lang.reflect.Field field = $internalController$.getClass().getDeclaredField(\"privateButton\");");
+        }
+
+        @Test
+        void addFieldWithNoPackage_treatsAsDefaultPackage() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithFields.class.getSimpleName(),
+                    TestControllerWithFields.class,
+                    List.of(new com.github.bsels.javafx.maven.plugin.fxml.introspect.ControllerField(
+                            Visibility.PROTECTED,
+                            "protectedButton",
+                            Button.class
+                    )),
+                    List.of()
+            );
+
+            FXMLField field = new FXMLField(Button.class, "protectedButton", false, List.of());
+
+            // When
+            String result = builder
+                    .openClass("TestView", null, null)
+                    .setFXMLController(controller)
+                    .addField(field)
+                    .build();
+
+            // Then
+            // Since controller is in com.github.bsels.javafx.maven.plugin.io and generated class has no package (default),
+            // it should use reflection
+            assertThat(result)
+                    .contains("java.lang.reflect.Field field = $internalController$.getClass().getDeclaredField(\"protectedButton\");");
+        }
+    }
 }
