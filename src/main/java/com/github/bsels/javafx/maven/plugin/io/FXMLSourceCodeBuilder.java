@@ -72,6 +72,17 @@ public final class FXMLSourceCodeBuilder {
     /// Used to construct parameter names dynamically by inserting a numeric value in place of `%d`.
     /// The `%d` placeholder is replaced with a number to generate unique parameter names.
     private static final String PARAM_NAME_FORMAT = "param%d";
+    /// A constant string that represents the name of the internal initialization method.
+    ///
+    /// This variable is intended to be used internally within the system to refer
+    /// consistently to the specific initialization method "$initialize$".
+    /// It is marked as private and static final to ensure immutability and prevent modification,
+    /// maintaining consistent behavior and avoiding accidental errors in the code base.
+    private static final String INTERNAL_INITIALIZATION_METHOD_NAME = "$initialize$";
+    /// A constant representing the name of the method used to initialize a controller.
+    /// This string is intended to be used as a reference to the "initialize" method.
+    /// It ensures consistency when referring to the controller's initialization logic.
+    private static final String CONTROLLER_INITIALIZE_METHOD = "initialize";
 
     /// A list that stores the fully qualified names of classes or packages imported into the current Java file.
     /// This list represents the import declarations used in the source code.
@@ -131,6 +142,9 @@ public final class FXMLSourceCodeBuilder {
     private boolean resourceBundleSet;
     /// Counter to track the number of methods accessed or processed via reflection during program execution.
     private int reflectionMethodCounter;
+    /// Indicates whether the controller has an initialization method defined.
+    /// This variable is used to determine if a controller requires an explicit initialization process during runtime.
+    private boolean hasControllerInitializeMethod;
 
     /// Constructs a new SourceCodeBuilder instance to build source code structures.
     ///
@@ -153,6 +167,7 @@ public final class FXMLSourceCodeBuilder {
         reflectionMethodCounter = 0;
         superLine = null;
         isRoot = false;
+        hasControllerInitializeMethod = false;
         super();
         addImport("javax.annotation.processing.Generated");
     }
@@ -334,6 +349,23 @@ public final class FXMLSourceCodeBuilder {
         fields.add("private final %s %s;".formatted(controller.className(), INTERNAL_CONTROLLER_FIELD));
         fieldInitializers.add("%s = new %s();".formatted(INTERNAL_CONTROLLER_FIELD, controller.className()));
         this.controller = controller;
+
+        Optional<ControllerMethod> initializeMethodOptional = findInitializeMethodOnController(controller);
+
+        if (initializeMethodOptional.isPresent()) {
+            ControllerMethod initializeMethod = initializeMethodOptional.get();
+            hasControllerInitializeMethod = true;
+            methods.add(
+                    callMethod(
+                            new StringBuilder()
+                                    .append(indent("private void ", 1))
+                                    .append(INTERNAL_INITIALIZATION_METHOD_NAME)
+                                    .append("()"),
+                            initializeMethod,
+                            new FXMLMethod(INTERNAL_INITIALIZATION_METHOD_NAME, List.of(), void.class, Map.of())
+                    ).append('\n').toString()
+            );
+        }
         return this;
     }
 
@@ -405,19 +437,41 @@ public final class FXMLSourceCodeBuilder {
             builder.append(indent("super();\n\n", 2));
         }
         if (!reflectionMethodInitializers.isEmpty()) {
-            builder.append(indent("// Initialize reflection-based method handlers\n", 1))
+            builder.append(indent("// Initialize reflection-based method handlers\n", 2))
                     .append(indent("try {\n", 2));
             reflectionMethodInitializers.forEach(f -> builder.append(indent(f, 3)).append("\n"));
             builder.append(indent("} catch (Throwable e) {\n", 2))
                     .append(indent("throw new RuntimeException(e);\n", 3))
                     .append(indent("}\n\n", 2))
-                    .append(indent("// End reflection-based method handlers, continue with the rest of the constructor body\n\n", 1));
+                    .append(indent("// End reflection-based method handlers, continue with the rest of the constructor body\n\n", 2));
         }
         constructorBody.forEach(f -> builder.append(indent(f, 2)).append("\n"));
+        if (hasControllerInitializeMethod) {
+            builder.append('\n')
+                    .append(indent("// Call initialize method on controller\n", 2))
+                    .append(indent(INTERNAL_INITIALIZATION_METHOD_NAME, 2)).append("();\n\n");
+        }
         builder.append(indent("}\n\n", 1));
         methods.forEach(builder::append);
         builder.append("}\n");
         return builder.toString();
+    }
+
+    /**
+     * Searches for the initialize method on the given {@code FXMLController}.
+     * The initialize method is expected to have the specific name, return type of void,
+     * no parameters, and the lowest visibility (e.g., private).
+     *
+     * @param controller the {@code FXMLController} in which to search for the initialize method
+     * @return an {@code Optional} containing the {@code ControllerMethod} if found, or an empty {@code Optional} if no such method is present
+     */
+    private Optional<ControllerMethod> findInitializeMethodOnController(FXMLController controller) {
+        return controller.instanceMethods()
+                .stream()
+                .filter(method -> void.class.equals(method.returnType()))
+                .filter(method -> method.parameterTypes().isEmpty())
+                .filter(method -> CONTROLLER_INITIALIZE_METHOD.equals(method.name()))
+                .min(Comparator.comparing(ControllerMethod::visibility));
     }
 
     /// Binds a specified controller field to the corresponding FXML field.
@@ -656,7 +710,8 @@ public final class FXMLSourceCodeBuilder {
     /// @param builder    The `StringBuilder` used to construct the method call representation.
     /// @param method     The `ControllerMethod` representing the method to be called.
     /// @param fxmlMethod The `FXMLMethod` providing additional metadata about the method such as return type.
-    private void callMethod(StringBuilder builder, ControllerMethod method, FXMLMethod fxmlMethod) {
+    /// @return The provided `StringBuilder` instance for method chaining.
+    private StringBuilder callMethod(StringBuilder builder, ControllerMethod method, FXMLMethod fxmlMethod) {
         log.debug("Constructing method call: %s".formatted(method.name()));
         builder.append(" {\n");
         boolean isVoid = void.class.equals(fxmlMethod.returnType());
@@ -704,7 +759,7 @@ public final class FXMLSourceCodeBuilder {
                     .append(indent("throw new RuntimeException(e);\n", 3))
                     .append(indent("}\n", 2));
         }
-        builder.append(indent("}\n", 1));
+        return builder.append(indent("}\n", 1));
     }
 
     /// Determines if the controller can be called without using reflection based on its visibility and package

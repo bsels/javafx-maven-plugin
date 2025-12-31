@@ -89,6 +89,26 @@ class FXMLSourceCodeBuilderTest {
         }
     }
 
+    public static class TestControllerWithPublicInitialize {
+        public void initialize() {
+        }
+    }
+
+    public static class TestControllerWithProtectedInitialize {
+        protected void initialize() {
+        }
+    }
+
+    public static class TestControllerWithPackagePrivateInitialize {
+        void initialize() {
+        }
+    }
+
+    public static class TestControllerWithPrivateInitialize {
+        private void initialize() {
+        }
+    }
+
     public static class TestButtonWithNamedArg {
         public TestButtonWithNamedArg(@NamedArg("text") String text) {
         }
@@ -2281,6 +2301,536 @@ class FXMLSourceCodeBuilderTest {
             // it should use reflection
             assertThat(result)
                     .contains("java.lang.reflect.Field field = $internalController$.getClass().getDeclaredField(\"protectedButton\");");
+        }
+    }
+
+    @Nested
+    class ControllerInitializeMethodTests {
+
+        @Test
+        void controllerWithPublicInitializeMethod_callsDirectly() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithPublicInitialize.class.getSimpleName(),
+                    TestControllerWithPublicInitialize.class,
+                    List.of(),
+                    List.of(new ControllerMethod(
+                            Visibility.PUBLIC,
+                            "initialize",
+                            void.class,
+                            List.of()
+                    ))
+            );
+
+            FXMLObjectNode rootNode = new FXMLObjectNode(
+                    false,
+                    "this",
+                    Button.class,
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+
+            ZonedDateTime now = ZonedDateTime.of(2025, 12, 31, 10, 0, 0, 0, ZoneOffset.UTC);
+            String result;
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(now);
+
+                // When
+                result = builder
+                        .setPackage("com.example")
+                        .openClass("TestClass", new ParentClass("Button", null), null)
+                        .setFXMLController(controller)
+                        .handleFXMLNode(rootNode)
+                        .build();
+            }
+
+            // Then
+            assertThat(result)
+                    .isEqualToIgnoringNewLines("""
+                            package com.example;
+
+                            import javax.annotation.processing.Generated;
+
+
+                            @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-12-31T10:00Z")
+                            public class TestClass
+                                    extends Button {
+
+                                private final TestControllerWithPublicInitialize $internalController$;
+
+                                public TestClass() {
+                                    $internalController$ = new TestControllerWithPublicInitialize();
+
+                                    super();
+
+                                    // Call initialize method on controller
+                                    $initialize$();
+
+                                }
+
+                                private void $initialize$() {
+                                    $internalController$.initialize();
+                                }
+
+                            }
+                            """);
+        }
+
+        @Test
+        void controllerWithProtectedInitializeMethodSamePackage_callsDirectly() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithProtectedInitialize.class.getSimpleName(),
+                    TestControllerWithProtectedInitialize.class,
+                    List.of(),
+                    List.of(new ControllerMethod(
+                            Visibility.PROTECTED,
+                            "initialize",
+                            void.class,
+                            List.of()
+                    ))
+            );
+
+            FXMLObjectNode rootNode = new FXMLObjectNode(
+                    false,
+                    "this",
+                    Button.class,
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+
+            ZonedDateTime now = ZonedDateTime.of(2025, 12, 31, 10, 0, 0, 0, ZoneOffset.UTC);
+            String result;
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(now);
+
+                // When
+                result = builder
+                        .setPackage("com.github.bsels.javafx.maven.plugin.io")
+                        .openClass("TestClass", new ParentClass("Button", null), null)
+                        .setFXMLController(controller)
+                        .handleFXMLNode(rootNode)
+                        .build();
+            }
+
+            // Then
+            assertThat(result)
+                    .isEqualToIgnoringNewLines("""
+                            package com.github.bsels.javafx.maven.plugin.io;
+
+                            import javax.annotation.processing.Generated;
+
+
+                            @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-12-31T10:00Z")
+                            public class TestClass
+                                    extends Button {
+
+                                private final TestControllerWithProtectedInitialize $internalController$;
+
+                                public TestClass() {
+                                    $internalController$ = new TestControllerWithProtectedInitialize();
+
+                                    super();
+
+                                    // Call initialize method on controller
+                                    $initialize$();
+
+                                }
+
+                                private void $initialize$() {
+                                    $internalController$.initialize();
+                                }
+
+                            }
+                            """);
+        }
+
+        @Test
+        void controllerWithProtectedInitializeMethodDifferentPackage_usesReflection() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithProtectedInitialize.class.getSimpleName(),
+                    TestControllerWithProtectedInitialize.class,
+                    List.of(),
+                    List.of(new ControllerMethod(
+                            Visibility.PROTECTED,
+                            "initialize",
+                            void.class,
+                            List.of()
+                    ))
+            );
+
+            FXMLObjectNode rootNode = new FXMLObjectNode(
+                    false,
+                    "this",
+                    Button.class,
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+
+            ZonedDateTime now = ZonedDateTime.of(2025, 12, 31, 10, 0, 0, 0, ZoneOffset.UTC);
+            String result;
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(now);
+
+                // When
+                result = builder
+                        .setPackage("com.example.different")
+                        .openClass("TestClass", new ParentClass("Button", null), null)
+                        .setFXMLController(controller)
+                        .handleFXMLNode(rootNode)
+                        .build();
+            }
+
+            // Then
+            assertThat(result)
+                    .isEqualToIgnoringNewLines("""
+                            package com.example.different;
+
+                            import javax.annotation.processing.Generated;
+
+
+                            @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-12-31T10:00Z")
+                            public class TestClass
+                                    extends Button {
+
+                                private final TestControllerWithProtectedInitialize $internalController$;
+                                private final java.lang.reflect.Method $reflectionMethod$0;
+
+                                public TestClass() {
+                                    $internalController$ = new TestControllerWithProtectedInitialize();
+
+                                    super();
+
+                                    // Initialize reflection-based method handlers
+                                    try {
+                                        $reflectionMethod$0 = TestControllerWithProtectedInitialize.class.getDeclaredMethod("initialize");
+                                    } catch (Throwable e) {
+                                        throw new RuntimeException(e);
+                                    }
+
+                                    // End reflection-based method handlers, continue with the rest of the constructor body
+
+                                    $reflectionMethod$0.setAccessible(true);
+
+                                    // Call initialize method on controller
+                                    $initialize$();
+
+                                }
+
+                                private void $initialize$() {
+                                    try {
+                                        $reflectionMethod$0.invoke($internalController$);
+                                    } catch (Throwable e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                }
+
+                            }
+                            """);
+        }
+
+        @Test
+        void controllerWithPackagePrivateInitializeMethodSamePackage_callsDirectly() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithPackagePrivateInitialize.class.getSimpleName(),
+                    TestControllerWithPackagePrivateInitialize.class,
+                    List.of(),
+                    List.of(new ControllerMethod(
+                            Visibility.PACKAGE_PRIVATE,
+                            "initialize",
+                            void.class,
+                            List.of()
+                    ))
+            );
+
+            FXMLObjectNode rootNode = new FXMLObjectNode(
+                    false,
+                    "this",
+                    Button.class,
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+
+            ZonedDateTime now = ZonedDateTime.of(2025, 12, 31, 10, 0, 0, 0, ZoneOffset.UTC);
+            String result;
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(now);
+
+                // When
+                result = builder
+                        .setPackage("com.github.bsels.javafx.maven.plugin.io")
+                        .openClass("TestClass", new ParentClass("Button", null), null)
+                        .setFXMLController(controller)
+                        .handleFXMLNode(rootNode)
+                        .build();
+            }
+
+            // Then
+            assertThat(result)
+                    .isEqualToIgnoringNewLines("""
+                            package com.github.bsels.javafx.maven.plugin.io;
+
+                            import javax.annotation.processing.Generated;
+
+
+                            @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-12-31T10:00Z")
+                            public class TestClass
+                                    extends Button {
+
+                                private final TestControllerWithPackagePrivateInitialize $internalController$;
+
+                                public TestClass() {
+                                    $internalController$ = new TestControllerWithPackagePrivateInitialize();
+
+                                    super();
+
+                                    // Call initialize method on controller
+                                    $initialize$();
+
+                                }
+
+                                private void $initialize$() {
+                                    $internalController$.initialize();
+                                }
+
+                            }
+                            """);
+        }
+
+        @Test
+        void controllerWithPackagePrivateInitializeMethodDifferentPackage_usesReflection() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithPackagePrivateInitialize.class.getSimpleName(),
+                    TestControllerWithPackagePrivateInitialize.class,
+                    List.of(),
+                    List.of(new ControllerMethod(
+                            Visibility.PACKAGE_PRIVATE,
+                            "initialize",
+                            void.class,
+                            List.of()
+                    ))
+            );
+
+            FXMLObjectNode rootNode = new FXMLObjectNode(
+                    false,
+                    "this",
+                    Button.class,
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+
+            ZonedDateTime now = ZonedDateTime.of(2025, 12, 31, 10, 0, 0, 0, ZoneOffset.UTC);
+            String result;
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(now);
+
+                // When
+                result = builder
+                        .setPackage("com.example.different")
+                        .openClass("TestClass", new ParentClass("Button", null), null)
+                        .setFXMLController(controller)
+                        .handleFXMLNode(rootNode)
+                        .build();
+            }
+
+            // Then
+            assertThat(result)
+                    .isEqualToIgnoringNewLines("""
+                            package com.example.different;
+
+                            import javax.annotation.processing.Generated;
+
+
+                            @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-12-31T10:00Z")
+                            public class TestClass
+                                    extends Button {
+
+                                private final TestControllerWithPackagePrivateInitialize $internalController$;
+                                private final java.lang.reflect.Method $reflectionMethod$0;
+
+                                public TestClass() {
+                                    $internalController$ = new TestControllerWithPackagePrivateInitialize();
+
+                                    super();
+
+                                    // Initialize reflection-based method handlers
+                                    try {
+                                        $reflectionMethod$0 = TestControllerWithPackagePrivateInitialize.class.getDeclaredMethod("initialize");
+                                    } catch (Throwable e) {
+                                        throw new RuntimeException(e);
+                                    }
+
+                                    // End reflection-based method handlers, continue with the rest of the constructor body
+
+                                    $reflectionMethod$0.setAccessible(true);
+
+                                    // Call initialize method on controller
+                                    $initialize$();
+
+                                }
+
+                                private void $initialize$() {
+                                    try {
+                                        $reflectionMethod$0.invoke($internalController$);
+                                    } catch (Throwable e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                }
+
+                            }
+                            """);
+        }
+
+        @Test
+        void controllerWithPrivateInitializeMethod_usesReflection() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestControllerWithPrivateInitialize.class.getSimpleName(),
+                    TestControllerWithPrivateInitialize.class,
+                    List.of(),
+                    List.of(new ControllerMethod(
+                            Visibility.PRIVATE,
+                            "initialize",
+                            void.class,
+                            List.of()
+                    ))
+            );
+
+            FXMLObjectNode rootNode = new FXMLObjectNode(
+                    false,
+                    "this",
+                    Button.class,
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+
+            ZonedDateTime now = ZonedDateTime.of(2025, 12, 31, 10, 0, 0, 0, ZoneOffset.UTC);
+            String result;
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(now);
+
+                // When
+                result = builder
+                        .setPackage("com.example")
+                        .openClass("TestClass", new ParentClass("Button", null), null)
+                        .setFXMLController(controller)
+                        .handleFXMLNode(rootNode)
+                        .build();
+            }
+
+            // Then
+            assertThat(result)
+                    .isEqualToIgnoringNewLines("""
+                            package com.example;
+
+                            import javax.annotation.processing.Generated;
+
+
+                            @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-12-31T10:00Z")
+                            public class TestClass
+                                    extends Button {
+
+                                private final TestControllerWithPrivateInitialize $internalController$;
+                                private final java.lang.reflect.Method $reflectionMethod$0;
+
+                                public TestClass() {
+                                    $internalController$ = new TestControllerWithPrivateInitialize();
+
+                                    super();
+
+                                    // Initialize reflection-based method handlers
+                                    try {
+                                        $reflectionMethod$0 = TestControllerWithPrivateInitialize.class.getDeclaredMethod("initialize");
+                                    } catch (Throwable e) {
+                                        throw new RuntimeException(e);
+                                    }
+
+                                    // End reflection-based method handlers, continue with the rest of the constructor body
+
+                                    $reflectionMethod$0.setAccessible(true);
+
+                                    // Call initialize method on controller
+                                    $initialize$();
+
+                                }
+
+                                private void $initialize$() {
+                                    try {
+                                        $reflectionMethod$0.invoke($internalController$);
+                                    } catch (Throwable e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                }
+
+                            }
+                            """);
+        }
+
+        @Test
+        void controllerWithoutInitializeMethod_doesNotCallInitialize() {
+            // Given
+            FXMLController controller = new FXMLController(
+                    TestController.class.getSimpleName(),
+                    TestController.class,
+                    List.of(),
+                    List.of()
+            );
+
+            FXMLObjectNode rootNode = new FXMLObjectNode(
+                    false,
+                    "this",
+                    Button.class,
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+
+            ZonedDateTime now = ZonedDateTime.of(2025, 12, 31, 10, 0, 0, 0, ZoneOffset.UTC);
+            String result;
+            try (MockedStatic<ZonedDateTime> zonedDateTimeMockedStatic = Mockito.mockStatic(ZonedDateTime.class)) {
+                zonedDateTimeMockedStatic.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(now);
+
+                // When
+                result = builder
+                        .setPackage("com.example")
+                        .openClass("TestClass", new ParentClass("Button", null), null)
+                        .setFXMLController(controller)
+                        .handleFXMLNode(rootNode)
+                        .build();
+            }
+
+            // Then
+            assertThat(result)
+                    .isEqualToIgnoringNewLines("""
+                            package com.example;
+
+                            import javax.annotation.processing.Generated;
+
+
+                            @Generated(value="com.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder", date="2025-12-31T10:00Z")
+                            public class TestClass
+                                    extends Button {
+
+                                private final TestController $internalController$;
+
+                                public TestClass() {
+                                    $internalController$ = new TestController();
+
+                                    super();
+
+                                }
+
+                            }
+                            """);
         }
     }
 }
