@@ -68,7 +68,7 @@ jobs:
       - name: Create release
         if: ${{ steps.bumpVersion.outputs.result != steps.projectVersion.outputs.version }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PAT_TOKEN }}
           tag: ${{ format('v{0}', steps.bumpVersion.outputs.result) }}
         run: |
           gh release create "$tag" \
