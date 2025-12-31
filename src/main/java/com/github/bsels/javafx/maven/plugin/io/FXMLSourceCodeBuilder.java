@@ -437,13 +437,13 @@ public final class FXMLSourceCodeBuilder {
             builder.append(indent("super();\n\n", 2));
         }
         if (!reflectionMethodInitializers.isEmpty()) {
-            builder.append(indent("// Initialize reflection-based method handlers\n", 1))
+            builder.append(indent("// Initialize reflection-based method handlers\n", 2))
                     .append(indent("try {\n", 2));
             reflectionMethodInitializers.forEach(f -> builder.append(indent(f, 3)).append("\n"));
             builder.append(indent("} catch (Throwable e) {\n", 2))
                     .append(indent("throw new RuntimeException(e);\n", 3))
                     .append(indent("}\n\n", 2))
-                    .append(indent("// End reflection-based method handlers, continue with the rest of the constructor body\n\n", 1));
+                    .append(indent("// End reflection-based method handlers, continue with the rest of the constructor body\n\n", 2));
         }
         constructorBody.forEach(f -> builder.append(indent(f, 2)).append("\n"));
         if (hasControllerInitializeMethod) {
