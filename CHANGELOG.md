@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.2 - 2026-01-20
+
+### Patch
+
+- Added semantic versioning plugin
+- Bumped dependencies:
+  - Jackson to 2.21.0
+  - JUnit to 6.0.2
+  - Central publishing plugin to 0.10.0
+
 ## 1.2.1 - 2025-12-31
 
 ### Patch
