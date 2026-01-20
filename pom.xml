@@ -52,14 +52,14 @@
         <maven.gpg.plugin.version>3.2.8</maven.gpg.plugin.version>
         <maven.javadoc.plugin.version>3.12.0</maven.javadoc.plugin.version>
         <maven.source.plugin.version>3.4.0</maven.source.plugin.version>
-        <central.publishing.maven.plugin.version>0.9.0</central.publishing.maven.plugin.version>
+        <central.publishing.maven.plugin.version>0.10.0</central.publishing.maven.plugin.version>
         <semantic.versioning.plugin>1.0.0</semantic.versioning.plugin>
         <!--endregion-->
         <!--region Dependency versions -->
         <assertj.version>3.27.6</assertj.version>
-        <jackson.version>2.20.1</jackson.version>
+        <jackson.version>2.21.0</jackson.version>
         <javafx.version>25.0.1</javafx.version>
-        <junit.version>6.0.1</junit.version>
+        <junit.version>6.0.2</junit.version>
         <mockito.version>5.21.0</mockito.version>
         <maven.plugin.version>3.15.2</maven.plugin.version>
         <plexus.java.version>1.5.1</plexus.java.version>
@@ -202,7 +202,7 @@
     </build>
 
     <dependencies>
-        <!-- Dependencies -->
+        <!-- region Dependencies -->
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-core</artifactId>
