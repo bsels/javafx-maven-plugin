@@ -1,8 +1,7 @@
 # PR Checklist
 - [ ] Added tests for the changes
 - [ ] Updated docs (root README.md, if necessary)
-- [ ] PR title starts with a semantic version bump: (patch, minor or major)
-  - Example: `patch: Update dependencies`
+- [ ] Contains at least one versioning Markdown in `.versioning`
 
 # Problem or reason
 What problem does this PR solve?

@@ -25,51 +25,27 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-      - name: Get current project version
-        id: projectVersion
-        run: |
-          echo "version=$(./mvnw help:evaluate --no-transfer-progress -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
-      - name: Bump version
+      - name: Build project and run versioning
         id: bumpVersion
-        uses: actions/github-script@v8
-        env:
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-          CURRENT_VERSION: ${{ steps.projectVersion.outputs.version }}
-        with:
-          result-encoding: string
-          script: |
-            const commitMessage = process.env.COMMIT_MESSAGE.trim().toLowerCase();
-            const [major, minor, patch] = process.env.CURRENT_VERSION.trim().split('.');
-            if (commitMessage.startsWith('major')) {
-              return `${parseInt(major) + 1}.0.0`;
-            }
-            if (commitMessage.startsWith('minor')) {
-              return `${major}.${parseInt(minor) + 1}.0`;
-            }
-            if (commitMessage.startsWith('patch')) {
-              return `${major}.${minor}.${parseInt(patch) + 1}`;
-            }
-            return process.env.CURRENT_VERSION;
-      - name: Set new project version
-        if: ${{ steps.bumpVersion.outputs.result != steps.projectVersion.outputs.version }}
         run: |
-          ./mvnw versions:set --no-transfer-progress -DnewVersion=${{ steps.bumpVersion.outputs.result }}
+          set -e
+          ./mvnw --no-transfer-progress --batch-mode semantic-version:update
+          VERSION=$(./mvnw --no-transfer-progress --batch-mode help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
       - name: Update version in README
-        if: ${{ steps.bumpVersion.outputs.result != steps.projectVersion.outputs.version }}
         run: |
-          sed -i 's/<version>[0-9]\+[.][0-9]\+[.][0-9]\+<\/version>/<version>${{ steps.bumpVersion.outputs.result }}<\/version>/g' README.md
+          sed -i 's/<version>[0-9]\+[.][0-9]\+[.][0-9]\+<\/version>/<version>${{ steps.bumpVersion.outputs.version }}<\/version>/g' README.md
       - name: Commit changes
-        if: ${{ steps.bumpVersion.outputs.result != steps.projectVersion.outputs.version }}
         run: |
-          git commit -am "Released ${{ steps.bumpVersion.outputs.result }} [skip ci]"
-          git tag "v${{ steps.bumpVersion.outputs.result }}"
+          git add .versioning CHANGELOG.md pom.xml
+          git commit -am "Released ${{ steps.bumpVersion.outputs.version }} [skip ci]"
+          git tag "v${{ steps.bumpVersion.outputs.version }}"
           git push
-          git push origin tag "v${{ steps.bumpVersion.outputs.result }}"
+          git push origin tag "v${{ steps.bumpVersion.outputs.version }}"
       - name: Create release
-        if: ${{ steps.bumpVersion.outputs.result != steps.projectVersion.outputs.version }}
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PAT_TOKEN }}
-          tag: ${{ format('v{0}', steps.bumpVersion.outputs.result) }}
+          tag: ${{ format('v{0}', steps.bumpVersion.outputs.version) }}
         run: |
           gh release create "$tag" \
               --repo="$GITHUB_REPOSITORY" \
