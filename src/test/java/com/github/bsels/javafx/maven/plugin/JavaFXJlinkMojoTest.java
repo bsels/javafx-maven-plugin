@@ -11,6 +11,7 @@ import org.codehaus.plexus.archiver.util.DefaultFileSet;
 import org.codehaus.plexus.languages.java.jpms.JavaModuleDescriptor;
 import org.codehaus.plexus.languages.java.jpms.LocationManager;
 import org.codehaus.plexus.util.Os;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -79,8 +80,11 @@ class JavaFXJlinkMojoTest {
     @Mock
     private Process mockProcess;
 
+    private String originalJavaHome;
+
     @BeforeEach
     void setUp() throws NoSuchMethodException {
+        originalJavaHome = System.getProperty("java.home");
         classUnderTest = new JavaFXJlinkMojo(locationManager, toolchainManager, mockZipArchiver);
         classUnderTest.project = mockProject;
         copyAdditionalBinariesToBinaryFolderMethod = JavaFXJlinkMojo.class.getDeclaredMethod("copyAdditionalBinariesToBinaryFolder");
@@ -103,6 +107,15 @@ class JavaFXJlinkMojoTest {
         getJLinkCommandMethod.setAccessible(true);
         patchLoggingFormatMethod = JavaFXJlinkMojo.class.getDeclaredMethod("patchLoggingFormat");
         patchLoggingFormatMethod.setAccessible(true);
+    }
+
+    @AfterEach
+    void restoreJavaHome() {
+        if (originalJavaHome == null) {
+            System.clearProperty("java.home");
+        } else {
+            System.setProperty("java.home", originalJavaHome);
+        }
     }
 
     private void mockStatic(MockedStatic<Files> files, MockedStatic<Os> osMock) {

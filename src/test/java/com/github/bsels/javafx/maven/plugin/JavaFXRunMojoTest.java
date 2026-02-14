@@ -6,6 +6,7 @@ import org.apache.maven.toolchain.ToolchainManager;
 import org.codehaus.plexus.languages.java.jpms.JavaModuleDescriptor;
 import org.codehaus.plexus.languages.java.jpms.LocationManager;
 import org.codehaus.plexus.util.Os;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -40,13 +41,23 @@ class JavaFXRunMojoTest {
 
     private JavaFXRunMojo classUnderTest;
     private Method getJavaRunCommand;
-
+    private String originalJavaHome;
 
     @BeforeEach
     void setUp() throws NoSuchMethodException {
+        originalJavaHome = System.getProperty("java.home");
         classUnderTest = new JavaFXRunMojo(locationManager, toolchainManager);
         getJavaRunCommand = JavaFXRunMojo.class.getDeclaredMethod("getJavaRunCommand");
         getJavaRunCommand.setAccessible(true);
+    }
+
+    @AfterEach
+    void restoreJavaHome() {
+        if (originalJavaHome == null) {
+            System.clearProperty("java.home");
+        } else {
+            System.setProperty("java.home", originalJavaHome);
+        }
     }
 
     private void mockStatic(MockedStatic<Files> files, MockedStatic<Os> osMock) {
