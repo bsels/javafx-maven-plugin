@@ -1,5 +1,5 @@
 ---
-io.github.bsels:semantic-version-maven-plugin: "PATCH"
+io.github.bsels:javafx-maven-plugin: "PATCH"
 ---
 
 Updated the following project dependencies:

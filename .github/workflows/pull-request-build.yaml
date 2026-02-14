@@ -24,3 +24,7 @@ jobs:
       - name: Build with Maven
         run: |
           ./mvnw --no-transfer-progress --batch-mode clean verify -Dgpg.skip
+      - name: Validate versioning files present
+        run: >
+          ./mvnw --no-transfer-progress --batch-mode semantic-version:verify
+          -Dversioning.git=COMMIT -Dversioning.verification.mode=ALL_PROJECTS
