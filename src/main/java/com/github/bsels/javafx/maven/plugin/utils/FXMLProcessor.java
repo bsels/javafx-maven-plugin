@@ -40,6 +40,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -75,16 +76,29 @@ import java.util.stream.Stream;
 ///
 /// @param log the logging system used for internal diagnostic and process logging. Must not be null.
 public record FXMLProcessor(Log log) {
-    /// A compiled regular expression pattern used to match and capture generic type definitions.
+
+    /// A regex pattern used to parse and extract information about generic types from a string.
+    /// The pattern identifies a generic type definition, capturing the following components:
+    /// - The index of the generic type, represented as an integer, identified by the named group "index".
+    /// - The raw type of the generic, represented as a fully qualified type name, identified by the named group "rawType".
+    /// - An optional generics declaration (e.g., angle-bracket-enclosed type parameters), identified by the named group "generics".
+    private static final Pattern GENERICS_REGEX = Pattern.compile(
+            "^\\s*generic\\s+(?<index>\\d+):\\s+(?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<>,.]*)>)?\\s*$"
+    );
+
+    /// A regular expression pattern used to match and parse nested generic type definitions.
+    /// This pattern identifies sequences of generic type declarations that may be nested
+    /// and separated by commas. It considers fully qualified names, optional generic type
+    /// parameters enclosed in angle brackets, and allows for whitespace around elements.
     ///
-    /// The pattern specifically focuses on strings in the format "generic {number}: {fully.qualified.TypeName}".
-    /// It captures:
-    /// - The number following the keyword "generic".
-    /// - The fully qualified type name that follows the colon.
-    ///
-    /// This regular expression is useful for parsing and extracting generic type information
-    /// from input strings that adhere to this predefined structure.
-    private static final Pattern GENERICS_REGEX = Pattern.compile("generic\\s+(\\d+):\\s+((\\w+\\.)*\\w+)");
+    /// The pattern handles:
+    /// - Nested generic definitions, e.g., `List<Map<String, Integer>>`.
+    /// - Fully qualified class names with optional generics, e.g., `java.util.Map<String, Integer>`.
+    /// - Multiple generic type declarations separated by commas, e.g., `Map<String, Integer>, List<String>`.
+    /// - Arbitrary whitespace around the types and delimiters.
+    private static final Pattern NESTED_GENERICS = Pattern.compile(
+            "^\\s*((?<first>((((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*),\\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?)$"
+    );
 
     /// Constructs a new instance of the FXMLProcessor.
     /// Ensures that the required log dependency is not null during instantiation.
@@ -453,37 +467,105 @@ public record FXMLProcessor(Log log) {
     /// @return a list of resolved generic types with improved import definitions
     /// @throws IllegalStateException if the generics defined in the comments are not sequential
     private List<String> extractGenerics(List<String> imports, List<String> comments) {
-        record Generic(int index, String type) {
-        }
         return comments.stream()
                 .map(String::strip)
                 .gather(Gatherer.ofSequential(
-                        (Void _, String input, Gatherer.Downstream<? super Generic> downStream) -> {
-                            Matcher matcher = GENERICS_REGEX.matcher(input);
-                            boolean keepGoing = true;
-                            while (matcher.find()) {
-                                keepGoing = downStream.push(
-                                        new Generic(Integer.parseUnsignedInt(matcher.group(1)), matcher.group(2))
-                                );
-                            }
-                            return keepGoing;
-                        }
+                        (Void _, String input, Gatherer.Downstream<? super Generic> downStream) -> parseGeneric(input, downStream)
                 ))
                 .sorted(Comparator.comparing(Generic::index))
                 .gather(Gatherer.ofSequential(
                         AtomicInteger::new,
-                        (AtomicInteger state, Generic input, Gatherer.Downstream<? super Generic> downStream) -> {
-                            if (input.index() != state.getAndIncrement()) {
-                                throw new IllegalStateException(
-                                        "Generic type indices are not sequential after sort: %d"
-                                                .formatted(input.index())
-                                );
-                            }
-                            return downStream.push(input);
-                        }
+                        (AtomicInteger state, Generic input, Gatherer.Downstream<? super Generic> downStream) -> validateGenericOrder(state, input, downStream)
                 ))
-                .map(generic -> Utils.improveImportForParameter(imports, generic.type()))
+                .map(generic -> generic.optimize(type -> Utils.improveImportForParameter(imports, type)))
+                .map(Generic::toString)
+                .peek(data -> log().debug("Extracted generic type: %s".formatted(data)))
                 .toList();
+    }
+
+    /// Parses generic type definitions from the given input string and processes them using the provided downstream
+    /// handler.
+    ///
+    /// @param input      the string containing generic type definitions to be parsed
+    /// @param downStream the downstream handler to process parsed generic definitions, where `downStream.push()` returns a boolean indicating whether to continue parsing or terminate early
+    /// @return a boolean indicating whether parsing should continue; returns `true` if all elements were successfully processed and no interruption occurred
+    /// @throws IllegalStateException if the generic definition in the input string is invalid
+    private boolean parseGeneric(String input, Gatherer.Downstream<? super Generic> downStream) {
+        Matcher matcher = GENERICS_REGEX.matcher(input);
+        boolean keepGoing = true;
+        log().debug("Parsing generic type definition: %s".formatted(input));
+        while (matcher.find()) {
+            String generics = matcher.group("generics");
+            int data = 0;
+            if (generics != null) {
+                data = generics.chars()
+                        .filter(c -> c == '<' || c == '>')
+                        .reduce(0, (sum, c) -> {
+                            if (c == '<') {
+                                return sum + 1;
+                            } else if (sum <= 0) {
+                                throw new IllegalStateException("Invalid generic definition: %s".formatted(generics));
+                            }
+                            return sum - 1;
+                        });
+            }
+            if (data != 0) {
+                throw new IllegalStateException("Invalid generic definition: %s".formatted(generics));
+            }
+            keepGoing = downStream.push(
+                    new Generic(
+                            Integer.parseUnsignedInt(matcher.group("index")),
+                            matcher.group("rawType").strip(),
+                            parseGenerics(generics)
+                    )
+            );
+        }
+        return keepGoing;
+    }
+
+    /// Validates the sequential order of a generic input based on its index and pushes it downstream if the order is
+    /// correct.
+    ///
+    /// @param state      an [AtomicInteger] tracking the expected sequential state
+    /// @param input      the generic input to validate
+    /// @param downStream a downstream gatherer to push the validated input
+    /// @return true if the input is successfully pushed downstream
+    /// @throws IllegalStateException if the input index is not sequential
+    private boolean validateGenericOrder(
+            AtomicInteger state,
+            Generic input,
+            Gatherer.Downstream<? super Generic> downStream
+    ) {
+        if (input.index() != state.getAndIncrement()) {
+            throw new IllegalStateException(
+                    "Generic type indices are not sequential after sort: %d"
+                            .formatted(input.index())
+            );
+        }
+        return downStream.push(input);
+    }
+
+    /// Parses a string representing generic type definitions and extracts a structured list of generic type objects.
+    ///
+    /// @param genericPart the string containing nested generic type definitions to parse; it is expected to follow the syntax of generics.
+    /// @return an unmodifiable list of Generic objects representing the parsed generics.
+    private List<Generic> parseGenerics(String genericPart) {
+        List<Generic> generics = new LinkedList<>();
+        while (genericPart != null) {
+            log().debug("Parsing nested generic type definition: %s".formatted(genericPart));
+            Matcher matcher = NESTED_GENERICS.matcher(genericPart);
+            if (matcher.find()) {
+                generics.addFirst(new Generic(
+                        -1,
+                        matcher.group("rawType").strip(),
+                        parseGenerics(matcher.group("generics"))
+                ));
+                genericPart = matcher.group("first");
+            } else {
+                throw new IllegalStateException("Invalid generic definition: %s".formatted(genericPart));
+            }
+        }
+        return List.copyOf(generics);
     }
 
     /// Extracts FXML properties from the given map of properties, filtering and processing entries
@@ -573,7 +655,7 @@ public record FXMLProcessor(Log log) {
     ///
     /// @param imports  the list of import statements used to resolve the types referenced in property definitions
     /// @param property a map entry representing the static property, where the key is the full property name
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 (including class and property name delimited by a dot ".") and the value is the property value to set
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 (including class and property name delimited by a dot ".") and the value is the property value to set
     /// @return an [Optional] containing the resolved property as an [FXMLStaticProperty] object if successful, or an empty `Optional` if no valid static setter was found or if there were multiple matching setters
     private Optional<FXMLProperty> getStaticProperty(List<String> imports, Map.Entry<String, String> property) {
         String propertyName = property.getKey();
@@ -830,6 +912,52 @@ public record FXMLProcessor(Log log) {
             );
         } else {
             throw new UnsupportedOperationException("Functional interface expected, but got %s".formatted(property.type()));
+        }
+    }
+
+    /// A record representing a generic type with an index, a type description, and a list of nested generics.
+    private record Generic(int index, String type, List<Generic> nestedGenerics) {
+
+        /**
+         * Constructs a new instance of the Generic class with the specified index, type, and nested generics.
+         *
+         * @param index          the index of this Generic instance
+         * @param type           the type of this Generic instance; must not be null
+         * @param nestedGenerics a list of nested Generic instances; if null, an empty list will be used
+         * @throws NullPointerException if the specified type is null
+         */
+        private Generic(int index, String type, List<Generic> nestedGenerics) {
+            this.index = index;
+            this.type = Objects.requireNonNull(type, "`type` cannot be null");
+            this.nestedGenerics = List.copyOf(Objects.requireNonNullElse(nestedGenerics, List.of()));
+        }
+
+        /**
+         * Creates a new instance of the Generic class by optimizing the type and its nested generics
+         * using the given typeMapper function.
+         *
+         * @param typeMapper a function that transforms the type of this Generic instance; must not be null
+         * @return a new instance of the Generic class with the transformed type and optimized nested generics
+         * @throws NullPointerException if the specified typeMapper is null
+         */
+        private Generic optimize(UnaryOperator<String> typeMapper) {
+            Objects.requireNonNull(typeMapper, "`typeMapper` cannot be null");
+            return new Generic(index, typeMapper.apply(type), nestedGenerics.stream().map(generic -> generic.optimize(typeMapper)).toList());
+        }
+
+        /// Converts this Generic instance to its string representation.
+        /// The representation includes the type and, if applicable, its nested generics in the format:
+        /// `type<nested1, nested2, ...>`.
+        ///
+        /// @return the string representation of this Generic instance, including its type and nested generics.
+        @Override
+        public String toString() {
+            if (nestedGenerics.isEmpty()) {
+                return type;
+            }
+            return nestedGenerics.stream()
+                    .map(Generic::toString)
+                    .collect(Collectors.joining(", ", type + "<", ">"));
         }
     }
 }
