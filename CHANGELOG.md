@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0 - 2026-02-46
+
+### Minor
+
+Added nested generics support using the standard Java notation.
+
 ## 1.2.3 - 2026-02-45
 
 ### Patch
