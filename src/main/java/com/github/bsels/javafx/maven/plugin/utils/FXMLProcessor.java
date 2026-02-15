@@ -492,8 +492,12 @@ public record FXMLProcessor(Log log) {
     /// @throws IllegalStateException if the generic definition in the input string is invalid
     private boolean parseGeneric(String input, Gatherer.Downstream<? super Generic> downStream) {
         Matcher matcher = GENERICS_REGEX.matcher(input);
+        if (!matcher.matches()) {
+            throw new IllegalStateException("Invalid generic definition: %s".formatted(input));
+        }
         boolean keepGoing = true;
         log().debug("Parsing generic type definition: %s".formatted(input));
+        matcher.reset();
         while (matcher.find()) {
             String generics = matcher.group("generics");
             int data = 0;
