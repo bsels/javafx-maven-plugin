@@ -28,17 +28,12 @@ jobs:
       - name: Build project and run versioning
         id: bumpVersion
         run: |
-          set -e
-          ./mvnw --no-transfer-progress --batch-mode semantic-version:update
+          ./mvnw --no-transfer-progress --batch-mode semantic-version:update \
+          -Dversioning.update.scripts=./update-readme.sh -Dversioning.git=COMMIT
           VERSION=$(./mvnw --no-transfer-progress --batch-mode help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-      - name: Update version in README
+      - name: Create tag and push
         run: |
-          sed -i 's/<version>[0-9]\+[.][0-9]\+[.][0-9]\+<\/version>/<version>${{ steps.bumpVersion.outputs.version }}<\/version>/g' README.md
-      - name: Commit changes
-        run: |
-          git add .versioning CHANGELOG.md pom.xml
-          git commit -am "Released ${{ steps.bumpVersion.outputs.version }} [skip ci]"
           git tag "v${{ steps.bumpVersion.outputs.version }}"
           git push
           git push origin tag "v${{ steps.bumpVersion.outputs.version }}"

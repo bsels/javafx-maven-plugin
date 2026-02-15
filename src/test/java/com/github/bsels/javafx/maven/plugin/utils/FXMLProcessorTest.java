@@ -1289,4 +1289,251 @@ class FXMLProcessorTest {
                     );
         }
     }
+
+    @Nested
+    @DisplayName("Generics parsing tests")
+    class GenericsParsingTests {
+
+        @Test
+        @DisplayName("Should process simple nested generics")
+        void shouldProcessSimpleNestedGenerics() {
+            // Given
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "List",
+                    Map.of(),
+                    List.of(),
+                    List.of("generic 0: java.util.List<java.lang.String>")
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("java.util.List", "java.lang.String"),
+                    rootStructure,
+                    "TestController"
+            );
+
+            // When
+            ProcessedFXML result = fxmlProcessor.process(parsedFXML);
+
+            // Then
+            assertThat(result.fields())
+                    .first()
+                    .satisfies(field -> assertThat(field.generics())
+                            .containsExactly("List<String>"));
+        }
+
+        @Test
+        @DisplayName("Should process multiple nested generics")
+        void shouldProcessMultipleNestedGenerics() {
+            // Given
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "Map",
+                    Map.of(),
+                    List.of(),
+                    List.of("generic 0: java.util.Map<java.lang.String, java.util.List<java.lang.Integer>>", "generic 1: java.lang.String")
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("java.util.Map", "java.lang.String", "java.util.List", "java.lang.Integer"),
+                    rootStructure,
+                    "TestController"
+            );
+
+            // When
+            ProcessedFXML result = fxmlProcessor.process(parsedFXML);
+
+            // Then
+            assertThat(result.fields())
+                    .first()
+                    .satisfies(field -> assertThat(field.generics())
+                            .containsExactly("Map<String, List<Integer>>", "String"));
+        }
+
+        @Test
+        @DisplayName("Should process multiple generic indices")
+        void shouldProcessMultipleGenericIndices() {
+            // Given
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "Map",
+                    Map.of(),
+                    List.of(),
+                    List.of("generic 1: java.lang.Integer", "generic 0: java.lang.String")
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("java.util.Map", "java.lang.String", "java.lang.Integer"),
+                    rootStructure,
+                    "TestController"
+            );
+
+            // When
+            ProcessedFXML result = fxmlProcessor.process(parsedFXML);
+
+            // Then
+            assertThat(result.fields())
+                    .first()
+                    .satisfies(field -> assertThat(field.generics())
+                            .containsExactly("String", "Integer"));
+        }
+
+        @Test
+        @DisplayName("Should throw IllegalStateException when generic definition has unbalanced brackets (too many opening)")
+        void shouldThrowExceptionWhenBracketsUnbalancedTooManyOpening() {
+            // Given
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "List",
+                    Map.of(),
+                    List.of(),
+                    List.of("generic 0: java.util.List<<java.lang.String>")
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("java.util.List", "java.lang.String"),
+                    rootStructure,
+                    "TestController"
+            );
+
+            // When & Then
+            assertThatThrownBy(() -> fxmlProcessor.process(parsedFXML))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Invalid generic definition");
+        }
+
+        @Test
+        @DisplayName("Should throw IllegalStateException when generic definition has unbalanced brackets (extra opening)")
+        void shouldThrowExceptionWhenBracketsUnbalancedOpening() {
+            // Given
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "List",
+                    Map.of(),
+                    List.of(),
+                    List.of("generic 0: java.util.List<java.lang.String<>>")
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("java.util.List", "java.lang.String"),
+                    rootStructure,
+                    "TestController"
+            );
+
+            // When & Then
+            assertThatThrownBy(() -> fxmlProcessor.process(parsedFXML))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Invalid generic definition");
+        }
+
+        @Test
+        @DisplayName("Should throw IllegalStateException when generic definition has unbalanced brackets (extra closing)")
+        void shouldThrowExceptionWhenBracketsUnbalancedClosing() {
+            // Given
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "List",
+                    Map.of(),
+                    List.of(),
+                    List.of("generic 0: java.util.List<java.lang.String>>")
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("java.util.List", "java.lang.String"),
+                    rootStructure,
+                    "TestController"
+            );
+
+            // When & Then
+            assertThatThrownBy(() -> fxmlProcessor.process(parsedFXML))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Invalid generic definition");
+        }
+
+        @Test
+        @DisplayName("Should throw IllegalStateException when generic definition has unbalanced brackets (missing closing)")
+        void shouldThrowExceptionWhenBracketsUnbalancedMissingClosing() {
+            // Given
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "List",
+                    Map.of(),
+                    List.of(),
+                    List.of("generic 0: java.util.List<java.lang.String")
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("java.util.List", "java.lang.String"),
+                    rootStructure,
+                    "TestController"
+            );
+
+            // When & Then
+            assertThatThrownBy(() -> fxmlProcessor.process(parsedFXML))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Invalid generic definition");
+        }
+
+        @Test
+        @DisplayName("Should throw IllegalStateException when generic definition has closing bracket before opening")
+        void shouldThrowExceptionWhenClosingBeforeOpening() {
+            // Given
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "List",
+                    Map.of(),
+                    List.of(),
+                    List.of("generic 0: java.util.List<java.lang.String>>")
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("java.util.List", "java.lang.String"),
+                    rootStructure,
+                    "TestController"
+            );
+
+            // When & Then
+            assertThatThrownBy(() -> fxmlProcessor.process(parsedFXML))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Invalid generic definition");
+        }
+
+        @Test
+        @DisplayName("Should throw IllegalStateException when generic indices are not sequential")
+        void shouldThrowExceptionWhenIndicesNotSequential() {
+            // Given
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "Map",
+                    Map.of(),
+                    List.of(),
+                    List.of("generic 0: java.lang.String", "generic 2: java.lang.Integer")
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("java.util.Map", "java.lang.String", "java.lang.Integer"),
+                    rootStructure,
+                    "TestController"
+            );
+
+            // When & Then
+            assertThatThrownBy(() -> fxmlProcessor.process(parsedFXML))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Generic type indices are not sequential after sort: 2");
+        }
+
+        @Test
+        @DisplayName("Should throw IllegalStateException when nested generic definition is invalid")
+        void shouldThrowExceptionWhenNestedDefinitionInvalid() {
+            // Given
+            ParsedXMLStructure rootStructure = new ParsedXMLStructure(
+                    "Map",
+                    Map.of(),
+                    List.of(),
+                    List.of("generic 0: java.util.Map<java.lang.String,,java.lang.Integer>", "generic 1: java.lang.String")
+            );
+
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    List.of("java.util.Map", "java.lang.String", "java.lang.Integer"),
+                    rootStructure,
+                    "TestController"
+            );
+
+            // When & Then
+            assertThatThrownBy(() -> fxmlProcessor.process(parsedFXML))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Invalid generic definition");
+        }
+    }
 }
