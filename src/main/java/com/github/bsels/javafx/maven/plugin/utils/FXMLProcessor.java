@@ -922,31 +922,33 @@ public record FXMLProcessor(Log log) {
     /// A record representing a generic type with an index, a type description, and a list of nested generics.
     private record Generic(int index, String type, List<Generic> nestedGenerics) {
 
-        /**
-         * Constructs a new instance of the Generic class with the specified index, type, and nested generics.
-         *
-         * @param index          the index of this Generic instance
-         * @param type           the type of this Generic instance; must not be null
-         * @param nestedGenerics a list of nested Generic instances; if null, an empty list will be used
-         * @throws NullPointerException if the specified type is null
-         */
+        /// Constructs a new instance of the Generic class with the specified index, type, and nested generics.
+        ///
+        /// @param index          the index of this Generic instance
+        /// @param type           the type of this Generic instance; must not be null
+        /// @param nestedGenerics a list of nested Generic instances; if null, an empty list will be used
+        /// @throws NullPointerException if the specified type is null
         private Generic(int index, String type, List<Generic> nestedGenerics) {
             this.index = index;
             this.type = Objects.requireNonNull(type, "`type` cannot be null");
             this.nestedGenerics = List.copyOf(Objects.requireNonNullElse(nestedGenerics, List.of()));
         }
 
-        /**
-         * Creates a new instance of the Generic class by optimizing the type and its nested generics
-         * using the given typeMapper function.
-         *
-         * @param typeMapper a function that transforms the type of this Generic instance; must not be null
-         * @return a new instance of the Generic class with the transformed type and optimized nested generics
-         * @throws NullPointerException if the specified typeMapper is null
-         */
+        /// Creates a new instance of the Generic class by optimizing the type and its nested generics
+        /// using the given typeMapper function.
+        ///
+        /// @param typeMapper a function that transforms the type of this Generic instance; must not be null
+        /// @return a new instance of the Generic class with the transformed type and optimized nested generics
+        /// @throws NullPointerException if the specified typeMapper is null
         private Generic optimize(UnaryOperator<String> typeMapper) {
             Objects.requireNonNull(typeMapper, "`typeMapper` cannot be null");
-            return new Generic(index, typeMapper.apply(type), nestedGenerics.stream().map(generic -> generic.optimize(typeMapper)).toList());
+            return new Generic(
+                    index,
+                    typeMapper.apply(type),
+                    nestedGenerics.stream()
+                            .map(generic -> generic.optimize(typeMapper))
+                            .toList()
+            );
         }
 
         /// Converts this Generic instance to its string representation.
