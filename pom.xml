@@ -41,27 +41,48 @@
     <properties>
         <java.version>25</java.version>
         <!--region Plugin versions -->
-        <maven.plugin.api.version>3.9.12</maven.plugin.api.version>
+        <!-- https://central.sonatype.com/artifact/org.jacoco/jacoco-maven-plugin -->
+        <jacoco.version>0.8.14</jacoco.version>
+        <!-- https://central.sonatype.com/artifact/org.apache.maven/maven-core -->
+        <maven.plugin.api.version>3.9.14</maven.plugin.api.version>
+        <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-enforcer-plugin -->
         <maven.enforcer.plugin.version>3.6.2</maven.enforcer.plugin.version>
+        <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-dependency-plugin -->
         <maven.dependency.plugin.version>3.10.0</maven.dependency.plugin.version>
+        <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-compiler-plugin -->
         <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
-        <maven.surefire.plugin.version>3.5.4</maven.surefire.plugin.version>
+        <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-surefire-plugin -->
+        <maven.surefire.plugin.version>3.5.5</maven.surefire.plugin.version>
+        <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-plugin-plugin -->
         <maven.plugin.plugin.version>3.15.2</maven.plugin.plugin.version>
+        <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-gpg-plugin -->
         <maven.gpg.plugin.version>3.2.8</maven.gpg.plugin.version>
+        <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-javadoc-plugin -->
         <maven.javadoc.plugin.version>3.12.0</maven.javadoc.plugin.version>
+        <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-source-plugin -->
         <maven.source.plugin.version>3.4.0</maven.source.plugin.version>
+        <!-- https://central.sonatype.com/artifact/org.sonatype.central/central-publishing-maven-plugin -->
         <central.publishing.maven.plugin.version>0.10.0</central.publishing.maven.plugin.version>
-        <semantic.versioning.plugin>1.3.0</semantic.versioning.plugin>
+        <!-- https://central.sonatype.com/artifact/io.github.bsels/semantic-version-maven-plugin -->
+        <semantic.versioning.plugin>1.3.1</semantic.versioning.plugin>
         <!--endregion-->
         <!--region Dependency versions -->
+        <!-- https://central.sonatype.com/artifact/org.assertj/assertj-core -->
         <assertj.version>3.27.7</assertj.version>
+        <!-- https://central.sonatype.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
         <jackson.version>2.21.0</jackson.version>
-        <javafx.version>25.0.2</javafx.version>
-        <junit.version>6.0.2</junit.version>
-        <mockito.version>5.21.0</mockito.version>
+        <!-- https://central.sonatype.com/artifact/org.junit.jupiter/junit-jupiter-api -->
+        <junit.version>6.0.3</junit.version>
+        <!-- https://central.sonatype.com/artifact/org.apache.maven.plugin-tools/maven-plugin-annotations -->
         <maven.plugin.version>3.15.2</maven.plugin.version>
+        <!-- https://central.sonatype.com/artifact/org.mockito/mockito-core -->
+        <mockito.version>5.23.0</mockito.version>
+        <!-- https://central.sonatype.com/artifact/org.codehaus.plexus/plexus-java -->
         <plexus.java.version>1.5.2</plexus.java.version>
+        <!-- https://central.sonatype.com/artifact/org.codehaus.plexus/plexus-archiver -->
         <plexus.archiver.version>4.11.0</plexus.archiver.version>
+        <!-- https://central.sonatype.com/artifact/org.openjfx/javafx-controls -->
+        <javafx.version>25.0.2</javafx.version>
         <!--endregion-->
         <!-- region Source code info -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -74,6 +95,30 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>default-report</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <formats>
+                                <format>HTML</format>
+                            </formats>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
                 <version>${maven.enforcer.plugin.version}</version>
@@ -85,9 +130,6 @@
                         </goals>
                         <configuration>
                             <rules>
-                                <requireMavenVersion>
-                                    <version>${maven.plugin.api.version}</version>
-                                </requireMavenVersion>
                                 <requireJavaVersion>
                                     <version>&gt;=25.0.0</version>
                                 </requireJavaVersion>
@@ -123,7 +165,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven.surefire.plugin.version}</version>
                 <configuration>
-                    <argLine>-javaagent:${org.mockito:mockito-core:jar}</argLine>
+                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
                 </configuration>
             </plugin>
             <plugin>
