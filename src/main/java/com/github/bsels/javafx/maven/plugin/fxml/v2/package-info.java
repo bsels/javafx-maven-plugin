@@ -1,0 +1,1 @@
+package com.github.bsels.javafx.maven.plugin.fxml.v2;

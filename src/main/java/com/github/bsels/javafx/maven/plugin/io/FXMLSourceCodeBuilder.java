@@ -150,6 +150,7 @@ public final class FXMLSourceCodeBuilder {
     ///
     /// @param log the logging utility used for logging messages and tracking actions during source code generation
     public FXMLSourceCodeBuilder(Log log) {
+        super();
         packageName = null;
         imports = new ArrayList<>();
         isAbstractClass = null;
@@ -168,7 +169,6 @@ public final class FXMLSourceCodeBuilder {
         superLine = null;
         isRoot = false;
         hasControllerInitializeMethod = false;
-        super();
         addImport("javax.annotation.processing.Generated");
     }
 
@@ -240,7 +240,7 @@ public final class FXMLSourceCodeBuilder {
     /// marks the class as abstract and adds an abstract method signature.
     ///
     /// @param method the `FXMLMethod` representing the method details such as return type, parameters, and method name to be added
-    /// @return the `SourceCodeBuilder` instance, allowing for method chaining
+    /// @return the `FXMLSourceCodeBuilder` instance, allowing for method chaining
     /// @throws NullPointerException if the passed method is null
     public FXMLSourceCodeBuilder addMethod(FXMLMethod method) throws NullPointerException {
         Objects.requireNonNull(method, "`method` must not be null");
@@ -306,7 +306,7 @@ public final class FXMLSourceCodeBuilder {
     /// @param className   the name of the class to be opened; must not be null
     /// @param parentClass the parent class of the new class; can be null if the class does not extend any parent
     /// @param interfaces  a map where the key is the name of the interface and the value is the list of generics associated with the interface; can be null or empty if no interfaces are implemented
-    /// @return the current instance of `SourceCodeBuilder` for method chaining
+    /// @return the current instance of `FXMLSourceCodeBuilder` for method chaining
     /// @throws NullPointerException  if the `className` is null
     /// @throws IllegalStateException if the class has already been opened
     public FXMLSourceCodeBuilder openClass(String className, ParentClass parentClass, Map<String, List<String>> interfaces) throws NullPointerException, IllegalStateException {
@@ -338,7 +338,7 @@ public final class FXMLSourceCodeBuilder {
     /// It also appends the necessary field declaration and initialization for the controller instance.
     ///
     /// @param controller the FXMLController instance to be set
-    /// @return the current instance of `SourceCodeBuilder` for method chaining
+    /// @return the current instance of `FXMLSourceCodeBuilder` for method chaining
     /// @throws IllegalStateException if a controller is already set
     /// @throws NullPointerException  if the passed controller is null
     public FXMLSourceCodeBuilder setFXMLController(FXMLController controller) throws IllegalStateException, NullPointerException {

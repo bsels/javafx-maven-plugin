@@ -69,8 +69,8 @@ public final class OptimisticInMemoryCompiler {
     ///
     /// @param classpath The classpath that needs to be added to the compiler
     public OptimisticInMemoryCompiler(List<URL> classpath) {
-        classpath = Objects.requireNonNullElseGet(classpath, List::of);
         super();
+        classpath = Objects.requireNonNullElseGet(classpath, List::of);
         if (!classpath.isEmpty()) {
             options = List.of(
                     "-cp",

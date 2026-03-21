@@ -400,7 +400,7 @@ public abstract sealed class BaseJavaFXMojo extends AbstractMojo permits JavaFXJ
         }
         String outputDirectory = project.getBuild().getOutputDirectory();
         if (outputDirectory == null || outputDirectory.isEmpty()) {
-            throw new MojoExecutionException("Error: Output directory does not exists");
+            throw new MojoExecutionException("Error: Output directory does not exist");
         }
 
         Path moduleDescriptorPath;
@@ -412,7 +412,7 @@ public abstract sealed class BaseJavaFXMojo extends AbstractMojo permits JavaFXJ
                             () -> new MojoExecutionException("Error: module-info.class file is required")
                     );
         } catch (IOException e) {
-            throw new MojoExecutionException("Error: Output directory does not exists", e);
+            throw new MojoExecutionException("Error: Output directory does not exist", e);
         }
 
         List<Path> dependencies = getDependencies();

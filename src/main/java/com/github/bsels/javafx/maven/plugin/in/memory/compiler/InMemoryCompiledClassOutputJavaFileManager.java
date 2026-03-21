@@ -40,9 +40,8 @@ public final class InMemoryCompiledClassOutputJavaFileManager extends Forwarding
     /// @param javaFileManager the underlying JavaFileManager to which operations will be delegated. Must not be null.
     /// @throws NullPointerException if the provided javaFileManager is null.
     public InMemoryCompiledClassOutputJavaFileManager(JavaFileManager javaFileManager) {
-        Objects.requireNonNull(javaFileManager, "`javaFileManager` cannot be null");
+        super(Objects.requireNonNull(javaFileManager, "`javaFileManager` cannot be null"));
         this.compiledClasses = new HashMap<>();
-        super(javaFileManager);
     }
 
     /// Retrieves an immutable map containing the compiled classes stored in memory.

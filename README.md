@@ -191,8 +191,8 @@ preserving the declarative benefits of FXML.
 
 The **`jlink`** goal creates a custom, minimal Java runtime image that contains only the modules required by your JavaFX
 application.
-It leverages the JDK’s `jlink` tool and aads JavaFX‑specific handling (native access, launcher scripts, additional
-binaries,logging configuration, optional ZIP packaging, etc.).
+It leverages the JDK’s `jlink` tool and adds JavaFX‑specific handling (native access, launcher scripts, additional
+binaries, logging configuration, optional ZIP packaging, etc.).
 
 ### When to Use It
 
@@ -250,7 +250,7 @@ binaries,logging configuration, optional ZIP packaging, etc.).
                 <!-- Optional – customise the image -->
                 <jlinkExecutable>jlink</jlinkExecutable><!-- path to jlink -->
                 <jmodsPath>${java.home}/jmods</jmodsPath><!-- custom JavaFX jmods -->
-                <jlinkImageName>my-ap-image</jlinkImageName><!-- output folder -->
+                <jlinkImageName>my-app-image</jlinkImageName><!-- output folder -->
                 <jlinkZipName>my-app-runtime</jlinkZipName> <!-- ZIP name (omit to skip) -->
 
                 <!-- Launcher configuration -->
@@ -298,7 +298,7 @@ target/
  │   │   └─ myapp.bat          ← launcher script (Windows)
  │   ├─ conf/
  │   │   └─ logging.properties ← patched format
- │   ├─ lib/…                  ← JavaFX modules + ap modules
+ │   ├─ lib/…                  ← JavaFX modules + app modules
  │   └─ …
  └─ my-app-runtime.zip         ← optional distribution archive
 ```
@@ -343,7 +343,7 @@ The **`run`** goal launches a JavaFX application directly from the Maven build l
 - Running the application with custom JVM options, debugger attachment, or additional native binaries.
 - Integrating UI tests into a CI pipeline that can start the app in head‑less mode (if the test harness supports it).
 
-The goal executes during the `proces-classes` phase and requires **runtime** dependency resolution.
+The goal executes during the `process-classes` phase and requires **runtime** dependency resolution.
 
 ### Key Configuration Parameters
 
@@ -429,7 +429,7 @@ The goal executes during the `proces-classes` phase and requires **runtime** dep
   runtime image for repeated runs.
 - **Headless CI** – If the CI environment lacks a display, add `-Djava.awt.headless=true` to options or configure a
   virtual frame buffer (e.g., Xvfb on Linux).
-- _\*Skipping Execution_ – Set `-Djavafx.skip=true` on the command line to bypass the run step (useful for multi‑module
+- _*Skipping Execution_ – Set `-Djavafx.skip=true` on the command line to bypass the run step (useful for multi‑module
   builds where only some modules need to be executed).
 
 ---

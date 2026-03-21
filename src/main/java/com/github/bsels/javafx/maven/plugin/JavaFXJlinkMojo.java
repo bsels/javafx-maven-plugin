@@ -250,7 +250,7 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         if (skip) {
-            getLog().info("Skipping execution of JavaFX run");
+            getLog().info("Skipping execution of JavaFX jlink");
             return;
         }
         if (isEmpty(jlinkExecutable)) {
