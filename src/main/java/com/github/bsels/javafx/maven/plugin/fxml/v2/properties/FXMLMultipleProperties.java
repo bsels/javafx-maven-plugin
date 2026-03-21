@@ -7,6 +7,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+/// Represents an FXML property that can have multiple values (a list).
+///
+/// @param name   The property name.
+/// @param setter The name of the setter method, if any.
+/// @param type   The property type.
+/// @param value  The list of values.
 public record FXMLMultipleProperties(
         String name,
         Optional<String> setter,
@@ -14,6 +20,13 @@ public record FXMLMultipleProperties(
         List<AbstractFXMLValue> value
 ) implements FXMLObjectProperty<List<AbstractFXMLValue>> {
 
+    /// Compact constructor to validate the property components.
+    ///
+    /// @param name   The property name.
+    /// @param setter The name of the setter method, if any.
+    /// @param type   The property type.
+    /// @param value  The list of values.
+    /// @throws NullPointerException if any required parameter is null.
     public FXMLMultipleProperties {
         Objects.requireNonNull(name, "`name` must not be null");
         Objects.requireNonNull(setter, "`setter` must not be null");

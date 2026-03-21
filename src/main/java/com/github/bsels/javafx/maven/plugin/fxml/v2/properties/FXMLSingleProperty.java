@@ -6,6 +6,12 @@ import java.lang.reflect.Type;
 import java.util.Objects;
 import java.util.Optional;
 
+/// Represents an FXML property that has a single value.
+///
+/// @param name   The property name.
+/// @param setter The name of the setter method, if any.
+/// @param type   The property type.
+/// @param value  The property value.
 public record FXMLSingleProperty(
         String name,
         Optional<String> setter,
@@ -13,6 +19,13 @@ public record FXMLSingleProperty(
         AbstractFXMLValue value
 ) implements FXMLObjectProperty<AbstractFXMLValue> {
 
+    /// Compact constructor to validate the property components.
+    ///
+    /// @param name   The property name.
+    /// @param setter The name of the setter method, if any.
+    /// @param type   The property type.
+    /// @param value  The property value.
+    /// @throws NullPointerException if any required parameter is null.
     public FXMLSingleProperty {
         Objects.requireNonNull(name, "`name` must not be null");
         Objects.requireNonNull(setter, "`setter` must not be null");

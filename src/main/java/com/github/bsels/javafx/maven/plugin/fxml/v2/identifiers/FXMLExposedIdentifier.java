@@ -4,8 +4,16 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.Utils;
 
 import java.util.Objects;
 
+/// Represents an identifier that is explicitly named in FXML (e.g., using fx:id).
+///
+/// @param name The name of the identifier.
 public record FXMLExposedIdentifier(String name) implements FXMLIdentifier {
 
+    /// Compact constructor to validate the identifier name.
+    ///
+    /// @param name The name of the identifier.
+    /// @throws NullPointerException     if the name is null.
+    /// @throws IllegalArgumentException if the name is not a valid Java identifier.
     public FXMLExposedIdentifier {
         Objects.requireNonNull(name, "Name must not be null");
         if (Utils.isInvalidIdentifierName(name)) {
@@ -13,6 +21,9 @@ public record FXMLExposedIdentifier(String name) implements FXMLIdentifier {
         }
     }
 
+    /// Returns the name of the identifier.
+    ///
+    /// @return The name.
     @Override
     public String toString() {
         return name;

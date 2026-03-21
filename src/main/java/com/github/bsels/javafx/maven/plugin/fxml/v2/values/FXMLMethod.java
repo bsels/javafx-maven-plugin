@@ -7,9 +7,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+/// Represents an FXML method call (e.g., event handlers).
+///
+/// @param name          The method name.
+/// @param parameters    The list of parameter types.
+/// @param returnType    The return type of the method.
+/// @param namedGenerics A map of generic type names to their actual types.
 public record FXMLMethod(String name, List<Type> parameters, Type returnType, Map<String, String> namedGenerics)
         implements AbstractFXMLValue {
 
+    /// Compact constructor to validate the method signature and generic types.
+    ///
+    /// @param name          The method name.
+    /// @param parameters    The list of parameter types.
+    /// @param returnType    The return type of the method.
+    /// @param namedGenerics A map of generic type names to their actual types.
+    /// @throws NullPointerException     if name, returnType or any element of parameters or namedGenerics is null.
+    /// @throws IllegalArgumentException if the name is not a valid Java identifier.
     public FXMLMethod {
         Objects.requireNonNull(name, "name cannot be null");
         if (Utils.isInvalidIdentifierName(name)) {

@@ -8,6 +8,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+/// Represents an object instantiated from FXML.
+///
+/// @param identifier    The identifier of the object.
+/// @param clazz         The class of the object.
+/// @param factoryMethod The factory method name, if any.
+/// @param generics      The generic type arguments.
+/// @param properties    The list of properties of the object.
+/// @param definitions   The list of objects defined within this object.
+/// @param scripts       The list of scripts associated with this object.
 public record FXMLObject(
         FXMLIdentifier identifier,
         Class<?> clazz,
@@ -18,6 +27,16 @@ public record FXMLObject(
         List<FXMLScript> scripts
 ) implements AbstractFXMLValue {
 
+    /// Compact constructor to validate the FXML object components.
+    ///
+    /// @param identifier    The identifier of the object.
+    /// @param clazz         The class of the object.
+    /// @param factoryMethod The factory method name, if any.
+    /// @param generics      The generic type arguments.
+    /// @param properties    The list of properties of the object.
+    /// @param definitions   The list of objects defined within this object.
+    /// @param scripts       The list of scripts associated with this object.
+    /// @throws NullPointerException if any required parameter is null.
     public FXMLObject {
         Objects.requireNonNull(identifier, "`identifier` must not be null");
         Objects.requireNonNull(clazz, "`clazz` must not be null");
