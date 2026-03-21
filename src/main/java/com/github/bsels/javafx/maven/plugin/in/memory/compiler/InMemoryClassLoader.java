@@ -36,8 +36,9 @@ public final class InMemoryClassLoader extends ClassLoader {
     /// @param parent          the parent [ClassLoader] to delegate class loading to if a class is not found in the in-memory compiled classes. This must not be null.
     /// @throws NullPointerException if `compiledClasses` or `parent` is null.
     public InMemoryClassLoader(Map<String, InMemoryCompiledClass> compiledClasses, ClassLoader parent) throws NullPointerException {
-        super(Objects.requireNonNull(parent, "`parent` cannot be null"));
+        Objects.requireNonNull(parent, "`parent` cannot be null");
         this.compiledClasses = Objects.requireNonNull(compiledClasses, "`compiledClasses` cannot be null");
+        super(parent);
     }
 
     /// Attempts to locate and load a class with the specified name.

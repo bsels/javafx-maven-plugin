@@ -150,7 +150,6 @@ public final class FXMLSourceCodeBuilder {
     ///
     /// @param log the logging utility used for logging messages and tracking actions during source code generation
     public FXMLSourceCodeBuilder(Log log) {
-        super();
         packageName = null;
         imports = new ArrayList<>();
         isAbstractClass = null;
@@ -169,6 +168,7 @@ public final class FXMLSourceCodeBuilder {
         superLine = null;
         isRoot = false;
         hasControllerInitializeMethod = false;
+        super();
         addImport("javax.annotation.processing.Generated");
     }
 

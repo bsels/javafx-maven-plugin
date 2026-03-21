@@ -37,9 +37,10 @@ public final class InMemoryCompiledClass extends SimpleJavaFileObject {
     /// @param className the fully qualified name of the class to be associated with this object. Must not be null.
     /// @throws NullPointerException if the className parameter is null.
     public InMemoryCompiledClass(String className) {
-        super(URI.create("jvm-memory:///%s%s".formatted(Objects.requireNonNull(className, "`className` must not be null").replace('.', '/'), Kind.CLASS.extension)), Kind.CLASS);
-        this.className = className;
+        this.className = Objects.requireNonNull(className, "`className` must not be null");
         this.outputStream = new ByteArrayOutputStream();
+        String uri = "jvm-memory:///%s%s".formatted(className.replace('.', '/'), Kind.CLASS.extension);
+        super(URI.create(uri), Kind.CLASS);
     }
 
     /// Retrieves the name of the class associated with this object.
