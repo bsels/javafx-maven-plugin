@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.1 - 2026-03-21
+## 1.3.1 - 2026-03-14
 
 ### Patch
 
@@ -14,13 +14,13 @@ Bumped dependencies:
 
 Added JaCoCo code coverage reporting
 
-## 1.3.0 - 2026-02-26
+## 1.3.0 - 2026-02-15
 
 ### Minor
 
 Added nested generics support using the standard Java notation.
 
-## 1.2.3 - 2026-02-25
+## 1.2.3 - 2026-02-14
 
 ### Patch
 
