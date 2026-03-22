@@ -1,5 +1,6 @@
 package com.github.bsels.javafx.maven.plugin.io;
 
+import com.github.bsels.javafx.maven.plugin.utils.Utils;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.logging.Log;
 import org.w3c.dom.Document;
@@ -47,6 +48,24 @@ public record FXMLReader(Log log) {
     /// This pattern is intended to be used for extracting and processing import statements
     /// declared within the FXML file for dynamic source code generation.
     private static final Pattern IMPORT_PATTERN = Pattern.compile("<\\?import\\s+((\\w+\\.)*(\\w+|\\*))\\s*\\?>");
+    /// A compiled regular expression pattern used to detect and extract language declarations within an FXML file.
+    /// The pattern matches specific tags of the form `<?language <language-name>?>`,
+    /// where `language-name` represents the name of the declared language.
+    ///
+    /// This pattern helps identify scripting language declarations embedded in FXML files,
+    /// typically used for associating a scripting language with the FXML elements.
+    ///
+    /// The pattern includes:
+    /// - `<?language` to match the opening declaration.
+    /// - `\\s+` to allow for one or more spaces between `language` and the language name.
+    /// - `(\\w+)` to capture the language name as a sequence of word characters.
+    /// - `\\s*` to optionally allow extra space before the closing `?>`.
+    ///
+    /// Example matches:
+    /// - `<?language javascript?>`
+    /// - `<?language groovy ?>`
+    /// - `<?language kotlin?>`
+    private static final Pattern LANGUAGE_PATTERN = Pattern.compile("<\\?language\\s+(\\w+)\\s*\\?>");
     /// A compiled regular expression used to match non-name characters within a string. Non-name characters are
     /// typically defined as characters that are not considered part of a valid name identifier, as indicated by the
     /// regex pattern "\W".
@@ -89,16 +108,26 @@ public record FXMLReader(Log log) {
     /// @return a [ParsedFXML] instance containing the import statements and the  root XML structure of the FXML file.
     /// @throws MojoExecutionException if the FXML file cannot be read or parsed due to an I/O error or XML parsing issues.
     public ParsedFXML readFXML(Path fxmlFile) throws MojoExecutionException {
-        List<String> imports;
+        record FXMLHeaders(List<String> imports, Optional<String> language) {
+        }
+
+        FXMLHeaders headers;
         try (Stream<String> lines = Files.lines(fxmlFile, StandardCharsets.UTF_8)) {
-            Predicate<String> importLinePredicate = IMPORT_PATTERN.asPredicate();
-            imports = lines.map(String::strip)
+            Predicate<String> combinedPredicate = IMPORT_PATTERN.asPredicate()
+                    .or(LANGUAGE_PATTERN.asPredicate());
+            headers = lines.map(String::strip)
                     .filter(Predicate.not(String::isEmpty))
-                    .dropWhile(Predicate.not(importLinePredicate))
-                    .takeWhile(importLinePredicate)
-                    .gather(EXTRACT_IMPORT_FROM_LINE)
-                    .toList();
-            log.info("Found %d imports: %s".formatted(imports.size(), imports));
+                    .dropWhile(combinedPredicate.negate())
+                    .takeWhile(combinedPredicate)
+                    .collect(Collectors.teeing(
+                            Utils.collectPattern(IMPORT_PATTERN),
+                            Collectors.collectingAndThen(
+                                    Utils.collectPattern(LANGUAGE_PATTERN),
+                                    Utils.singletonOrEmpty()
+                            ),
+                            FXMLHeaders::new
+                    ));
+            log.info("Found %d imports: %s".formatted(headers.imports().size(), headers.imports()));
         } catch (IOException e) {
             throw new MojoExecutionException("Unable to read FXML file", e);
         }
@@ -119,7 +148,7 @@ public record FXMLReader(Log log) {
         } catch (ParserConfigurationException | SAXException e) {
             throw new RuntimeException(e);
         }
-        return new ParsedFXML(imports, data, deriveClassName(fxmlFile));
+        return new ParsedFXML(headers.language(), headers.imports(), data, deriveClassName(fxmlFile));
     }
 
     /// Parses an XML node and its subtree recursively, constructing a [ParsedXMLStructure] instance that represents
@@ -127,7 +156,7 @@ public record FXMLReader(Log log) {
     ///
     /// @param node the XML `Node` to parse. Must not be null.
     /// @return a [ParsedXMLStructure] object representing the parsed structure of the given node and its subtree.
-    /// The object includes the node's name, attributes as key-value pairs, and a list of parsed child nodes.
+    ///                         The object includes the node's name, attributes as key-value pairs, and a list of parsed child nodes.
     private ParsedXMLStructure readDocument(Node node, int depth) {
         String name = node.getNodeName();
         log.debug("Reading node: %s".formatted(name).indent(depth * 2).stripTrailing());

@@ -4,7 +4,6 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 
 import java.lang.reflect.Type;
 import java.util.List;
-import java.util.Optional;
 
 /// Represents a static (attached) FXML property that can have multiple values.
 ///
@@ -21,11 +20,4 @@ public record FXMLStaticMultipleProperties(
         List<AbstractFXMLValue> value
 ) implements FXMLStaticProperty<List<AbstractFXMLValue>> {
 
-    /// Returns the name of the static setter method.
-    ///
-    /// @return The static setter name wrapped in an `Optional`.
-    @Override
-    public Optional<String> setter() {
-        return Optional.of(staticSetter);
-    }
 }

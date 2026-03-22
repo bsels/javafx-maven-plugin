@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.github.bsels.javafx.maven.plugin.fxml.ProcessedFXML;
 import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import com.github.bsels.javafx.maven.plugin.parameters.FXMLParameterized;
@@ -771,7 +772,9 @@ public class FXMLToSourceCodeMojoTest {
                                 throw new JsonGenerationException("Test exception", gen);
                             }
                         });
-                ObjectMapper objectMapper = new ObjectMapper().registerModule(simpleModule);
+                ObjectMapper objectMapper = new ObjectMapper()
+                        .registerModule(simpleModule)
+                        .registerModule(new Jdk8Module());
                 objectMapperProviderMockedStatic.when(ObjectMapperProvider::getObjectMapper)
                         .thenReturn(objectMapper);
 

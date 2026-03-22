@@ -60,7 +60,7 @@ public record FXMLDocumentParser(Log log) {
 
     /// Parses the given [ParsedFXML] into a [FXMLDocument].
     ///
-    /// @param parsedFXML the raw parsed FXML structure to convert. Must not be null.
+    /// @param parsedFXML the raw-parsed FXML structure to convert. Must not be null.
     /// @return the parsed [FXMLDocument] representing the V2 model.
     /// @throws NullPointerException     if parsedFXML is null.
     /// @throws IllegalArgumentException if the FXML structure is invalid.
@@ -72,20 +72,18 @@ public record FXMLDocumentParser(Log log) {
         AtomicInteger internalCounter = new AtomicInteger();
 
         Optional<String> controller = Optional.ofNullable(rootStructure.properties().get("fx:controller"));
-        // TODO Fix this, should be part of the parsed FXML
-        Optional<String> scriptEngine = Optional.ofNullable(rootStructure.properties().get("fx:scriptEngine"));
 
         FXMLObject root = convertObject(imports, rootStructure, internalCounter, true);
 
-        return new FXMLDocument(root, controller, scriptEngine, imports);
+        return new FXMLDocument(root, controller, parsedFXML.scriptNamespace(), imports);
     }
 
     /// Converts a [ParsedXMLStructure] node into an [FXMLObject].
     ///
-    /// @param imports          the list of imports used for class resolution.
-    /// @param structure        the XML structure node to convert.
-    /// @param internalCounter  the counter used to generate unique internal identifiers.
-    /// @param isRoot           whether this node is the document root element.
+    /// @param imports         the list of imports used for class resolution.
+    /// @param structure       the XML structure node to convert.
+    /// @param internalCounter the counter used to generate unique internal identifiers.
+    /// @param isRoot          whether this node is the document root element.
     /// @return the converted [FXMLObject].
     private FXMLObject convertObject(
             List<String> imports,
@@ -334,11 +332,11 @@ public record FXMLDocumentParser(Log log) {
 
     /// Converts an instance property child element into an [FXMLProperty].
     ///
-    /// @param imports          the list of imports for class resolution.
-    /// @param clazz            the class owning the property.
-    /// @param propName         the property name.
-    /// @param child            the child XML structure containing the property values.
-    /// @param internalCounter  the counter for generating internal identifiers.
+    /// @param imports         the list of imports for class resolution.
+    /// @param clazz           the class owning the property.
+    /// @param propName        the property name.
+    /// @param child           the child XML structure containing the property values.
+    /// @param internalCounter the counter for generating internal identifiers.
     /// @return an [Optional] containing the property, or empty if unresolvable.
     private Optional<FXMLProperty<?>> convertInstancePropertyElement(
             List<String> imports,
@@ -379,9 +377,9 @@ public record FXMLDocumentParser(Log log) {
 
     /// Converts the children of a property element into a list of [AbstractFXMLValue].
     ///
-    /// @param imports          the list of imports for class resolution.
-    /// @param propertyElement  the property element whose children are to be converted.
-    /// @param internalCounter  the counter for generating internal identifiers.
+    /// @param imports         the list of imports for class resolution.
+    /// @param propertyElement the property element whose children are to be converted.
+    /// @param internalCounter the counter for generating internal identifiers.
     /// @return the list of converted values.
     private List<AbstractFXMLValue> convertChildrenToValues(
             List<String> imports,
@@ -397,9 +395,9 @@ public record FXMLDocumentParser(Log log) {
 
     /// Converts a [ParsedXMLStructure] node into an [AbstractFXMLValue].
     ///
-    /// @param imports          the list of imports for class resolution.
-    /// @param structure        the XML structure node to convert.
-    /// @param internalCounter  the counter for generating internal identifiers.
+    /// @param imports         the list of imports for class resolution.
+    /// @param structure       the XML structure node to convert.
+    /// @param internalCounter the counter for generating internal identifiers.
     /// @return the converted [AbstractFXMLValue].
     private AbstractFXMLValue convertValue(
             List<String> imports,

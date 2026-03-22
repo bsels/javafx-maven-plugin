@@ -16,14 +16,22 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 import java.util.stream.Gatherer;
 import java.util.stream.Stream;
 
@@ -202,7 +210,7 @@ public final class Utils {
     /// @param typeName the name of the type to be resolved; may be a simple name or fully qualified name
     /// @return the resolved [Class<?>] object corresponding to the typeName
     /// @throws InternalClassNotFoundException if the type cannot be resolved or if multiple types are found
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               for a given name in wildcard imports
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         for a given name in wildcard imports
     public static Class<?> findType(List<String> imports, String typeName) {
         if (typeName.contains(".")) {
             return findTypeForName(typeName)
@@ -269,6 +277,19 @@ public final class Utils {
     /// @return a binary operator that returns the first of its input arguments
     public static <T> BinaryOperator<T> getFirstLambda() {
         return (a, _) -> a;
+    }
+
+    /// Returns a binary operator that applies the given bi-function to its inputs and always
+    /// returns the first input.
+    ///
+    /// @param <T>      the type of the input arguments and the result
+    /// @param function a bi-function that is applied to the two input arguments
+    /// @return a binary operator that applies the given bi-function and returns the first input
+    public static <T> BinaryOperator<T> merge(BiFunction<T, T, ?> function) {
+        return (a, b) -> {
+            function.apply(a, b);
+            return a;
+        };
     }
 
     /// Finds and returns a list of parameterized types for the specified property name in the public constructors of
@@ -358,7 +379,7 @@ public final class Utils {
     /// @return the return type of the validated getter method
     /// @throws NoSuchMethodException if the specified getter method does not exist in the class
     /// @throws IllegalStateException if the method's return type is not a collection,
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             or its generic type is incompatible with the given parameter type
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 or its generic type is incompatible with the given parameter type
     public static Class<?> findCollectionGetterWithAllowedReturnType(
             Class<?> clazz,
             String identifier,
@@ -401,7 +422,7 @@ public final class Utils {
     /// @param imports   a collection of fully qualified class names representing the current imports
     /// @param parameter the fully qualified class name of the parameter to be processed
     /// @return a simplified class name if the parameter can be reduced using the import set,
-    ///                 otherwise the original fully qualified class name of the parameter
+    ///                                                                 otherwise the original fully qualified class name of the parameter
     public static String improveImportForParameter(Collection<String> imports, String parameter) {
         String simpleName = parameter.substring(parameter.lastIndexOf('.') + 1);
         if (imports.contains(parameter)) {
@@ -448,6 +469,54 @@ public final class Utils {
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /// Creates a [Collector] that collects strings matching the specified pattern into an immutable list.
+    ///
+    /// @param pattern the regular expression pattern used to match strings; must not be null
+    /// @return a [Collector] that accumulates strings matching the pattern into an immutable list
+    public static Collector<String, ?, List<String>> collectPattern(Pattern pattern) {
+        Objects.requireNonNull(pattern, "pattern must not be null");
+        return Collectors.filtering(
+                pattern.asPredicate(),
+                Collector.of(
+                        ArrayList::new,
+                        collectPatternConsumer(pattern),
+                        merge(List::addAll),
+                        List::copyOf
+                )
+        );
+    }
+
+    /// Returns a function that processes a collection and retrieves its single element wrapped in an [Optional],
+    /// or an empty [Optional] if the collection is empty.
+    /// If the collection contains more than one element, an [IllegalStateException] is thrown.
+    ///
+    /// @return a function that converts a collection to an [Optional] containing its single element, or empty if the collection is empty
+    public static <E, C extends Collection<E>> Function<C, Optional<E>> singletonOrEmpty() {
+        return collection -> {
+            if (collection.size() > 1) {
+                throw new IllegalStateException(
+                        "Expected an empty or singleton collection, found %d elements".formatted(collection.size())
+                );
+            }
+            return collection.stream()
+                    .findFirst();
+        };
+    }
+
+    /// Creates a [BiConsumer] that collects matches of a given [Pattern] from strings into a list.
+    ///
+    /// @param pattern the regular expression pattern to match against input strings; must not be null
+    /// @return a [BiConsumer] that takes a [List] of strings and an input string and adds the first capture group of all matches in the input string to the list
+    private static BiConsumer<List<String>, String> collectPatternConsumer(Pattern pattern) {
+        Objects.requireNonNull(pattern, "pattern must not be null");
+        return (list, line) -> {
+            Matcher matcher = pattern.matcher(line);
+            while (matcher.find()) {
+                list.add(matcher.group(1));
+            }
+        };
     }
 
     /// Constructs and returns a filter predicate for methods, identifying those that are public, abstract, non-default,

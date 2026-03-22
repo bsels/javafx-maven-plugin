@@ -89,7 +89,7 @@ class BaseJavaFXMojoTest {
 
             assertThatExceptionOfType(MojoExecutionException.class)
                     .isThrownBy(() -> classUnderTest.init(null))
-                    .withMessage("Error: Output directory does not exists");
+                    .withMessage("Error: Output directory does not exist");
         }
 
         @Test
@@ -101,7 +101,7 @@ class BaseJavaFXMojoTest {
 
             assertThatExceptionOfType(MojoExecutionException.class)
                     .isThrownBy(() -> classUnderTest.init(null))
-                    .withMessage("Error: Output directory does not exists");
+                    .withMessage("Error: Output directory does not exist");
         }
 
         @Test
@@ -115,7 +115,7 @@ class BaseJavaFXMojoTest {
 
             assertThatExceptionOfType(MojoExecutionException.class)
                     .isThrownBy(() -> classUnderTest.init(null))
-                    .withMessage("Error: Output directory does not exists");
+                    .withMessage("Error: Output directory does not exist");
         }
 
         @Test
