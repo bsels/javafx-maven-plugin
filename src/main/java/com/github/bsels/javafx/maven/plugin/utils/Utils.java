@@ -210,7 +210,7 @@ public final class Utils {
     /// @param typeName the name of the type to be resolved; may be a simple name or fully qualified name
     /// @return the resolved [Class<?>] object corresponding to the typeName
     /// @throws InternalClassNotFoundException if the type cannot be resolved or if multiple types are found
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         for a given name in wildcard imports
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                for a given name in wildcard imports
     public static Class<?> findType(List<String> imports, String typeName) {
         if (typeName.contains(".")) {
             return findTypeForName(typeName)
@@ -379,7 +379,7 @@ public final class Utils {
     /// @return the return type of the validated getter method
     /// @throws NoSuchMethodException if the specified getter method does not exist in the class
     /// @throws IllegalStateException if the method's return type is not a collection,
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 or its generic type is incompatible with the given parameter type
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               or its generic type is incompatible with the given parameter type
     public static Class<?> findCollectionGetterWithAllowedReturnType(
             Class<?> clazz,
             String identifier,
@@ -422,7 +422,7 @@ public final class Utils {
     /// @param imports   a collection of fully qualified class names representing the current imports
     /// @param parameter the fully qualified class name of the parameter to be processed
     /// @return a simplified class name if the parameter can be reduced using the import set,
-    ///                                                                 otherwise the original fully qualified class name of the parameter
+    ///                                                                         otherwise the original fully qualified class name of the parameter
     public static String improveImportForParameter(Collection<String> imports, String parameter) {
         String simpleName = parameter.substring(parameter.lastIndexOf('.') + 1);
         if (imports.contains(parameter)) {
@@ -492,6 +492,8 @@ public final class Utils {
     /// or an empty [Optional] if the collection is empty.
     /// If the collection contains more than one element, an [IllegalStateException] is thrown.
     ///
+    /// @param <E> the type of elements in the collection
+    /// @param <C> the type of the collection
     /// @return a function that converts a collection to an [Optional] containing its single element, or empty if the collection is empty
     public static <E, C extends Collection<E>> Function<C, Optional<E>> singletonOrEmpty() {
         return collection -> {

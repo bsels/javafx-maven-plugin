@@ -95,7 +95,6 @@ public record FXMLDocumentParser(Log log) {
             throws IllegalStateException {
         Map<String, String> properties = structure.properties();
         String nodeName = structure.name();
-
         ClassAndIdentifier classAndIdentifier = resolveClassAndIdentifier(nodeName, properties, buildContext, isRoot);
         if (Collection.class.isAssignableFrom(classAndIdentifier.clazz())) {
             return parseCollection(structure, buildContext, classAndIdentifier);
@@ -124,6 +123,7 @@ public record FXMLDocumentParser(Log log) {
         List<AbstractFXMLValue> values = structure.children()
                 .stream()
                 .map(child -> parseValue(child, buildContext))
+                .gather(Utils.<AbstractFXMLValue>optional())
                 .toList();
         return new FXMLCollection(
                 classAndIdentifier.identifier(),
@@ -134,8 +134,16 @@ public record FXMLDocumentParser(Log log) {
         );
     }
 
-    private AbstractFXMLValue parseValue(ParsedXMLStructure structure, BuildContext buildContext) {
-        return null; // TODO
+    private Optional<AbstractFXMLValue> parseValue(ParsedXMLStructure structure, BuildContext buildContext) {
+        String nodeName = structure.name();
+        if (FXMLConstants.FX_DEFINE_ELEMENT.equals(nodeName)) {
+            structure.children()
+                    .stream()
+                    .map(child -> parseObject(child, buildContext, false))
+                    .forEach(buildContext.definitions()::add);
+            return Optional.empty();
+        }
+        return Optional.empty(); // TODO
     }
 
     /// Resolves and returns an [ClassAndIdentifier] object based on the given node name, attributes, and context.
@@ -733,7 +741,7 @@ public record FXMLDocumentParser(Log log) {
     private record BuildContext(
             AtomicInteger internalCounter,
             List<String> imports,
-            List<FXMLObject> definitions,
+            List<AbstractFXMLObject> definitions,
             List<FXMLScript> scripts
     ) {
 

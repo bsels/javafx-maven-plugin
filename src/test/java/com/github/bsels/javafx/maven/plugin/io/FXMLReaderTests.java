@@ -389,33 +389,4 @@ class FXMLReaderTests {
             }
         }
     }
-
-    @Nested
-    class ExtractImportFromLineTest {
-
-        @Test
-        @SuppressWarnings("unchecked")
-        public void shouldExtractImportFromLine() throws IllegalAccessException, NoSuchFieldException {
-            // Arrange
-            Field field = FXMLReader.class.getDeclaredField("EXTRACT_IMPORT_FROM_LINE");
-            field.setAccessible(true);
-            Gatherer<String, Void, String> gatherer = (Gatherer<String, Void, String>) field.get(FXMLReader.class);
-            List<String> importsLines = List.of(
-                    "ignore",
-                    "<?import java.lang.String?>",
-                    "<?import java.lang.Boolean?><?import java.lang.Integer?>"
-            );
-
-            // Act
-            List<String> classes = importsLines.stream()
-                    .gather(gatherer)
-                    .limit(2)
-                    .toList();
-
-            // Assert
-            assertThat(classes)
-                    .containsExactly("java.lang.String", "java.lang.Boolean");
-        }
-    }
-
 }

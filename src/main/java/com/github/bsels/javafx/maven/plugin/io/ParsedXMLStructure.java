@@ -40,4 +40,18 @@ public record ParsedXMLStructure(
     public ParsedXMLStructure(String name, Map<String, String> properties, List<ParsedXMLStructure> children) {
         this(name, properties, children, List.of());
     }
+
+    /// Retrieves the text value of this XML element.
+    ///
+    /// This method is intended to be called on elements that do not contain child elements.
+    /// If the element has children, an [IllegalStateException] is thrown.
+    ///
+    /// @return the text value of the element as a [String] if the element does not have children
+    /// @throws IllegalStateException if the element contains child elements
+    public String getTextValue() throws IllegalStateException {
+        if (!children.isEmpty()) {
+            throw new IllegalStateException("Cannot get text value of an element with children");
+        }
+        return ""; // TODO
+    }
 }
