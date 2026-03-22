@@ -1,7 +1,5 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
-import com.github.bsels.javafx.maven.plugin.fxml.v2.Utils;
-
 import java.util.Objects;
 
 /// Represents an FXML copy (e.g., using fx:copy).
@@ -15,8 +13,6 @@ public record FXMLCopy(String name) implements AbstractFXMLValue {
     /// @throws IllegalArgumentException if the name is not a valid Java identifier.
     public FXMLCopy {
         Objects.requireNonNull(name, "name cannot be null");
-        if (Utils.isInvalidIdentifierName(name)) {
-            throw new IllegalArgumentException("name must be a valid Java identifier: %s".formatted(name));
-        }
+        AbstractFXMLValue.validateIdentifier(name);
     }
 }

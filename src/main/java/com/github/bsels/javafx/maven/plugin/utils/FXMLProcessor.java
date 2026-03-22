@@ -591,7 +591,7 @@ public record FXMLProcessor(Log log) {
     }
 
     /// Extracts a single FXML property from the provided entry, determining whether it is a static property
-    /// or an object/constructor property based on the property name format. If the property name contains a dot ("."),
+    /// or an object/constructor property based on the property name format. If the property name contains a dot (`.`),
     /// it attempts to resolve it as a static property. Otherwise, it processes it as an object or constructor property.
     ///
     /// @param imports  the list of import statements used to resolve type references during property extraction

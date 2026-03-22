@@ -46,7 +46,7 @@ public record CheckAndCast<I, O>(Class<O> clazz) implements Gatherer<I, Void, O>
     ///
     /// @param state      the state of the integration process (unused in this implementation)
     /// @param element    the input element to check and potentially cast
-    /// @param downstream the downstream consumer that processes casted elements of the target type
+    /// @param downstream the downstream consumer that processes elements of the target type
     /// @return `true` if processing should continue; otherwise `false` to stop further processing
     private boolean integrate(Void state, I element, Downstream<? super O> downstream) {
         if (clazz.isInstance(element)) {

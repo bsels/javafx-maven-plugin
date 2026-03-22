@@ -3,6 +3,8 @@ package com.github.bsels.javafx.maven.plugin.fxml.v2;
 /// Constants for FXML elements, attributes, properties, and prefixes.
 public final class FXMLConstants {
     // region: Attributes
+    /// The `charset` attribute.
+    public static final String CHARSET_ATTRIBUTE = "charset";
     /// The `fx:constant` attribute.
     public static final String FX_CONSTANT_ATTRIBUTE = "fx:constant";
     /// The `fx:controller` attribute.
@@ -19,6 +21,10 @@ public final class FXMLConstants {
     public static final String FX_REFERENCE_ATTRIBUTE = "fx:reference";
     /// The `fx:value` attribute.
     public static final String FX_VALUE_ATTRIBUTE = "fx:value";
+    /// The `source` attribute.
+    public static final String SOURCE_ATTRIBUTE = "source";
+    /// The `type` attribute.
+    public static final String TYPE_ATTRIBUTE = "type";
     // endregion
     // region: Elements
     /// The `fx:root` element.
@@ -27,12 +33,6 @@ public final class FXMLConstants {
     public static final String FX_DEFINE_ELEMENT = "fx:define";
     /// The `fx:script` element.
     public static final String FX_SCRIPT_ELEMENT = "fx:script";
-    // endregion
-    // region: Properties
-    /// The `source` property.
-    public static final String SOURCE = "source";
-    /// The `charset` property.
-    public static final String CHARSET = "charset";
     // endregion
     // region: Prefixes
     /// The `\` prefix for escaping.

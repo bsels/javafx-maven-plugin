@@ -1,6 +1,7 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2;
 
 import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLScript;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLObject;
 
 import java.util.List;
@@ -16,7 +17,7 @@ import java.util.Optional;
 /// @param definitions  The list of objects defined within this object.
 /// @param scripts      The list of scripts associated with this object.
 public record FXMLDocument(
-        FXMLObject root,
+        AbstractFXMLObject root,
         Optional<String> controller,
         Optional<String> scriptEngine,
         List<String> imports,

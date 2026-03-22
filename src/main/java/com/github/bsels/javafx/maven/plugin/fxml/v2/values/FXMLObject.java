@@ -1,8 +1,8 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
+import com.github.bsels.javafx.maven.plugin.fxml.v2.Utils;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLScript;
 
 import java.util.List;
 import java.util.Objects;
@@ -21,7 +21,7 @@ public record FXMLObject(
         Optional<String> factoryMethod,
         List<String> generics,
         List<FXMLProperty<?>> properties
-) implements AbstractFXMLValue {
+) implements AbstractFXMLValue, AbstractFXMLObject {
 
     /// Compact constructor to validate the FXML object components.
     ///
@@ -30,12 +30,21 @@ public record FXMLObject(
     /// @param factoryMethod The factory method name, if any.
     /// @param generics      The generic type arguments.
     /// @param properties    The list of properties of the object.
-    /// @throws NullPointerException if any required parameter is null.
+    /// @throws NullPointerException     if any required parameter is null.
+    /// @throws IllegalArgumentException if factoryMethod is not a valid Java identifier
     public FXMLObject {
         Objects.requireNonNull(identifier, "`identifier` must not be null");
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         Objects.requireNonNull(factoryMethod, "`factoryMethod` must not be null");
         generics = List.copyOf(Objects.requireNonNullElseGet(generics, List::of));
         properties = List.copyOf(Objects.requireNonNullElseGet(properties, List::of));
+        factoryMethod.ifPresent(
+                factoryMethodValue -> {
+                    if (Utils.isInvalidIdentifierName(factoryMethodValue))
+                        throw new IllegalArgumentException(
+                                "Factory method is not a valid Java identifier: %s".formatted(factoryMethodValue)
+                        );
+                }
+        );
     }
 }

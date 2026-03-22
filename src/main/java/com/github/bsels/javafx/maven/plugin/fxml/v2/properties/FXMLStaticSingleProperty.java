@@ -4,7 +4,6 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 
 import java.lang.reflect.Type;
 import java.util.Objects;
-import java.util.Optional;
 
 /// Represents a static (attached) FXML property that has a single value.
 ///

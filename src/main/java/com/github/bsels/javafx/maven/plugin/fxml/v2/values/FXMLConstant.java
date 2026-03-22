@@ -19,5 +19,6 @@ public record FXMLConstant(Class<?> clazz, String identifier, Type constantType)
         Objects.requireNonNull(clazz, "Class must not be null");
         Objects.requireNonNull(identifier, "Identifier must not be null");
         Objects.requireNonNull(constantType, "Constant type must not be null");
+        AbstractFXMLValue.validateIdentifier(identifier);
     }
 }

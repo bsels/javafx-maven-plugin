@@ -22,7 +22,7 @@ public record FXMLMethod(String name, List<Type> parameters, Type returnType, Ma
     /// @param parameters    The list of parameter types.
     /// @param returnType    The return type of the method.
     /// @param namedGenerics A map of generic type names to their actual types.
-    /// @throws NullPointerException     if name, returnType or any element of parameters or namedGenerics is null.
+    /// @throws NullPointerException     if the name, returnType, or any element of parameters or namedGenerics is null.
     /// @throws IllegalArgumentException if the name is not a valid Java identifier.
     public FXMLMethod {
         Objects.requireNonNull(name, "name cannot be null");
