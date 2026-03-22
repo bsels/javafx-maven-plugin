@@ -1,5 +1,6 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2;
 
+import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLObject;
 
 import java.util.List;
@@ -12,11 +13,15 @@ import java.util.Optional;
 /// @param controller   The controller class name, if any.
 /// @param scriptEngine The script engine name, if any.
 /// @param imports      The list of imported classes or packages.
+/// @param definitions  The list of objects defined within this object.
+/// @param scripts      The list of scripts associated with this object.
 public record FXMLDocument(
         FXMLObject root,
         Optional<String> controller,
         Optional<String> scriptEngine,
-        List<String> imports
+        List<String> imports,
+        List<FXMLObject> definitions,
+        List<FXMLScript> scripts
 ) {
     /// Compact constructor to validate the FXML document components.
     ///
@@ -24,11 +29,15 @@ public record FXMLDocument(
     /// @param controller   The controller class name, if any.
     /// @param scriptEngine The script engine name, if any.
     /// @param imports      The list of imported classes or packages.
+    /// @param definitions  The list of objects defined within this object.
+    /// @param scripts      The list of scripts associated with this object.
     /// @throws NullPointerException if any required parameter is null.
     public FXMLDocument {
         Objects.requireNonNull(root, "`root` must not be null");
         Objects.requireNonNull(controller, "`controller` must not be null");
         Objects.requireNonNull(scriptEngine, "`scriptEngine` must not be null");
         imports = List.copyOf(Objects.requireNonNullElseGet(imports, List::of));
+        definitions = List.copyOf(Objects.requireNonNullElseGet(definitions, List::of));
+        scripts = List.copyOf(Objects.requireNonNullElseGet(scripts, List::of));
     }
 }

@@ -3,7 +3,7 @@ package com.github.bsels.javafx.maven.plugin.fxml.v2.values;
 /// Represents an FXML expression (e.g., using ${expression}).
 ///
 /// @param expression The expression string.
-public record FXMLExpression(String expression) {
+public record FXMLExpression(String expression) implements AbstractFXMLValue {
     /// Compact constructor to validate the expression.
     ///
     /// @param expression The expression string.
