@@ -21,10 +21,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Gatherer;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -74,24 +72,6 @@ public record FXMLReader(Log log) {
     /// structured information. Its primary usage is likely to assist in identifying invalid characters in
     /// names or identifiers during processing.
     private static final Pattern NON_NAME_CHAR_PATTERN = Pattern.compile("\\W");
-    /// A [Gatherer] instance designed to extract class or package names from "import" statements
-    /// in lines of text during sequential processing. Specifically, this `Gatherer` uses
-    /// a regular expression matcher to identify and extract substrings that match import patterns.
-    ///
-    /// The `integrator` implementation iterates through matches found within a line of text,
-    /// extracts the relevant group from the matched text, and pushes it downstream for further processing.
-    /// The operation halts if downstream processing requests termination.
-    private static final Gatherer<String, Void, String> EXTRACT_IMPORT_FROM_LINE = Gatherer.ofSequential(
-            (_, line, integrator) -> {
-                Matcher matcher = IMPORT_PATTERN.matcher(line);
-                while (matcher.find()) {
-                    if (!integrator.push(matcher.group(1))) {
-                        return false;
-                    }
-                }
-                return true;
-            }
-    );
 
     /// Constructs an instance of the [FXMLReader] class.
     ///
