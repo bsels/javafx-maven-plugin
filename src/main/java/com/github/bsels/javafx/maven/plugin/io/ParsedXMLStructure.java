@@ -1,5 +1,7 @@
 package com.github.bsels.javafx.maven.plugin.io;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,6 +50,7 @@ public record ParsedXMLStructure(
     ///
     /// @return the text value of the element as a [String] if the element does not have children
     /// @throws IllegalStateException if the element contains child elements
+    @JsonIgnore
     public String getTextValue() throws IllegalStateException {
         if (!children.isEmpty()) {
             throw new IllegalStateException("Cannot get text value of an element with children");

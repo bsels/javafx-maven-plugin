@@ -173,6 +173,19 @@ public final class Utils {
         return (Gatherer<? super Optional<T>, Void, T>) OPTIONAL;
     }
 
+
+    /// Returns a [Gatherer] instance that works with [Optional] values.
+    /// This method is designed to handle Optional instances by facilitating operations on their contained
+    /// values in a generic and type-safe manner.
+    ///
+    /// @param <T>   the type of the element contained within the [Optional]
+    /// @param clazz the class of the element contained within the [Optional]
+    /// @return a [Gatherer] instance that processes Optional values
+    public static <T> Gatherer<? super Optional<T>, Void, T> optional(Class<T> clazz) {
+        Objects.requireNonNull(clazz, "clazz cannot be null");
+        return optional();
+    }
+
     /// Identifies and retrieves the single functional method of a given class if the class represents a functional interface.
     /// A functional interface is expected to have exactly one abstract method.
     ///
@@ -210,7 +223,7 @@ public final class Utils {
     /// @param typeName the name of the type to be resolved; may be a simple name or fully qualified name
     /// @return the resolved [Class<?>] object corresponding to the typeName
     /// @throws InternalClassNotFoundException if the type cannot be resolved or if multiple types are found
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                for a given name in wildcard imports
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       for a given name in wildcard imports
     public static Class<?> findType(List<String> imports, String typeName) {
         if (typeName.contains(".")) {
             return findTypeForName(typeName)
@@ -379,7 +392,7 @@ public final class Utils {
     /// @return the return type of the validated getter method
     /// @throws NoSuchMethodException if the specified getter method does not exist in the class
     /// @throws IllegalStateException if the method's return type is not a collection,
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               or its generic type is incompatible with the given parameter type
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             or its generic type is incompatible with the given parameter type
     public static Class<?> findCollectionGetterWithAllowedReturnType(
             Class<?> clazz,
             String identifier,
@@ -422,7 +435,7 @@ public final class Utils {
     /// @param imports   a collection of fully qualified class names representing the current imports
     /// @param parameter the fully qualified class name of the parameter to be processed
     /// @return a simplified class name if the parameter can be reduced using the import set,
-    ///                                                                         otherwise the original fully qualified class name of the parameter
+    ///                                                                                 otherwise the original fully qualified class name of the parameter
     public static String improveImportForParameter(Collection<String> imports, String parameter) {
         String simpleName = parameter.substring(parameter.lastIndexOf('.') + 1);
         if (imports.contains(parameter)) {

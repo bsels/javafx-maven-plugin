@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 /// Parses a [ParsedFXML] raw XML structure into a [FXMLDocument] V2 model.
 ///
@@ -122,8 +123,8 @@ public record FXMLDocumentParser(Log log) {
         Optional<String> factoryMethod = Optional.ofNullable(properties.get(FXMLConstants.FX_FACTORY_ATTRIBUTE));
         List<AbstractFXMLValue> values = structure.children()
                 .stream()
-                .map(child -> parseValue(child, buildContext))
-                .gather(Utils.<AbstractFXMLValue>optional())
+                .map(parseValueChild(buildContext))
+                .gather(Utils.optional(AbstractFXMLValue.class))
                 .toList();
         return new FXMLCollection(
                 classAndIdentifier.identifier(),
@@ -134,7 +135,21 @@ public record FXMLDocumentParser(Log log) {
         );
     }
 
-    private Optional<AbstractFXMLValue> parseValue(ParsedXMLStructure structure, BuildContext buildContext) {
+    /// Parses a child XML structure into an [AbstractFXMLValue].
+    ///
+    /// @param buildContext the build context for parsing
+    /// @return a function that parses a child XML structure into an [AbstractFXMLValue]
+    private Function<ParsedXMLStructure, Optional<AbstractFXMLValue>> parseValueChild(BuildContext buildContext) {
+        return child -> parseValueChild(child, buildContext);
+    }
+
+    /// Parses a value node from the XML structure and processes it based on its type.
+    /// Handles special cases such as "fx:define", "fx:script", or nodes with skippable prefixes.
+    ///
+    /// @param structure    the parsed XML structure representing the value node
+    /// @param buildContext the context used during building, containing definitions, scripts, and other relevant data
+    /// @return an [Optional] containing the parsed [AbstractFXMLValue], or an empty [Optional] if the node is processed without producing a value (e.g., "fx:define" or "fx:script" nodes)
+    private Optional<AbstractFXMLValue> parseValueChild(ParsedXMLStructure structure, BuildContext buildContext) {
         String nodeName = structure.name();
         if (FXMLConstants.FX_DEFINE_ELEMENT.equals(nodeName)) {
             structure.children()
@@ -142,8 +157,31 @@ public record FXMLDocumentParser(Log log) {
                     .map(child -> parseObject(child, buildContext, false))
                     .forEach(buildContext.definitions()::add);
             return Optional.empty();
+        } else if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(nodeName)) {
+            buildContext.scripts()
+                    .add(parseScript(structure));
+            return Optional.empty();
+        } else if (hasSkippablePrefix(nodeName)) {
+            return Optional.empty();
+        } else {
+            return Optional.of(parseValue(structure, buildContext));
         }
-        return Optional.empty(); // TODO
+    }
+
+    private AbstractFXMLValue parseValue(ParsedXMLStructure structure, BuildContext buildContext) {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
+
+    /// Determines if the given string has a skippable prefix.
+    ///
+    /// @param key the string to check for skippable prefixes
+    /// @return true if the string starts with a skippable prefix; false otherwise
+    private boolean hasSkippablePrefix(String key) {
+        return key.startsWith(FXMLConstants.FX_PREFIX) || key.startsWith(FXMLConstants.XML_NAMESPACE_PREFIX);
+    }
+
+    private FXMLScript parseScript(ParsedXMLStructure structure) {
+        return null; // TODO
     }
 
     /// Resolves and returns an [ClassAndIdentifier] object based on the given node name, attributes, and context.
@@ -264,9 +302,9 @@ public record FXMLDocumentParser(Log log) {
             } else if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(childName)) {
                 // fx:script — collected globally
                 scripts.add(convertScript(child));
-            } else if (FXMLConstants.FX_INCLUDE_ATTRIBUTE.equals(childName)
-                    || FXMLConstants.FX_REFERENCE_ATTRIBUTE.equals(childName)
-                    || FXMLConstants.FX_COPY_ATTRIBUTE.equals(childName)) {
+            } else if (FXMLConstants.FX_INCLUDE_ELEMENT.equals(childName)
+                    || FXMLConstants.FX_REFERENCE_ELEMENT.equals(childName)
+                    || FXMLConstants.FX_COPY_ELEMENT.equals(childName)) {
                 // Special fx: value elements used as children
                 AbstractFXMLValue fxValue = convertValue(imports, child, internalCounter, definitions, scripts);
                 Optional<String> defaultPropName = resolveDefaultPropertyName(clazz);
@@ -551,7 +589,7 @@ public record FXMLDocumentParser(Log log) {
         String nodeName = structure.name();
         Map<String, String> attributes = structure.properties();
 
-        if (FXMLConstants.FX_INCLUDE_ATTRIBUTE.equals(nodeName)) {
+        if (FXMLConstants.FX_INCLUDE_ELEMENT.equals(nodeName)) {
             String src = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
             if (src == null) {
                 throw new IllegalArgumentException("fx:include must have a 'source' attribute");
@@ -559,7 +597,7 @@ public record FXMLDocumentParser(Log log) {
             return new FXMLInclude(null, src);
         }
 
-        if (FXMLConstants.FX_REFERENCE_ATTRIBUTE.equals(nodeName)) {
+        if (FXMLConstants.FX_REFERENCE_ELEMENT.equals(nodeName)) {
             String source = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
             if (source == null) {
                 throw new IllegalArgumentException("fx:reference must have a 'source' attribute");
@@ -567,7 +605,7 @@ public record FXMLDocumentParser(Log log) {
             return new FXMLReference(source);
         }
 
-        if (FXMLConstants.FX_COPY_ATTRIBUTE.equals(nodeName)) {
+        if (FXMLConstants.FX_COPY_ELEMENT.equals(nodeName)) {
             String source = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
             if (source == null) {
                 throw new IllegalArgumentException("fx:copy must have a 'source' attribute");
