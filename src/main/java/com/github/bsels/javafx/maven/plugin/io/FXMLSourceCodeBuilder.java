@@ -540,8 +540,10 @@ public final class FXMLSourceCodeBuilder {
     /// and annotations align with the given properties.
     /// Throws an exception if either no valid constructor or multiple matching constructors are found.
     ///
+    /// @param builder    the StringBuilder to append the constructor parameters to
     /// @param clazz      the class whose constructor parameters are to be processed
     /// @param properties a list of FXMLProperty objects to be associated with the constructor parameters
+    /// @return the modified StringBuilder with the appended constructor parameters
     private StringBuilder addConstructorParameters(
             StringBuilder builder,
             Class<?> clazz,
@@ -557,8 +559,10 @@ public final class FXMLSourceCodeBuilder {
     /// constructor properties. A constructor is considered minimal if it has the least number of parameters
     /// while still satisfying the property name and annotation requirements.
     ///
+    /// @param builder               the StringBuilder to append the minimal constructor to
     /// @param clazz                 the class whose constructors are being evaluated
     /// @param constructorProperties a map of property names to `FXMLConstructorProperty` that defines the required constructor parameters and their corresponding values
+    /// @return the modified StringBuilder with the appended minimal constructor
     /// @throws IllegalStateException if no minimal matching constructor can be found
     private StringBuilder findMinimalConstructor(
             StringBuilder builder,
@@ -798,6 +802,7 @@ public final class FXMLSourceCodeBuilder {
     /// @param builder the StringBuilder to append the resulting string
     /// @param isVoid  a boolean indicating if the method return type is void
     /// @param indent  the level of indentation to apply before the appended string
+    /// @return the modified StringBuilder
     private StringBuilder addReturnIfNeeded(StringBuilder builder, boolean isVoid, int indent) {
         if (!isVoid) {
             builder.append(indent("return ", indent));

@@ -141,6 +141,7 @@ public final class OptimisticInMemoryCompiler {
     /// Extracts and returns a set of file paths corresponding to diagnostics with an error or other severe kind.
     /// Filters diagnostics to include only those of kind ERROR or OTHER, and maps their sources to file paths.
     ///
+    /// @param logger      the logger to use for logging diagnostics. Must not be null.
     /// @param diagnostics a `DiagnosticCollector<JavaFileObject>` instance that contains the diagnostic information of a compilation process. Must not be null. Each diagnostic may provide details such as its severity and the associated source file.
     /// @return a `Set<Path>` containing the file paths of source files associated with error or other severe diagnostics. Returns an empty set if there are no such diagnostics or if their sources are unavailable.
     private Set<Path> getFailedFilesFromDiagnostics(Log logger, DiagnosticCollector<JavaFileObject> diagnostics) {

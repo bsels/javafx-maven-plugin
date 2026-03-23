@@ -134,9 +134,9 @@ public record FXMLReader(Log log) {
     /// Parses an XML node and its subtree recursively, constructing a [ParsedXMLStructure] instance that represents
     /// the name, attributes, and children of the node.
     ///
-    /// @param node the XML `Node` to parse. Must not be null.
-    /// @return a [ParsedXMLStructure] object representing the parsed structure of the given node and its subtree.
-    ///                                                                         The object includes the node's name, attributes as key-value pairs, and a list of parsed child nodes.
+    /// @param node  the XML `Node` to parse. Must not be null.
+    /// @param depth the current depth in the XML tree, used for indentation in debug logs.
+    /// @return a [ParsedXMLStructure] object representing the parsed structure of the given node and its subtree. The object includes the node's name, attributes as key-value pairs, and a list of parsed child nodes.
     private ParsedXMLStructure readDocument(Node node, int depth) {
         String name = node.getNodeName();
         log.debug("Reading node: %s".formatted(name).indent(depth * 2).stripTrailing());

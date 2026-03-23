@@ -605,6 +605,8 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
     /// - Sets the created ZIP file as the project's artifact file.
     /// - Logs the successful completion of the zipping process.
     /// Note: Ensure that the required resources are in place before invoking this method to avoid runtime issues.
+    ///
+    /// @throws MojoExecutionException if an error occurs during the zipping process
     private void zipApplication() throws MojoExecutionException {
         if (isEmpty(jlinkZipName)) {
             return;

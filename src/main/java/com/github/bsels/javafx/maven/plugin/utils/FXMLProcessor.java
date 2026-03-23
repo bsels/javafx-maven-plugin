@@ -920,6 +920,10 @@ public record FXMLProcessor(Log log) {
     }
 
     /// A record representing a generic type with an index, a type description, and a list of nested generics.
+    ///
+    /// @param index          the index of this Generic instance
+    /// @param type           the type of this Generic instance; must not be null
+    /// @param nestedGenerics a list of nested Generic instances; if null, an empty list will be used
     private record Generic(int index, String type, List<Generic> nestedGenerics) {
 
         /// Constructs a new instance of the Generic class with the specified index, type, and nested generics.
