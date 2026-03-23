@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Set;
 
 /// The InterfacesWithMethod class represents a data structure associating an interface name with a set of method names.
-/// It provides constructors, getter and setter methods, and a string representation for managing and accessing this data.
+/// It provides constructors, getter and getter methods, and a string representation for managing and accessing this data.
 public class InterfacesWithMethod {
     /// Represents the name of an interface.
     ///

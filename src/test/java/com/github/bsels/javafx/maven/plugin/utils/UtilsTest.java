@@ -1670,15 +1670,15 @@ class UtilsTest {
         // Helper classes for testing
         static class TestClassWithSetters {
             public static void setStaticProperty(String value) {
-                // Static setter - should be excluded
+                // Static getter - should be excluded
             }
 
             public void setValue(String value) {
-                // Overloaded setter 1
+                // Overloaded getter 1
             }
 
             public void setValue(Integer value) {
-                // Overloaded setter 2
+                // Overloaded getter 2
             }
 
             public void setNoParam() {
@@ -1701,23 +1701,23 @@ class UtilsTest {
                 // Array parameter type
             }
 
-            // Non-setter methods that should be ignored
+            // Non-getter methods that should be ignored
             public String getName() {
                 return null;
             }
 
             public void setName(String name) {
-                // Single parameter setter
+                // Single parameter getter
             }
 
             public void doSomething(String param) {
-                // Not a setter
+                // Not a getter
             }
         }
 
         static class TestParentClassWithSetters {
             public void setParentProperty(String value) {
-                // Parent setter
+                // Parent getter
             }
 
             public void setSharedProperty(String value) {
@@ -1728,11 +1728,11 @@ class UtilsTest {
         static class TestSubClassWithSetters extends TestParentClassWithSetters {
             @Override
             public void setSharedProperty(String value) {
-                // Overridden setter
+                // Overridden getter
             }
 
             public void setChildProperty(String value) {
-                // Child-specific setter
+                // Child-specific getter
             }
         }
 
@@ -1745,20 +1745,20 @@ class UtilsTest {
 
         static class TestClassWithDifferentVisibilities {
             public void setPublicProperty(String value) {
-                // Public setter
+                // Public getter
             }
 
             protected void setProtectedProperty(String value) {
-                // Protected setter
+                // Protected getter
             }
 
             void setPackageProperty(String value) {
-                // Package-private setter
+                // Package-private getter
             }
 
             @SuppressWarnings("unused")
             private void setPrivateProperty(String value) {
-                // Private setter
+                // Private getter
             }
         }
     }
@@ -1998,18 +1998,18 @@ class UtilsTest {
         // Helper classes for testing
         static class TestClassWithStaticSettersForNode {
 
-            // Valid static setter for Node
+            // Valid static getter for Node
             public static void setNodeProperty(Node node, String value) {
-                // Valid static setter
+                // Valid static getter
             }
 
             // Overloaded static setters
             public static void setOverloadedProperty(Node node, String value) {
-                // Overloaded setter 1
+                // Overloaded getter 1
             }
 
             public static void setOverloadedProperty(Node node, Double value) {
-                // Overloaded setter 2
+                // Overloaded getter 2
             }
 
             // Wrong parameter count - should be excluded
@@ -2041,13 +2041,13 @@ class UtilsTest {
                 // Array second parameter
             }
 
-            // Non-setter methods that should be ignored
+            // Non-getter methods that should be ignored
             public static Node getNodeProperty() {
                 return null;
             }
 
             public static void doSomething(Node node, String value) {
-                // Not a setter name
+                // Not a getter name
             }
 
             // Non-static method - should be excluded
@@ -2058,13 +2058,13 @@ class UtilsTest {
 
         static class TestParentClassWithStaticSetters {
             public static void setParentStaticProperty(Node node, String value) {
-                // Parent static setter
+                // Parent static getter
             }
         }
 
         static class TestSubClassWithStaticSetters extends TestParentClassWithStaticSetters {
             public static void setChildStaticProperty(Node node, String value) {
-                // Child static setter
+                // Child static getter
             }
         }
     }

@@ -607,13 +607,13 @@ public record FXMLProcessor(Log log) {
         }
     }
 
-    /// Attempts to resolve an FXML property either as an object property using a setter method
+    /// Attempts to resolve an FXML property either as an object property using a getter method
     /// or as a constructor property based on the provided class, imports, and property entry.
-    /// If multiple setters for a property are found or no valid setter/constructor property
+    /// If multiple setters for a property are found or no valid getter/constructor property
     /// is determinable, the method logs appropriate details and returns an empty Optional.
     ///
     /// @param imports  the list of import statements used to resolve types referenced in property definitions
-    /// @param clazz    the class associated with the FXML being processed, used to find matching setter methods or constructors
+    /// @param clazz    the class associated with the FXML being processed, used to find matching getter methods or constructors
     /// @param property a map entry representing a property, where the key is the property name and the value is the property value to be set
     /// @return an Optional containing the resolved property as an FXMLProperty object if successful, or an empty Optional if no valid property was found
     private Optional<FXMLProperty> getObjectOrConstructorProperty(List<String> imports, Class<?> clazz, Map.Entry<String, String> property) {
@@ -632,7 +632,7 @@ public record FXMLProcessor(Log log) {
                         propertyValue
                 ));
             } catch (NoSuchMethodException _) {
-                log.debug("No setter or getter list found for property %s on %s, potentially using constructor".formatted(propertyName, clazz));
+                log.debug("No getter or getter list found for property %s on %s, potentially using constructor".formatted(propertyName, clazz));
                 return getNamedConstructorProperty(clazz, propertyName, propertyValue);
             }
         }
@@ -640,7 +640,7 @@ public record FXMLProcessor(Log log) {
             log.warn("Multiple %d setters for property %s on %s, skipping".formatted(setters.size(), clazz, propertyName));
             return Optional.empty();
         }
-        log.debug("Found setter for property %s on %s: %s".formatted(propertyName, clazz, setterName));
+        log.debug("Found getter for property %s on %s: %s".formatted(propertyName, clazz, setterName));
         Method setter = setters.getFirst();
         Type parameterType = setter.getGenericParameterTypes()[0];
         addImport(imports, parameterType);
@@ -653,14 +653,14 @@ public record FXMLProcessor(Log log) {
     }
 
     /// Attempts to resolve a static FXML property based on the provided property entry, the list of imports,
-    /// and the presence of a static setter method in the associated static class. The method looks for a valid
-    /// static setter for the property and ensures the value type compatibility. If a valid static setter is found,
+    /// and the presence of a static getter method in the associated static class. The method looks for a valid
+    /// static getter for the property and ensures the value type compatibility. If a valid static getter is found,
     /// it resolves the property into an [FXMLStaticProperty] object.
     ///
     /// @param imports  the list of import statements used to resolve the types referenced in property definitions
     /// @param property a map entry representing the static property, where the key is the full property name
     ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 (including class and property name delimited by a dot ".") and the value is the property value to set
-    /// @return an [Optional] containing the resolved property as an [FXMLStaticProperty] object if successful, or an empty `Optional` if no valid static setter was found or if there were multiple matching setters
+    /// @return an [Optional] containing the resolved property as an [FXMLStaticProperty] object if successful, or an empty `Optional` if no valid static getter was found or if there were multiple matching setters
     private Optional<FXMLProperty> getStaticProperty(List<String> imports, Map.Entry<String, String> property) {
         String propertyName = property.getKey();
         String propertyValue = property.getValue();
@@ -668,14 +668,14 @@ public record FXMLProcessor(Log log) {
         String staticSetterName = Utils.getSetterName(propertyName.substring(propertyName.lastIndexOf('.') + 1));
         List<Method> staticSetters = Utils.findStaticSettersForNode(staticClass, staticSetterName);
         if (staticSetters.isEmpty()) {
-            log.warn("No static setter found for property %s on %s, skipping".formatted(propertyName, staticClass));
+            log.warn("No static getter found for property %s on %s, skipping".formatted(propertyName, staticClass));
             return Optional.empty();
         }
         if (staticSetters.size() > 1) {
             log.warn("Multiple %d static setters for property %s on %s, skipping".formatted(staticSetters.size(), staticClass, propertyName));
             return Optional.empty();
         }
-        log.debug("Found static setter for property %s on %s: %s".formatted(propertyName, staticClass, staticSetterName));
+        log.debug("Found static getter for property %s on %s: %s".formatted(propertyName, staticClass, staticSetterName));
         Method staticSetter = staticSetters.getFirst();
         Type parameterType = staticSetter.getGenericParameterTypes()[1];
         addImport(imports, parameterType);

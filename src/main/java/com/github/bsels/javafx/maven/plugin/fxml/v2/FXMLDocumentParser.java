@@ -4,11 +4,10 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdent
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMultipleProperties;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLSingleProperty;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticMultipleProperties;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticSingleProperty;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticObjectProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLFileScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLSourceScript;
@@ -243,9 +242,9 @@ public record FXMLDocumentParser(Log log) {
                 String ownerPart = childName.substring(0, dotIndex);
                 String propName = childName.substring(dotIndex + 1);
                 if (Character.isUpperCase(ownerPart.charAt(0))) {
-                    Class<?> staticClass = Utils.findType(buildContext.imports(), ownerPart);
-                    String staticSetterName = Utils.getSetterName(propName);
-                    parseStaticPropertyElement(buildContext, staticClass, staticSetterName, propName, child)
+                    Class<?> staticClazz = Utils.findType(buildContext.imports(), ownerPart);
+                    String setterName = Utils.getSetterName(propName);
+                    parseStaticPropertyElement(buildContext, staticClazz, setterName, propName, child)
                             .ifPresent(properties::add);
                 } else {
                     parseInstancePropertyElement(buildContext, clazz, propName, child).ifPresent(properties::add);
@@ -256,7 +255,7 @@ public record FXMLDocumentParser(Log log) {
                 String getterName = Utils.getGetterName(defaultPropName.orElseThrow());
                 try {
                     Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
-                    addValueToMultipleProperty(properties, defaultPropName.orElseThrow(), getterName, elementType, (AbstractFXMLValue) childObject);
+                    addValueToMultipleProperty(properties, defaultPropName.orElseThrow(), getterName, elementType, childObject);
                 } catch (NoSuchMethodException _) {
                     log.debug("No default list property found on %s for child %s, skipping".formatted(clazz.getSimpleName(), childName));
                 }
@@ -495,7 +494,7 @@ public record FXMLDocumentParser(Log log) {
         }
     }
 
-    /// Converts a static attribute property (e.g., `GridPane.rowIndex="0"`) into an [FXMLStaticSingleProperty].
+    /// Converts a static attribute property (e.g., `GridPane.rowIndex="0"`) into an [FXMLStaticObjectProperty].
     ///
     /// @param buildContext  the build context for class resolution.
     /// @param attributeName the full attribute name including the class prefix.
@@ -516,25 +515,25 @@ public record FXMLDocumentParser(Log log) {
             log.warn("Could not resolve static property class '%s', skipping attribute '%s'".formatted(className, attributeName));
             return Optional.empty();
         }
-        String staticSetterName = Utils.getSetterName(propName);
-        List<Method> setters = Utils.findStaticSettersForNode(staticClass, staticSetterName);
+        String setterName = Utils.getSetterName(propName);
+        List<Method> setters = Utils.findStaticSettersForNode(staticClass, setterName);
         if (setters.isEmpty()) {
-            log.warn("No static setter '%s' found on '%s', skipping".formatted(staticSetterName, staticClass.getName()));
+            log.warn("No static setter '%s' found on '%s', skipping".formatted(setterName, staticClass.getName()));
             return Optional.empty();
         }
         if (setters.size() > 1) {
-            log.warn("Multiple static setters '%s' found on '%s', skipping".formatted(staticSetterName, staticClass.getName()));
+            log.warn("Multiple static setters '%s' found on '%s', skipping".formatted(setterName, staticClass.getName()));
             return Optional.empty();
         }
         Method setter = setters.getFirst();
         Type paramType = setter.getGenericParameterTypes()[1];
         FXMLValue fxmlValue = new FXMLValue(Optional.empty(), new FXMLClassType(Utils.getClassType(paramType)), value);
-        return Optional.of(new FXMLStaticSingleProperty(propName, staticClass, staticSetterName, paramType, fxmlValue));
+        return Optional.of(new FXMLStaticObjectProperty(propName, staticClass, setterName, paramType, fxmlValue));
     }
 
-    /// Converts an instance attribute property (e.g., `text="Hello"`) into an [FXMLSingleProperty].
+    /// Converts an instance attribute property (e.g., `text="Hello"`) into an [FXMLObjectProperty].
     ///
-    /// If the setter's parameter type is `EventHandler`, the value may be an inline script (no prefix),
+    /// If the getter's parameter type is `EventHandler`, the value may be an inline script (no prefix),
     /// an expression (`$`), or a method reference (`#`), all of which are handled accordingly.
     ///
     /// @param buildContext  the build context for class resolution.
@@ -558,15 +557,15 @@ public record FXMLDocumentParser(Log log) {
             Method setter = setters.getFirst();
             Type paramType = setter.getGenericParameterTypes()[0];
             AbstractFXMLValue fxmlValue = parseValueString(value, Utils.getClassType(paramType), buildContext);
-            return Optional.of(new FXMLSingleProperty(attributeName, Optional.of(setterName), paramType, fxmlValue));
+            return Optional.of(new FXMLObjectProperty(attributeName, setterName, paramType, fxmlValue));
         }
         String getterName = Utils.getGetterName(attributeName);
         try {
             Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
             AbstractFXMLValue fxmlValue = parseValueString(value);
-            return Optional.of(new FXMLSingleProperty(attributeName, Optional.of(getterName + "().add"), elementType, fxmlValue));
+            return Optional.of(new FXMLCollectionProperties(attributeName, getterName, elementType, List.of(fxmlValue), List.of()));
         } catch (NoSuchMethodException _) {
-            log.debug("No setter or list getter found for '%s' on '%s', skipping".formatted(attributeName, clazz.getName()));
+            log.debug("No getter or list getter found for '%s' on '%s', skipping".formatted(attributeName, clazz.getName()));
             return Optional.empty();
         }
     }
@@ -574,34 +573,35 @@ public record FXMLDocumentParser(Log log) {
     /// Converts a static property child element into an [FXMLProperty].
     ///
     /// @param buildContext     the build context for class resolution.
-    /// @param staticClass      the class defining the static property.
-    /// @param staticSetterName the name of the static setter method.
-    /// @param propName         the property name.
-    /// @param child            the child XML structure containing the property values.
+    /// @param clazz      the class defining the static property.
+    /// @param setterName the name of the static setter method.
+    /// @param propName   the property name.
+    /// @param child      the child XML structure containing the property values.
     /// @return an [Optional] containing the property, or empty if unresolvable.
     private Optional<FXMLProperty<?>> parseStaticPropertyElement(
             BuildContext buildContext,
-            Class<?> staticClass,
-            String staticSetterName,
+            Class<?> clazz,
+            String setterName,
             String propName,
             ParsedXMLStructure child
     ) {
-        List<Method> setters = Utils.findStaticSettersForNode(staticClass, staticSetterName);
+        List<Method> setters = Utils.findStaticSettersForNode(clazz, setterName);
         if (setters.isEmpty()) {
-            log.warn("No static setter '%s' found on '%s', skipping".formatted(staticSetterName, staticClass.getName()));
+            log.warn("No static setter '%s' found on '%s', skipping".formatted(setterName, clazz.getName()));
             return Optional.empty();
         }
         if (setters.size() > 1) {
-            log.warn("Multiple static setters '%s' found on '%s', skipping".formatted(staticSetterName, staticClass.getName()));
+            log.warn("Multiple static setters '%s' found on '%s', skipping".formatted(setterName, clazz.getName()));
             return Optional.empty();
         }
         Method setter = setters.getFirst();
         Type paramType = setter.getGenericParameterTypes()[1];
         List<AbstractFXMLValue> values = parseChildrenToValues(buildContext, child);
         if (values.size() == 1) {
-            return Optional.of(new FXMLStaticSingleProperty(propName, staticClass, staticSetterName, paramType, values.getFirst()));
+            return Optional.of(new FXMLStaticObjectProperty(propName, clazz, setterName, paramType, values.getFirst()));
         }
-        return Optional.of(new FXMLStaticMultipleProperties(propName, staticClass, staticSetterName, paramType, values));
+        log.warn("Multiple values for static property '%s' on '%s' are not supported, skipping".formatted(propName, clazz.getName()));
+        return Optional.empty();
     }
 
     /// Converts an instance property child element into an [FXMLProperty].
@@ -629,24 +629,24 @@ public record FXMLDocumentParser(Log log) {
             Method setter = setters.getFirst();
             Type paramType = setter.getGenericParameterTypes()[0];
             if (values.size() == 1) {
-                return Optional.of(new FXMLSingleProperty(propName, Optional.of(setterName), paramType, values.getFirst()));
+                return Optional.of(new FXMLObjectProperty(propName, setterName, paramType, values.getFirst()));
             }
-            return Optional.of(new FXMLMultipleProperties(propName, Optional.of(setterName), paramType, values));
+            return Optional.of(new FXMLCollectionProperties(propName, setterName, paramType, values, List.of()));
         }
 
         String getterName = Utils.getGetterName(propName);
         try {
             Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
-            return Optional.of(new FXMLMultipleProperties(propName, Optional.of(getterName + "().add"), elementType, values));
+            return Optional.of(new FXMLCollectionProperties(propName, getterName, elementType, values, List.of()));
         } catch (NoSuchMethodException _) {
-            log.debug("No setter or list getter found for property element '%s' on '%s', skipping".formatted(propName, clazz.getName()));
+            log.debug("No getter or list getter found for property element '%s' on '%s', skipping".formatted(propName, clazz.getName()));
             return Optional.empty();
         }
     }
 
     /// Converts the children of a property element into a list of [AbstractFXMLValue].
     ///
-    /// @param buildContext   the build context for class resolution.
+    /// @param buildContext    the build context for class resolution.
     /// @param propertyElement the property element whose children are to be converted.
     /// @return the list of converted values.
     private List<AbstractFXMLValue> parseChildrenToValues(
@@ -676,7 +676,7 @@ public record FXMLDocumentParser(Log log) {
         return parseValueString(value, null, null);
     }
 
-    /// Parses an attribute value string into an [AbstractFXMLValue], with awareness of the expected setter
+    /// Parses an attribute value string into an [AbstractFXMLValue], with awareness of the expected getter
     /// parameter type and build context.
     ///
     /// When the expected `paramType` is a functional interface (e.g., `EventHandler`), a method reference
@@ -693,7 +693,7 @@ public record FXMLDocumentParser(Log log) {
     /// - No prefix — plain string value, returns [FXMLValue].
     ///
     /// @param value        the raw attribute value string.
-    /// @param paramType    the expected setter parameter type, used to detect functional interfaces; may be `null`.
+    /// @param paramType    the expected getter parameter type, used to detect functional interfaces; may be `null`.
     /// @param buildContext the build context used for type resolution; may be `null`.
     /// @return the corresponding [AbstractFXMLValue].
     private AbstractFXMLValue parseValueString(String value, Class<?> paramType, BuildContext buildContext) {
@@ -724,7 +724,7 @@ public record FXMLDocumentParser(Log log) {
     /// Otherwise, `void` is used as the return type.
     ///
     /// @param methodName the method name (without the `#` prefix).
-    /// @param paramType  the expected setter parameter type; may be `null`.
+    /// @param paramType  the expected getter parameter type; may be `null`.
     /// @return the corresponding [FXMLMethod].
     private FXMLMethod resolveMethodReference(String methodName, Class<?> paramType) {
         // TODO Improve handling of method references generics
@@ -825,7 +825,7 @@ public record FXMLDocumentParser(Log log) {
         return generics;
     }
 
-    /// Adds a value to an existing [FXMLMultipleProperties] entry or creates a new one.
+    /// Adds a value to an existing [FXMLCollectionProperties] entry or creates a new one.
     ///
     /// @param properties  The current list of properties to update.
     /// @param propName    The property name.
@@ -839,19 +839,18 @@ public record FXMLDocumentParser(Log log) {
             Type elementType,
             AbstractFXMLValue value
     ) {
-        String accessorName = getterName + "().add";
         for (int i = 0; i < properties.size(); i++) {
             FXMLProperty<?> existing = properties.get(i);
-            if (existing instanceof FXMLMultipleProperties mp && mp.name().equals(propName)) {
+            if (existing instanceof FXMLCollectionProperties mp && mp.name().equals(propName)) {
                 List<AbstractFXMLValue> newValues = new ArrayList<>(mp.value());
                 newValues.add(value);
-                properties.set(i, new FXMLMultipleProperties(propName, Optional.of(accessorName), elementType, newValues));
+                properties.set(i, new FXMLCollectionProperties(propName, getterName, elementType, newValues, List.of()));
                 return;
             }
         }
         List<AbstractFXMLValue> values = new ArrayList<>();
         values.add(value);
-        properties.add(new FXMLMultipleProperties(propName, Optional.of(accessorName), elementType, values));
+        properties.add(new FXMLCollectionProperties(propName, getterName, elementType, values, List.of()));
     }
 
     /// Holds a class and its associated FXML identifier.

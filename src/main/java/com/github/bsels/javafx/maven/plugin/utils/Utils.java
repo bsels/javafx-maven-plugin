@@ -89,17 +89,17 @@ public final class Utils {
         }
     }
 
-    /// Generates the setter method name for a given field name.
+    /// Generates the getter method name for a given field name.
     ///
-    /// @param name the name of the field for which to generate the setter method name
-    /// @return the setter method name corresponding to the specified field name
+    /// @param name the name of the field for which to generate the getter method name
+    /// @return the getter method name corresponding to the specified field name
     public static String getSetterName(String name) {
         return "set" + name.substring(0, 1).toUpperCase() + name.substring(1);
     }
 
     /// Generates the getter method name for a given field name.
     ///
-    /// @param name the name of the field for which to generate the setter method name
+    /// @param name the name of the field for which to generate the getter method name
     /// @return the getter method name corresponding to the specified field name
     public static String getGetterName(String name) {
         return "get" + name.substring(0, 1).toUpperCase() + name.substring(1);
@@ -387,12 +387,12 @@ public final class Utils {
                 .toList();
     }
 
-    /// Retrieves a list of static setter methods from the specified class that match the given method name.
+    /// Retrieves a list of static getter methods from the specified class that match the given method name.
     /// The method must be static, have the specified name, and take exactly two parameters,
     /// where the first parameter is assignable from the Node class.
     ///
-    /// @param staticClass      the class to search for static setter methods
-    /// @param staticSetterName the name of the static setter methods to look for
+    /// @param staticClass      the class to search for static getter methods
+    /// @param staticSetterName the name of the static getter methods to look for
     /// @return a list of methods that match the criteria, or an empty list if no matching methods are found
     public static List<Method> findStaticSettersForNode(Class<?> staticClass, String staticSetterName) {
         return Stream.of(staticClass.getMethods())
@@ -403,10 +403,10 @@ public final class Utils {
                 .toList();
     }
 
-    /// Finds all non-static setter methods in the given class with the specified name.
+    /// Finds all non-static getter methods in the given class with the specified name.
     ///
     /// @param clazz      the class to search for the methods
-    /// @param setterName the name of the setter methods to find
+    /// @param setterName the name of the getter methods to find
     /// @return a list of methods that are non-static, match the specified name, and have exactly one parameter
     public static List<Method> findObjectSetters(Class<?> clazz, String setterName) {
         return Stream.of(clazz.getMethods())

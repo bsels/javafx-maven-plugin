@@ -1,14 +1,35 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.properties;
 
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
+
+import java.lang.reflect.Type;
+import java.util.Objects;
 import java.util.Optional;
 
-/// Base interface for standard FXML properties.
+/// Represents an FXML property that has a single value.
 ///
-/// @param <T> The value type.
-public sealed interface FXMLObjectProperty<T> extends FXMLProperty<T> permits FXMLMultipleProperties, FXMLSingleProperty {
+/// @param name   The property name.
+/// @param setter The name of the getter method, if any.
+/// @param type   The property type.
+/// @param value  The property value.
+public record FXMLObjectProperty(
+        String name,
+        String setter,
+        Type type,
+        AbstractFXMLValue value
+) implements FXMLProperty<AbstractFXMLValue> {
 
-    /// Returns the name of the setter method, if any.
+    /// Compact constructor to validate the property components.
     ///
-    /// @return The setter name.
-    Optional<String> setter();
+    /// @param name   The property name.
+    /// @param setter The name of the getter method, if any.
+    /// @param type   The property type.
+    /// @param value  The property value.
+    /// @throws NullPointerException if `name`, `getter`, `type`, or `value` is `null`.
+    public FXMLObjectProperty {
+        Objects.requireNonNull(name, "`name` must not be null");
+        Objects.requireNonNull(setter, "`getter` must not be null");
+        Objects.requireNonNull(type, "`type` must not be null");
+        Objects.requireNonNull(value, "`value` must not be null");
+    }
 }

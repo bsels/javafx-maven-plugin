@@ -7,7 +7,7 @@ package com.github.bsels.javafx.maven.plugin.fxml;
 ///
 /// Implementations of this interface include:
 /// - [FXMLConstructorProperty]: Represents a property defined in the constructor of an FXML element.
-/// - [FXMLObjectProperty]: Represents an object property with a specific setter in the context of FXML processing.
+/// - [FXMLObjectProperty]: Represents an object property with a specific getter in the context of FXML processing.
 /// - [FXMLStaticProperty]: Represents a static property associated with a specific static class and method.
 ///
 /// FXMLProperty provides an abstraction to describe different types of configurable attributes

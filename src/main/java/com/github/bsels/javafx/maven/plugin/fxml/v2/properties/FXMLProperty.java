@@ -5,7 +5,8 @@ import java.lang.reflect.Type;
 /// Base interface for FXML properties.
 ///
 /// @param <T> The value type of the property.
-public sealed interface FXMLProperty<T> permits FXMLObjectProperty, FXMLStaticProperty {
+public sealed interface FXMLProperty<T>
+        permits FXMLCollectionProperties, FXMLMapProperty, FXMLObjectProperty, FXMLStaticObjectProperty {
     /// Returns the name of the property.
     ///
     /// @return The property name.
