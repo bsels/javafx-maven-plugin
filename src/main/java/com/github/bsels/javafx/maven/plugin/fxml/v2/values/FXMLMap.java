@@ -1,7 +1,10 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
 
 import java.util.Map;
 import java.util.Objects;
@@ -33,5 +36,21 @@ public record FXMLMap(
         Objects.requireNonNull(type, "`type` must not be null");
         Objects.requireNonNull(factoryMethod, "`factoryMethod` must not be null");
         entries = Map.copyOf(Objects.requireNonNullElseGet(entries, Map::of));
+        switch (type) {
+            case FXMLClassType(Class<?> clazz) -> {
+                if (!Map.class.isAssignableFrom(clazz)) {
+                    throw new IllegalArgumentException("`type` must be a Collection: %s".formatted(clazz));
+                }
+            }
+            case FXMLGenericType(Class<?> clazz, _) -> {
+                if (!Map.class.isAssignableFrom(clazz)) {
+                    throw new IllegalArgumentException("`type` must be a Collection: %s".formatted(clazz));
+                }
+            }
+            case FXMLUncompiledGenericType _ -> {
+                // The type is not yet compiled or available in the current classloader;
+                // map assignability cannot be verified at this point.
+            }
+        }
     }
 }

@@ -15,8 +15,7 @@ import java.util.Optional;
 /// Represents a collection of FXML values.
 ///
 /// @param identifier    The unique identifier associated with this FXML collection.
-/// @param type          The class type of the values stored in this collection.
-///                      May be an [FXMLClassType], [FXMLGenericType], or [FXMLUncompiledGenericType].
+/// @param type          The class type of the values stored in this collection. It may be an [FXMLClassType], [FXMLGenericType], or [FXMLUncompiledGenericType].
 /// @param factoryMethod An optional factory method name used for instantiation.
 /// @param values        The collection of values.
 public record FXMLCollection(
