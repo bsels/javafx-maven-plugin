@@ -15,6 +15,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLSourceScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
@@ -32,6 +33,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLTranslation;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
 import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import com.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
+import com.github.bsels.javafx.maven.plugin.utils.InternalClassNotFoundException;
 import com.github.bsels.javafx.maven.plugin.utils.Utils;
 import javafx.beans.DefaultProperty;
 import javafx.event.EventHandler;
@@ -46,12 +48,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /// Parses a [ParsedFXML] raw XML structure into a [FXMLDocument] V2 model.
@@ -62,6 +67,20 @@ import java.util.stream.Stream;
 ///
 /// @param log the logging instance used for diagnostic output. Must not be null.
 public record FXMLDocumentParser(Log log) {
+
+    /// A regular expression pattern used to match and parse nested generic type definitions.
+    /// This pattern identifies sequences of generic type declarations that may be nested
+    /// and separated by commas. It considers fully qualified names, optional generic type
+    /// parameters enclosed in angle brackets, and allows for whitespace around elements.
+    ///
+    /// The pattern handles:
+    /// - Nested generic definitions, e.g., `List<Map<String, Integer>>`.
+    /// - Fully qualified class names with optional generics, e.g., `java.util.Map<String, Integer>`.
+    /// - Multiple generic type declarations separated by commas, e.g., `Map<String, Integer>, List<String>`.
+    /// - Arbitrary whitespace around the types and delimiters.
+    private static final Pattern NESTED_GENERICS = Pattern.compile(
+            "^\\s*((?<first>((((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*),\\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?)$"
+    );
 
     /// Compact constructor to validate the log dependency.
     ///
@@ -287,8 +306,11 @@ public record FXMLDocumentParser(Log log) {
 
     /// Builds an [FXMLType] from a class and a list of generic type name strings.
     ///
-    /// If the generics list is empty, returns a [FXMLClassType]. Otherwise, parses each generic
-    /// string into an [FXMLType] and returns an [FXMLGenericType].
+    /// If the generics list is empty, returns a [FXMLClassType]. Otherwise, recursively parses
+    /// each generic string into an [FXMLType] tree supporting nested generics (e.g.,
+    /// `Map<String, List<Integer>>`). If a type cannot be resolved via the current classloader,
+    /// an [FXMLUncompiledGenericType] is used as a fallback for that argument.
+    /// The result is an [FXMLGenericType] combining the base class with the resolved type arguments.
     ///
     /// @param clazz        The base class.
     /// @param generics     The list of generic type name strings extracted from XML comments.
@@ -299,9 +321,74 @@ public record FXMLDocumentParser(Log log) {
             return new FXMLClassType(clazz);
         }
         List<FXMLType> typeArgs = generics.stream()
-                .<FXMLType>map(generic -> new FXMLClassType(Utils.findType(buildContext.imports(), generic)))
+                .map(generic -> parseGenericString(generic.strip(), buildContext))
                 .toList();
         return new FXMLGenericType(clazz, typeArgs);
+    }
+
+    /// Recursively parses a single generic type string into an [FXMLType].
+    ///
+    /// Uses the [#NESTED_GENERICS] pattern to extract the raw type name and any nested
+    /// type arguments. If the raw type cannot be resolved via the current classloader,
+    /// an [FXMLUncompiledGenericType] is returned as a fallback.
+    ///
+    /// @param genericString The generic type string to parse (e.g., `Map<String, List<Integer>>`).
+    /// @param buildContext  The build context used for class resolution.
+    /// @return The corresponding [FXMLType], potentially nested.
+    private FXMLType parseGenericString(String genericString, BuildContext buildContext) {
+        Matcher matcher = NESTED_GENERICS.matcher(genericString);
+        if (!matcher.find()) {
+            log().warn("Could not parse generic type string: %s".formatted(genericString));
+            return new FXMLUncompiledGenericType(genericString, List.of());
+        }
+        String rawType = matcher.group("rawType").strip();
+        String nestedGenerics = matcher.group("generics");
+        List<FXMLType> nestedTypeArgs = parseNestedGenerics(nestedGenerics, buildContext);
+        try {
+            Class<?> resolvedClass = Utils.findType(buildContext.imports(), rawType);
+            if (nestedTypeArgs.isEmpty()) {
+                return new FXMLClassType(resolvedClass);
+            }
+            return new FXMLGenericType(resolvedClass, nestedTypeArgs);
+        } catch (InternalClassNotFoundException _) {
+            return new FXMLUncompiledGenericType(rawType, nestedTypeArgs);
+        }
+    }
+
+    /// Parses a comma-separated list of nested generic type strings into a list of [FXMLType] objects.
+    ///
+    /// Iterates over the nested generics string using the [#NESTED_GENERICS] pattern, extracting
+    /// each type argument recursively. Returns an empty list if the input is null or blank.
+    ///
+    /// @param nestedGenerics The string containing comma-separated nested generic type arguments.
+    /// @param buildContext   The build context used for class resolution.
+    /// @return A list of [FXMLType] objects representing the parsed nested type arguments.
+    private List<FXMLType> parseNestedGenerics(String nestedGenerics, BuildContext buildContext) {
+        if (nestedGenerics == null || nestedGenerics.isBlank()) {
+            return List.of();
+        }
+        List<FXMLType> result = new LinkedList<>();
+        String remaining = nestedGenerics;
+        while (remaining != null) {
+            Matcher matcher = NESTED_GENERICS.matcher(remaining);
+            if (!matcher.find()) {
+                log().warn("Could not parse nested generic type string: %s".formatted(remaining));
+                break;
+            }
+            String rawType = matcher.group("rawType").strip();
+            String deeper = matcher.group("generics");
+            List<FXMLType> deeperArgs = parseNestedGenerics(deeper, buildContext);
+            FXMLType type;
+            try {
+                Class<?> resolvedClass = Utils.findType(buildContext.imports(), rawType);
+                type = deeperArgs.isEmpty() ? new FXMLClassType(resolvedClass) : new FXMLGenericType(resolvedClass, deeperArgs);
+            } catch (InternalClassNotFoundException _) {
+                type = new FXMLUncompiledGenericType(rawType, deeperArgs);
+            }
+            result.addFirst(type);
+            remaining = matcher.group("first");
+        }
+        return List.copyOf(result);
     }
 
     /// Parses a child XML structure into an [AbstractFXMLValue].

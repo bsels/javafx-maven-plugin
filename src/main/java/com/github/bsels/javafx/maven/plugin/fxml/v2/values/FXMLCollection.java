@@ -5,6 +5,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
 
 import java.util.Collection;
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.Optional;
 ///
 /// @param identifier    The unique identifier associated with this FXML collection.
 /// @param type          The class type of the values stored in this collection.
+///                      May be an [FXMLClassType], [FXMLGenericType], or [FXMLUncompiledGenericType].
 /// @param factoryMethod An optional factory method name used for instantiation.
 /// @param values        The collection of values.
 public record FXMLCollection(
@@ -31,7 +33,8 @@ public record FXMLCollection(
     /// @param factoryMethod An optional factory method name used for instantiation.
     /// @param values        The collection of values.
     /// @throws NullPointerException     if `identifier`, `type`, `factoryMethod`, or `values` is `null`.
-    /// @throws IllegalArgumentException if `factoryMethod` is not a valid Java identifier or if `type` is not a `Collection`.
+    /// @throws IllegalArgumentException if `factoryMethod` is not a valid Java identifier or if `type` is a compiled type
+    ///                                  that is not a `Collection`.
     public FXMLCollection {
         Objects.requireNonNull(identifier, "`identifier` must not be null");
         Objects.requireNonNull(type, "`type` must not be null");
@@ -56,6 +59,10 @@ public record FXMLCollection(
                 if (!Collection.class.isAssignableFrom(clazz)) {
                     throw new IllegalArgumentException("`type` must be a Collection: %s".formatted(clazz));
                 }
+            }
+            case FXMLUncompiledGenericType _ -> {
+                // The type is not yet compiled or available in the current classloader;
+                // collection assignability cannot be verified at this point.
             }
         }
     }
