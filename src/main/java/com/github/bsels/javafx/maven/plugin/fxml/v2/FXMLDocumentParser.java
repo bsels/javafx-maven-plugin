@@ -145,6 +145,12 @@ public record FXMLDocumentParser(Log log) {
 
     /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLMap] object.
     ///
+    /// Entries are collected from two sources:
+    /// - Attributes on the map element (skipping `fx:` and `xmlns` prefixes as well as `fx:factory`),
+    ///   each parsed via [#parseValueString(String)].
+    /// - Child elements, where the element name is used as the key and the child is parsed via
+    ///   [#parseValue(ParsedXMLStructure, BuildContext)].
+    ///
     /// @param structure          The [ParsedXMLStructure] representing the XML to be parsed.
     /// @param buildContext       The [BuildContext] that provides the context during the parsing process.
     /// @param classAndIdentifier The [ClassAndIdentifier] containing the class type and identifier for the map.
@@ -158,11 +164,16 @@ public record FXMLDocumentParser(Log log) {
         FXMLType type = buildFXMLType(classAndIdentifier.clazz(), extractGenericsFromComments(structure.comments()), buildContext);
         Optional<String> factoryMethod = Optional.ofNullable(properties.get(FXMLConstants.FX_FACTORY_ATTRIBUTE));
         Map<String, AbstractFXMLValue> entries = new LinkedHashMap<>();
-        for (ParsedXMLStructure child : structure.children()) {
-            String key = child.properties().get(FXMLConstants.FX_ID_ATTRIBUTE);
-            if (key != null) {
-                entries.put(key, parseValue(child, buildContext));
+        for (Map.Entry<String, String> entry : properties.entrySet()) {
+            String key = entry.getKey();
+            if (hasSkippablePrefix(key) || FXMLConstants.FX_FACTORY_ATTRIBUTE.equals(key)) {
+                continue;
             }
+            entries.put(key, parseValueString(entry.getValue()));
+        }
+        for (ParsedXMLStructure child : structure.children()) {
+            // TODO filter script elements and define elements from it
+            entries.put(child.name(), parseValue(child, buildContext));
         }
         return new FXMLMap(
                 classAndIdentifier.identifier(),
@@ -183,6 +194,7 @@ public record FXMLDocumentParser(Log log) {
             BuildContext buildContext,
             ClassAndIdentifier classAndIdentifier
     ) {
+        // TODO: Check implementation
         Class<?> clazz = classAndIdentifier.clazz();
         FXMLType type = buildFXMLType(clazz, extractGenericsFromComments(structure.comments()), buildContext);
         Map<String, String> attributes = structure.properties();
@@ -278,7 +290,7 @@ public record FXMLDocumentParser(Log log) {
             return new FXMLClassType(clazz);
         }
         List<FXMLType> typeArgs = generics.stream()
-                .map(g -> (FXMLType) new FXMLClassType(Utils.findType(buildContext.imports(), g)))
+                .<FXMLType>map(generic -> new FXMLClassType(Utils.findType(buildContext.imports(), generic)))
                 .toList();
         return new FXMLGenericType(clazz, typeArgs);
     }
@@ -325,6 +337,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param buildContext The context used during the building process.
     /// @return The parsed [AbstractFXMLValue].
     private AbstractFXMLValue parseValue(ParsedXMLStructure structure, BuildContext buildContext) {
+        // TODO: Check implementation
         String nodeName = structure.name();
         Map<String, String> attributes = structure.properties();
 
@@ -334,7 +347,6 @@ public record FXMLDocumentParser(Log log) {
                 throw new IllegalArgumentException("`source` attribute is required for fx:include");
             }
             FXMLIdentifier includeId = resolveOptionalIdentifier(attributes)
-                    .map(id -> (FXMLIdentifier) id)
                     .orElseGet(() -> new FXMLInternalIdentifier(buildContext.internalCounter().getAndIncrement()));
             return new FXMLInclude(includeId, src);
         }
@@ -353,14 +365,13 @@ public record FXMLDocumentParser(Log log) {
                 throw new IllegalArgumentException("`source` attribute is required for fx:copy");
             }
             FXMLIdentifier copyId = resolveOptionalIdentifier(attributes)
-                    .map(id -> (FXMLIdentifier) id)
                     .orElseGet(() -> new FXMLInternalIdentifier(buildContext.internalCounter().getAndIncrement()));
             return new FXMLCopy(copyId, source);
         }
 
         if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(nodeName)) {
-            String scriptContent = attributes.get("#text");
-            if (scriptContent != null && !scriptContent.isBlank()) {
+            String scriptContent = structure.getTextValue();
+            if (!scriptContent.isBlank()) {
                 return new FXMLInlineScript(scriptContent);
             }
             throw new IllegalArgumentException("`fx:script` used as value must have inline content");
@@ -406,11 +417,11 @@ public record FXMLDocumentParser(Log log) {
             Charset charset = Charset.forName(charsetName);
             return new FXMLFileScript(source, charset);
         }
-        String scriptContent = attributes.get("#text");
-        if (scriptContent != null && !scriptContent.isBlank()) {
+        String scriptContent = structure.getTextValue();
+        if (!scriptContent.isBlank()) {
             return new FXMLSourceScript(scriptContent);
         }
-        return new FXMLSourceScript("");
+        return new FXMLSourceScript(scriptContent);
     }
 
     /// Resolves and returns a [ClassAndIdentifier] object based on the given node name, attributes, and context.
@@ -469,6 +480,7 @@ public record FXMLDocumentParser(Log log) {
             String attributeName,
             String value
     ) {
+        // TODO: Make a difference for setters that accepts an javafx.event.EventHandler can contain an inline script (no prefix), expression or method reference
         if (attributeName.contains(".")) {
             return parseStaticAttributeProperty(buildContext, attributeName, value);
         } else {
@@ -655,6 +667,7 @@ public record FXMLDocumentParser(Log log) {
             return new FXMLResource(value.substring(1));
         }
         if (value.startsWith(FXMLConstants.METHOD_REFERENCE_PREFIX)) {
+            // TODO: Check typing for method reference and properly include it, also includes type name mapping also respecting the generics of the parent
             return new FXMLMethod(value.substring(1), List.of(), new FXMLClassType(void.class));
         }
         if (value.startsWith(FXMLConstants.EXPRESSION_PREFIX)) {
