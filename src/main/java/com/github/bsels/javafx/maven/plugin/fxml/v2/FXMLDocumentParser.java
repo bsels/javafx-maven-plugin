@@ -727,6 +727,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param paramType  the expected setter parameter type; may be `null`.
     /// @return the corresponding [FXMLMethod].
     private FXMLMethod resolveMethodReference(String methodName, Class<?> paramType) {
+        // TODO Improve handling of method references generics
         FXMLType returnType;
         if (paramType != null && isFunctionalInterface(paramType)) {
             try {

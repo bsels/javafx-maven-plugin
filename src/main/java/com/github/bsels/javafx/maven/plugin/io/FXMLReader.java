@@ -136,7 +136,7 @@ public record FXMLReader(Log log) {
     ///
     /// @param node the XML `Node` to parse. Must not be null.
     /// @return a [ParsedXMLStructure] object representing the parsed structure of the given node and its subtree.
-    ///                         The object includes the node's name, attributes as key-value pairs, and a list of parsed child nodes.
+    ///                                                                         The object includes the node's name, attributes as key-value pairs, and a list of parsed child nodes.
     private ParsedXMLStructure readDocument(Node node, int depth) {
         String name = node.getNodeName();
         log.debug("Reading node: %s".formatted(name).indent(depth * 2).stripTrailing());
@@ -165,7 +165,28 @@ public record FXMLReader(Log log) {
         log.debug(
                 "Found %d comments: %s".formatted(comments.size(), comments).indent((depth + 1) * 2).stripTrailing()
         );
-        return new ParsedXMLStructure(name, properties, children, comments);
+        Optional<String> textValue = getCombinedTextContent(children, childNodes);
+        return new ParsedXMLStructure(name, properties, children, comments, textValue);
+    }
+
+    /// Combines the text content from the provided child nodes into a single stripped string
+    /// if the list of parsed children is empty.
+    /// If the list of parsed children is not empty, the method returns an empty [Optional].
+    ///
+    /// @param children   a list of [ParsedXMLStructure] objects representing the parsed children of an XML element. If this list is not empty, the method will return an empty `Optional`.
+    /// @param childNodes a [NodeList] containing the child nodes of an XML element. This method will extract text content from nodes of type [Node#TEXT_NODE] or [Node#CDATA_SECTION_NODE].
+    /// @return an `Optional<String>` containing the combined and stripped text content of the child nodes if the list of parsed children is empty. If the children list is not empty, returns `Optional.empty()`.
+    private Optional<String> getCombinedTextContent(List<ParsedXMLStructure> children, NodeList childNodes) {
+        if (!children.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(
+                IntStream.range(0, childNodes.getLength())
+                        .mapToObj(childNodes::item)
+                        .filter(childNode -> Node.TEXT_NODE == childNode.getNodeType() || Node.CDATA_SECTION_NODE == childNode.getNodeType())
+                        .map(Node::getNodeValue)
+                        .collect(Collectors.collectingAndThen(Collectors.joining(), String::strip))
+        );
     }
 
     /// Derives the class name corresponding to the given FXML file path.
