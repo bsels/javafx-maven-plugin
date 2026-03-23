@@ -12,6 +12,9 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticSingleP
 import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLFileScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLSourceScript;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
@@ -20,6 +23,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCopy;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLExpression;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInclude;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInlineScript;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMap;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLObject;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLReference;
@@ -38,9 +42,9 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -75,10 +79,9 @@ public record FXMLDocumentParser(Log log) {
         ParsedXMLStructure rootStructure = parsedFXML.root();
         BuildContext buildContext = new BuildContext(parsedFXML.imports());
 
-        Optional<String> controller = Optional.ofNullable(
-                rootStructure.properties()
-                        .get(FXMLConstants.FX_CONTROLLER_ATTRIBUTE)
-        );
+        Optional<Class<?>> controller = Optional.ofNullable(
+                rootStructure.properties().get(FXMLConstants.FX_CONTROLLER_ATTRIBUTE)
+        ).map(name -> Utils.findType(buildContext.imports(), name));
 
         AbstractFXMLObject root = parseObject(rootStructure, buildContext, true);
 
@@ -107,9 +110,9 @@ public record FXMLDocumentParser(Log log) {
         if (Collection.class.isAssignableFrom(classAndIdentifier.clazz())) {
             return parseCollection(structure, buildContext, classAndIdentifier);
         } else if (Map.class.isAssignableFrom(classAndIdentifier.clazz())) {
-            return null; // TODO
+            return parseMap(structure, buildContext, classAndIdentifier);
         } else {
-            return null; // TODO
+            return parsePlainObject(structure, buildContext, classAndIdentifier);
         }
     }
 
@@ -119,14 +122,13 @@ public record FXMLDocumentParser(Log log) {
     /// @param buildContext       The [BuildContext] that provides the context during the parsing process.
     /// @param classAndIdentifier The [ClassAndIdentifier] containing the class type and identifier for the collection.
     /// @return An [FXMLCollection] object constructed from the parsed XML structure, generics, factory method, and child values.
-    @SuppressWarnings("unchecked")
     private FXMLCollection parseCollection(
             ParsedXMLStructure structure,
             BuildContext buildContext,
             ClassAndIdentifier classAndIdentifier
     ) {
         Map<String, String> properties = structure.properties();
-        List<String> generics = extractGenericsFromComments(structure.comments());
+        FXMLType type = buildFXMLType(classAndIdentifier.clazz(), extractGenericsFromComments(structure.comments()), buildContext);
         Optional<String> factoryMethod = Optional.ofNullable(properties.get(FXMLConstants.FX_FACTORY_ATTRIBUTE));
         List<AbstractFXMLValue> values = structure.children()
                 .stream()
@@ -135,11 +137,150 @@ public record FXMLDocumentParser(Log log) {
                 .toList();
         return new FXMLCollection(
                 classAndIdentifier.identifier(),
-                (Class<? extends Collection<?>>) classAndIdentifier.clazz(),
+                type,
                 factoryMethod,
-                generics,
                 values
         );
+    }
+
+    /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLMap] object.
+    ///
+    /// @param structure          The [ParsedXMLStructure] representing the XML to be parsed.
+    /// @param buildContext       The [BuildContext] that provides the context during the parsing process.
+    /// @param classAndIdentifier The [ClassAndIdentifier] containing the class type and identifier for the map.
+    /// @return An [FXMLMap] object constructed from the parsed XML structure.
+    private FXMLMap parseMap(
+            ParsedXMLStructure structure,
+            BuildContext buildContext,
+            ClassAndIdentifier classAndIdentifier
+    ) {
+        Map<String, String> properties = structure.properties();
+        FXMLType type = buildFXMLType(classAndIdentifier.clazz(), extractGenericsFromComments(structure.comments()), buildContext);
+        Optional<String> factoryMethod = Optional.ofNullable(properties.get(FXMLConstants.FX_FACTORY_ATTRIBUTE));
+        Map<String, AbstractFXMLValue> entries = new LinkedHashMap<>();
+        for (ParsedXMLStructure child : structure.children()) {
+            String key = child.properties().get(FXMLConstants.FX_ID_ATTRIBUTE);
+            if (key != null) {
+                entries.put(key, parseValue(child, buildContext));
+            }
+        }
+        return new FXMLMap(
+                classAndIdentifier.identifier(),
+                type,
+                factoryMethod,
+                entries
+        );
+    }
+
+    /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLObject].
+    ///
+    /// @param structure          The [ParsedXMLStructure] representing the XML to be parsed.
+    /// @param buildContext       The [BuildContext] that provides the context during the parsing process.
+    /// @param classAndIdentifier The [ClassAndIdentifier] containing the class type and identifier for the object.
+    /// @return An [FXMLObject] constructed from the parsed XML structure.
+    private FXMLObject parsePlainObject(
+            ParsedXMLStructure structure,
+            BuildContext buildContext,
+            ClassAndIdentifier classAndIdentifier
+    ) {
+        Class<?> clazz = classAndIdentifier.clazz();
+        FXMLType type = buildFXMLType(clazz, extractGenericsFromComments(structure.comments()), buildContext);
+        Map<String, String> attributes = structure.properties();
+        Optional<String> factoryMethod = Optional.ofNullable(attributes.get(FXMLConstants.FX_FACTORY_ATTRIBUTE));
+        List<FXMLProperty<?>> properties = new ArrayList<>();
+
+        for (Map.Entry<String, String> entry : attributes.entrySet()) {
+            String key = entry.getKey();
+            if (hasSkippablePrefix(key)) {
+                continue;
+            }
+            parseAttributeProperty(buildContext, clazz, key, entry.getValue()).ifPresent(properties::add);
+        }
+
+        for (ParsedXMLStructure child : structure.children()) {
+            String childName = child.name();
+            if (FXMLConstants.FX_DEFINE_ELEMENT.equals(childName)) {
+                child.children().stream()
+                        .map(defChild -> parseObject(defChild, buildContext, false))
+                        .forEach(buildContext.definitions()::add);
+            } else if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(childName)) {
+                buildContext.scripts().add(parseScript(child));
+            } else if (FXMLConstants.FX_INCLUDE_ELEMENT.equals(childName)
+                    || FXMLConstants.FX_REFERENCE_ELEMENT.equals(childName)
+                    || FXMLConstants.FX_COPY_ELEMENT.equals(childName)) {
+                AbstractFXMLValue fxValue = parseValue(child, buildContext);
+                Optional<String> defaultPropName = resolveDefaultPropertyName(clazz);
+                String getterName = Utils.getGetterName(defaultPropName.orElseThrow());
+                try {
+                    Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
+                    addValueToMultipleProperty(properties, defaultPropName.orElseThrow(), getterName, elementType, fxValue);
+                } catch (NoSuchMethodException _) {
+                    log.debug("No default list property found on %s for %s, skipping".formatted(clazz.getSimpleName(), childName));
+                }
+            } else if (childName.contains(".")) {
+                int dotIndex = childName.lastIndexOf('.');
+                String ownerPart = childName.substring(0, dotIndex);
+                String propName = childName.substring(dotIndex + 1);
+                if (Character.isUpperCase(ownerPart.charAt(0))) {
+                    Class<?> staticClass = Utils.findType(buildContext.imports(), ownerPart);
+                    String staticSetterName = Utils.getSetterName(propName);
+                    parseStaticPropertyElement(buildContext, staticClass, staticSetterName, propName, child)
+                            .ifPresent(properties::add);
+                } else {
+                    parseInstancePropertyElement(buildContext, clazz, propName, child).ifPresent(properties::add);
+                }
+            } else if (!hasSkippablePrefix(childName)) {
+                AbstractFXMLObject childObject = parseObject(child, buildContext, false);
+                Optional<String> defaultPropName = resolveDefaultPropertyName(clazz);
+                String getterName = Utils.getGetterName(defaultPropName.orElseThrow());
+                try {
+                    Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
+                    addValueToMultipleProperty(properties, defaultPropName.orElseThrow(), getterName, elementType, (AbstractFXMLValue) childObject);
+                } catch (NoSuchMethodException _) {
+                    log.debug("No default list property found on %s for child %s, skipping".formatted(clazz.getSimpleName(), childName));
+                }
+            }
+        }
+
+        return new FXMLObject(classAndIdentifier.identifier(), type, factoryMethod, properties);
+    }
+
+    /// Resolves the default property name for a class using the [DefaultProperty] annotation.
+    ///
+    /// If the class (or any of its superclasses) is annotated with [DefaultProperty],
+    /// the annotated property name is returned.
+    ///
+    /// @param clazz the class to inspect for a [DefaultProperty] annotation.
+    /// @return the default property name if found, or an empty [Optional] if not found.
+    private Optional<String> resolveDefaultPropertyName(Class<?> clazz) {
+        Class<?> current = clazz;
+        while (current != null) {
+            DefaultProperty annotation = current.getAnnotation(DefaultProperty.class);
+            if (annotation != null) {
+                return Optional.of(annotation.value());
+            }
+            current = current.getSuperclass();
+        }
+        return Optional.empty();
+    }
+
+    /// Builds an [FXMLType] from a class and a list of generic type name strings.
+    ///
+    /// If the generics list is empty, returns a [FXMLClassType]. Otherwise, parses each generic
+    /// string into an [FXMLType] and returns an [FXMLGenericType].
+    ///
+    /// @param clazz        The base class.
+    /// @param generics     The list of generic type name strings extracted from XML comments.
+    /// @param buildContext The build context used for class resolution.
+    /// @return The corresponding [FXMLType].
+    private FXMLType buildFXMLType(Class<?> clazz, List<String> generics, BuildContext buildContext) {
+        if (generics.isEmpty()) {
+            return new FXMLClassType(clazz);
+        }
+        List<FXMLType> typeArgs = generics.stream()
+                .map(g -> (FXMLType) new FXMLClassType(Utils.findType(buildContext.imports(), g)))
+                .toList();
+        return new FXMLGenericType(clazz, typeArgs);
     }
 
     /// Parses a child XML structure into an [AbstractFXMLValue].
@@ -177,12 +318,69 @@ public record FXMLDocumentParser(Log log) {
 
     /// Parses an XML structure into an FXML value.
     ///
+    /// Handles `fx:include`, `fx:reference`, `fx:copy`, `fx:script` (inline), `fx:constant`,
+    /// `fx:value`, and plain object nodes.
+    ///
     /// @param structure    The parsed XML structure.
     /// @param buildContext The context used during the building process.
     /// @return The parsed [AbstractFXMLValue].
     private AbstractFXMLValue parseValue(ParsedXMLStructure structure, BuildContext buildContext) {
         String nodeName = structure.name();
-        throw new UnsupportedOperationException("Not yet implemented");
+        Map<String, String> attributes = structure.properties();
+
+        if (FXMLConstants.FX_INCLUDE_ELEMENT.equals(nodeName)) {
+            String src = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
+            if (src == null) {
+                throw new IllegalArgumentException("`source` attribute is required for fx:include");
+            }
+            FXMLIdentifier includeId = resolveOptionalIdentifier(attributes)
+                    .map(id -> (FXMLIdentifier) id)
+                    .orElseGet(() -> new FXMLInternalIdentifier(buildContext.internalCounter().getAndIncrement()));
+            return new FXMLInclude(includeId, src);
+        }
+
+        if (FXMLConstants.FX_REFERENCE_ELEMENT.equals(nodeName)) {
+            String source = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
+            if (source == null) {
+                throw new IllegalArgumentException("`source` attribute is required for fx:reference");
+            }
+            return new FXMLReference(source);
+        }
+
+        if (FXMLConstants.FX_COPY_ELEMENT.equals(nodeName)) {
+            String source = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
+            if (source == null) {
+                throw new IllegalArgumentException("`source` attribute is required for fx:copy");
+            }
+            FXMLIdentifier copyId = resolveOptionalIdentifier(attributes)
+                    .map(id -> (FXMLIdentifier) id)
+                    .orElseGet(() -> new FXMLInternalIdentifier(buildContext.internalCounter().getAndIncrement()));
+            return new FXMLCopy(copyId, source);
+        }
+
+        if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(nodeName)) {
+            String scriptContent = attributes.get("#text");
+            if (scriptContent != null && !scriptContent.isBlank()) {
+                return new FXMLInlineScript(scriptContent);
+            }
+            throw new IllegalArgumentException("`fx:script` used as value must have inline content");
+        }
+
+        Class<?> clazz = Utils.findType(buildContext.imports(), nodeName);
+
+        if (attributes.containsKey(FXMLConstants.FX_CONSTANT_ATTRIBUTE)) {
+            String constantName = attributes.get(FXMLConstants.FX_CONSTANT_ATTRIBUTE);
+            FXMLType constantType = new FXMLClassType(Utils.getClassType(resolveConstantType(clazz, constantName)));
+            return new FXMLConstant(clazz, constantName, constantType);
+        }
+
+        if (attributes.containsKey(FXMLConstants.FX_VALUE_ATTRIBUTE)) {
+            String val = attributes.get(FXMLConstants.FX_VALUE_ATTRIBUTE);
+            Optional<FXMLIdentifier> id = resolveOptionalIdentifier(attributes);
+            return new FXMLValue(id, new FXMLClassType(clazz), val);
+        }
+
+        return parseObject(structure, buildContext, false);
     }
 
     /// Determines if the given string has a skippable prefix.
@@ -193,12 +391,26 @@ public record FXMLDocumentParser(Log log) {
         return key.startsWith(FXMLConstants.FX_PREFIX) || key.startsWith(FXMLConstants.XML_NAMESPACE_PREFIX);
     }
 
-    /// Parses an XML structure into an FXML script.
+    /// Parses an XML structure into an [FXMLScript].
     ///
-    /// @param structure The parsed XML structure.
+    /// If the structure has a `source` attribute, returns an [FXMLFileScript] with the resolved
+    /// path and charset. Otherwise, returns an [FXMLSourceScript] with the inline script content.
+    ///
+    /// @param structure The parsed XML structure representing the `fx:script` element.
     /// @return The parsed [FXMLScript].
     private FXMLScript parseScript(ParsedXMLStructure structure) {
-        return null; // TODO
+        Map<String, String> attributes = structure.properties();
+        if (attributes.containsKey(FXMLConstants.SOURCE_ATTRIBUTE)) {
+            String source = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
+            String charsetName = attributes.getOrDefault(FXMLConstants.CHARSET_ATTRIBUTE, StandardCharsets.UTF_8.name());
+            Charset charset = Charset.forName(charsetName);
+            return new FXMLFileScript(source, charset);
+        }
+        String scriptContent = attributes.get("#text");
+        if (scriptContent != null && !scriptContent.isBlank()) {
+            return new FXMLSourceScript(scriptContent);
+        }
+        return new FXMLSourceScript("");
     }
 
     /// Resolves and returns a [ClassAndIdentifier] object based on the given node name, attributes, and context.
@@ -244,160 +456,34 @@ public record FXMLDocumentParser(Log log) {
         return new ClassAndIdentifier(clazz, identifier);
     }
 
-    /// Converts a [ParsedXMLStructure] node into an [FXMLObject].
-    ///
-    /// Definitions and scripts encountered at any nesting level are accumulated into the
-    /// provided global `definitions` and `scripts` lists.
-    ///
-    /// @param imports         the list of imports used for class resolution.
-    /// @param structure       the XML structure node to convert.
-    /// @param internalCounter the counter used to generate unique internal identifiers.
-    /// @param isRoot          whether this node is the document root element.
-    /// @param definitions     the global list to accumulate all `fx:define` objects into.
-    /// @param scripts         the global list to accumulate all `fx:script` elements into.
-    /// @return the converted [FXMLObject].
-    private FXMLObject convertObject(
-            List<String> imports,
-            ParsedXMLStructure structure,
-            AtomicInteger internalCounter,
-            boolean isRoot,
-            List<FXMLObject> definitions,
-            List<FXMLScript> scripts
-    ) {
-        Map<String, String> attributes = structure.properties();
-        String nodeName = structure.name();
-
-        Class<?> clazz;
-        FXMLIdentifier identifier;
-        Optional<String> factoryMethod = Optional.empty();
-
-        if (FXMLConstants.FX_ROOT_ELEMENT.equals(nodeName)) {
-            String typeName = attributes.get("type");
-            if (typeName == null) {
-                throw new IllegalArgumentException("fx:root must have a 'type' attribute");
-            }
-            clazz = Utils.findType(imports, typeName);
-            identifier = FXMLRootIdentifier.INSTANCE;
-            log.debug("Parsed fx:root with type: %s".formatted(clazz.getName()));
-        } else {
-            clazz = Utils.findType(imports, nodeName);
-            if (isRoot) {
-                identifier = FXMLRootIdentifier.INSTANCE;
-            } else if (attributes.containsKey(FXMLConstants.FX_ID_ATTRIBUTE)) {
-                identifier = new FXMLExposedIdentifier(attributes.get(FXMLConstants.FX_ID_ATTRIBUTE));
-            } else {
-                identifier = new FXMLInternalIdentifier(internalCounter.getAndIncrement());
-            }
-        }
-
-        if (attributes.containsKey(FXMLConstants.FX_FACTORY_ATTRIBUTE)) {
-            factoryMethod = Optional.of(attributes.get(FXMLConstants.FX_FACTORY_ATTRIBUTE));
-        }
-
-        List<String> generics = extractGenericsFromComments(structure.comments());
-        List<FXMLProperty<?>> properties = new ArrayList<>();
-
-        // Process XML attributes as properties (skip fx: namespace and xmlns attributes)
-        for (Map.Entry<String, String> entry : attributes.entrySet()) {
-            String key = entry.getKey();
-            if (key.startsWith("fx:") || key.startsWith("xmlns")) {
-                continue;
-            }
-            Optional<FXMLProperty<?>> prop = convertAttributeProperty(imports, clazz, key, entry.getValue());
-            prop.ifPresent(properties::add);
-        }
-
-        // Process child elements
-        for (ParsedXMLStructure child : structure.children()) {
-            String childName = child.name();
-
-            if (FXMLConstants.FX_DEFINE_ELEMENT.equals(childName)) {
-                // fx:define block — children are object definitions, collected globally
-                for (ParsedXMLStructure defChild : child.children()) {
-                    definitions.add(convertObject(imports, defChild, internalCounter, false, definitions, scripts));
-                }
-            } else if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(childName)) {
-                // fx:script — collected globally
-                scripts.add(convertScript(child));
-            } else if (FXMLConstants.FX_INCLUDE_ELEMENT.equals(childName)
-                    || FXMLConstants.FX_REFERENCE_ELEMENT.equals(childName)
-                    || FXMLConstants.FX_COPY_ELEMENT.equals(childName)) {
-                // Special fx: value elements used as children
-                AbstractFXMLValue fxValue = convertValue(imports, child, internalCounter, definitions, scripts);
-                Optional<String> defaultPropName = resolveDefaultPropertyName(clazz);
-                String getterName = Utils.getGetterName(defaultPropName.orElseThrow());
-                try {
-                    Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
-                    addValueToMultipleProperty(properties, defaultPropName.orElseThrow(), getterName, elementType, fxValue);
-                } catch (NoSuchMethodException _) {
-                    log.debug("No default list property found on %s for %s, skipping".formatted(clazz.getSimpleName(), childName));
-                }
-            } else if (childName.contains(".")) {
-                // Property element: either "ClassName.propertyName" (static) or "propertyName" (instance)
-                int dotIndex = childName.lastIndexOf('.');
-                String ownerPart = childName.substring(0, dotIndex);
-                String propName = childName.substring(dotIndex + 1);
-
-                if (Character.isUpperCase(ownerPart.charAt(0))) {
-                    // Static property element
-                    Class<?> staticClass = Utils.findType(imports, ownerPart);
-                    String staticSetterName = Utils.getSetterName(propName);
-                    Optional<FXMLProperty<?>> prop = convertStaticPropertyElement(
-                            imports, staticClass, staticSetterName, propName, child, internalCounter, definitions, scripts
-                    );
-                    prop.ifPresent(properties::add);
-                } else {
-                    // Instance property element (e.g., <Button.padding>)
-                    Optional<FXMLProperty<?>> prop = convertInstancePropertyElement(
-                            imports, clazz, propName, child, internalCounter, definitions, scripts
-                    );
-                    prop.ifPresent(properties::add);
-                }
-            } else {
-                // Regular child object — treat as a child value in the default property
-                FXMLObject childObject = convertObject(imports, child, internalCounter, false, definitions, scripts);
-                Optional<String> defaultPropName = resolveDefaultPropertyName(clazz);
-                String getterName = Utils.getGetterName(defaultPropName.orElseThrow());
-                try {
-                    Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
-                    addValueToMultipleProperty(properties, defaultPropName.orElseThrow(), getterName, elementType, childObject);
-                } catch (NoSuchMethodException _) {
-                    log.debug("No default list property found on %s for child %s, skipping".formatted(clazz.getSimpleName(), childName));
-                }
-            }
-        }
-
-        return new FXMLObject(identifier, clazz, factoryMethod, generics, properties);
-    }
-
     /// Converts an XML attribute into an [FXMLProperty], handling both static and instance properties.
     ///
-    /// @param imports       the list of imports for class resolution.
+    /// @param buildContext  the build context for class resolution.
     /// @param clazz         the class owning the property.
     /// @param attributeName the attribute name (may contain a dot for static properties).
     /// @param value         the attribute value string.
     /// @return an [Optional] containing the property, or empty if it could not be resolved.
-    private Optional<FXMLProperty<?>> convertAttributeProperty(
-            List<String> imports,
+    private Optional<FXMLProperty<?>> parseAttributeProperty(
+            BuildContext buildContext,
             Class<?> clazz,
             String attributeName,
             String value
     ) {
         if (attributeName.contains(".")) {
-            return convertStaticAttributeProperty(imports, attributeName, value);
+            return parseStaticAttributeProperty(buildContext, attributeName, value);
         } else {
-            return convertInstanceAttributeProperty(clazz, attributeName, value);
+            return parseInstanceAttributeProperty(clazz, attributeName, value);
         }
     }
 
     /// Converts a static attribute property (e.g., `GridPane.rowIndex="0"`) into an [FXMLStaticSingleProperty].
     ///
-    /// @param imports       the list of imports for class resolution.
+    /// @param buildContext  the build context for class resolution.
     /// @param attributeName the full attribute name including the class prefix.
     /// @param value         the attribute value string.
     /// @return an [Optional] containing the static property, or empty if unresolvable.
-    private Optional<FXMLProperty<?>> convertStaticAttributeProperty(
-            List<String> imports,
+    private Optional<FXMLProperty<?>> parseStaticAttributeProperty(
+            BuildContext buildContext,
             String attributeName,
             String value
     ) {
@@ -406,7 +492,7 @@ public record FXMLDocumentParser(Log log) {
         String propName = attributeName.substring(dotIndex + 1);
         Class<?> staticClass;
         try {
-            staticClass = Utils.findType(imports, className);
+            staticClass = Utils.findType(buildContext.imports(), className);
         } catch (Exception e) {
             log.warn("Could not resolve static property class '%s', skipping attribute '%s'".formatted(className, attributeName));
             return Optional.empty();
@@ -423,7 +509,7 @@ public record FXMLDocumentParser(Log log) {
         }
         Method setter = setters.getFirst();
         Type paramType = setter.getGenericParameterTypes()[1];
-        FXMLValue fxmlValue = new FXMLValue(Optional.empty(), Utils.getClassType(paramType), value);
+        FXMLValue fxmlValue = new FXMLValue(Optional.empty(), new FXMLClassType(Utils.getClassType(paramType)), value);
         return Optional.of(new FXMLStaticSingleProperty(propName, staticClass, staticSetterName, paramType, fxmlValue));
     }
 
@@ -433,7 +519,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param attributeName the attribute name.
     /// @param value         the attribute value string.
     /// @return an [Optional] containing the property, or empty if unresolvable.
-    private Optional<FXMLProperty<?>> convertInstanceAttributeProperty(
+    private Optional<FXMLProperty<?>> parseInstanceAttributeProperty(
             Class<?> clazz,
             String attributeName,
             String value
@@ -450,7 +536,6 @@ public record FXMLDocumentParser(Log log) {
             Type paramType = setter.getGenericParameterTypes()[0];
             return Optional.of(new FXMLSingleProperty(attributeName, Optional.of(setterName), paramType, fxmlValue));
         }
-        // Try list getter
         String getterName = Utils.getGetterName(attributeName);
         try {
             Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
@@ -461,45 +546,20 @@ public record FXMLDocumentParser(Log log) {
         }
     }
 
-    /// Resolves the default property name for a class using the [DefaultProperty] annotation.
-    ///
-    /// If the class (or any of its superclasses) is annotated with [DefaultProperty],
-    /// the annotated property name is returned.
-    ///
-    /// @param clazz the class to inspect for a [DefaultProperty] annotation.
-    /// @return the default property name if found, or an empty [Optional] if not found.
-    private Optional<String> resolveDefaultPropertyName(Class<?> clazz) {
-        Class<?> current = clazz;
-        while (current != null) {
-            DefaultProperty annotation = current.getAnnotation(DefaultProperty.class);
-            if (annotation != null) {
-                return Optional.of(annotation.value());
-            }
-            current = current.getSuperclass();
-        }
-        return Optional.empty();
-    }
-
     /// Converts a static property child element into an [FXMLProperty].
     ///
-    /// @param imports          the list of imports for class resolution.
+    /// @param buildContext     the build context for class resolution.
     /// @param staticClass      the class defining the static property.
     /// @param staticSetterName the name of the static setter method.
     /// @param propName         the property name.
     /// @param child            the child XML structure containing the property values.
-    /// @param internalCounter  the counter for generating internal identifiers.
-    /// @param definitions      the global list to accumulate all `fx:define` objects into.
-    /// @param scripts          the global list to accumulate all `fx:script` elements into.
     /// @return an [Optional] containing the property, or empty if unresolvable.
-    private Optional<FXMLProperty<?>> convertStaticPropertyElement(
-            List<String> imports,
+    private Optional<FXMLProperty<?>> parseStaticPropertyElement(
+            BuildContext buildContext,
             Class<?> staticClass,
             String staticSetterName,
             String propName,
-            ParsedXMLStructure child,
-            AtomicInteger internalCounter,
-            List<FXMLObject> definitions,
-            List<FXMLScript> scripts
+            ParsedXMLStructure child
     ) {
         List<Method> setters = Utils.findStaticSettersForNode(staticClass, staticSetterName);
         if (setters.isEmpty()) {
@@ -512,7 +572,7 @@ public record FXMLDocumentParser(Log log) {
         }
         Method setter = setters.getFirst();
         Type paramType = setter.getGenericParameterTypes()[1];
-        List<AbstractFXMLValue> values = convertChildrenToValues(imports, child, internalCounter, definitions, scripts);
+        List<AbstractFXMLValue> values = parseChildrenToValues(buildContext, child);
         if (values.size() == 1) {
             return Optional.of(new FXMLStaticSingleProperty(propName, staticClass, staticSetterName, paramType, values.getFirst()));
         }
@@ -521,26 +581,20 @@ public record FXMLDocumentParser(Log log) {
 
     /// Converts an instance property child element into an [FXMLProperty].
     ///
-    /// @param imports         the list of imports for class resolution.
-    /// @param clazz           the class owning the property.
-    /// @param propName        the property name.
-    /// @param child           the child XML structure containing the property values.
-    /// @param internalCounter the counter for generating internal identifiers.
-    /// @param definitions     the global list to accumulate all `fx:define` objects into.
-    /// @param scripts         the global list to accumulate all `fx:script` elements into.
+    /// @param buildContext the build context for class resolution.
+    /// @param clazz        the class owning the property.
+    /// @param propName     the property name.
+    /// @param child        the child XML structure containing the property values.
     /// @return an [Optional] containing the property, or empty if unresolvable.
-    private Optional<FXMLProperty<?>> convertInstancePropertyElement(
-            List<String> imports,
+    private Optional<FXMLProperty<?>> parseInstancePropertyElement(
+            BuildContext buildContext,
             Class<?> clazz,
             String propName,
-            ParsedXMLStructure child,
-            AtomicInteger internalCounter,
-            List<FXMLObject> definitions,
-            List<FXMLScript> scripts
+            ParsedXMLStructure child
     ) {
         String setterName = Utils.getSetterName(propName);
         List<Method> setters = Utils.findObjectSetters(clazz, setterName);
-        List<AbstractFXMLValue> values = convertChildrenToValues(imports, child, internalCounter, definitions, scripts);
+        List<AbstractFXMLValue> values = parseChildrenToValues(buildContext, child);
 
         if (!setters.isEmpty()) {
             if (setters.size() > 1) {
@@ -555,7 +609,6 @@ public record FXMLDocumentParser(Log log) {
             return Optional.of(new FXMLMultipleProperties(propName, Optional.of(setterName), paramType, values));
         }
 
-        // Try list getter
         String getterName = Utils.getGetterName(propName);
         try {
             Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
@@ -568,110 +621,18 @@ public record FXMLDocumentParser(Log log) {
 
     /// Converts the children of a property element into a list of [AbstractFXMLValue].
     ///
-    /// @param imports         the list of imports for class resolution.
+    /// @param buildContext   the build context for class resolution.
     /// @param propertyElement the property element whose children are to be converted.
-    /// @param internalCounter the counter for generating internal identifiers.
-    /// @param definitions     the global list to accumulate all `fx:define` objects into.
-    /// @param scripts         the global list to accumulate all `fx:script` elements into.
     /// @return the list of converted values.
-    private List<AbstractFXMLValue> convertChildrenToValues(
-            List<String> imports,
-            ParsedXMLStructure propertyElement,
-            AtomicInteger internalCounter,
-            List<FXMLObject> definitions,
-            List<FXMLScript> scripts
+    private List<AbstractFXMLValue> parseChildrenToValues(
+            BuildContext buildContext,
+            ParsedXMLStructure propertyElement
     ) {
         List<AbstractFXMLValue> values = new ArrayList<>();
         for (ParsedXMLStructure child : propertyElement.children()) {
-            values.add(convertValue(imports, child, internalCounter, definitions, scripts));
+            values.add(parseValue(child, buildContext));
         }
         return values;
-    }
-
-    /// Converts a [ParsedXMLStructure] node into an [AbstractFXMLValue].
-    ///
-    /// @param imports         the list of imports for class resolution.
-    /// @param structure       the XML structure node to convert.
-    /// @param internalCounter the counter for generating internal identifiers.
-    /// @param definitions     the global list to accumulate all `fx:define` objects into.
-    /// @param scripts         the global list to accumulate all `fx:script` elements into.
-    /// @return the converted [AbstractFXMLValue].
-    private AbstractFXMLValue convertValue(
-            List<String> imports,
-            ParsedXMLStructure structure,
-            AtomicInteger internalCounter,
-            List<FXMLObject> definitions,
-            List<FXMLScript> scripts
-    ) {
-        String nodeName = structure.name();
-        Map<String, String> attributes = structure.properties();
-
-        if (FXMLConstants.FX_INCLUDE_ELEMENT.equals(nodeName)) {
-            String src = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
-            if (src == null) {
-                throw new IllegalArgumentException("fx:include must have a 'source' attribute");
-            }
-            return new FXMLInclude(null, src);
-        }
-
-        if (FXMLConstants.FX_REFERENCE_ELEMENT.equals(nodeName)) {
-            String source = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
-            if (source == null) {
-                throw new IllegalArgumentException("fx:reference must have a 'source' attribute");
-            }
-            return new FXMLReference(source);
-        }
-
-        if (FXMLConstants.FX_COPY_ELEMENT.equals(nodeName)) {
-            String source = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
-            if (source == null) {
-                throw new IllegalArgumentException("fx:copy must have a 'source' attribute");
-            }
-            return new FXMLCopy(source);
-        }
-
-        if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(nodeName)) {
-            String scriptContent = attributes.get("#text");
-            if (scriptContent != null && !scriptContent.isBlank()) {
-                return new FXMLInlineScript(scriptContent);
-            }
-            throw new IllegalArgumentException("fx:script used as value must have inline content");
-        }
-
-        Class<?> clazz = Utils.findType(imports, nodeName);
-
-        if (attributes.containsKey(FXMLConstants.FX_CONSTANT_ATTRIBUTE)) {
-            String constantName = attributes.get(FXMLConstants.FX_CONSTANT_ATTRIBUTE);
-            Type constantType = resolveConstantType(clazz, constantName);
-            return new FXMLConstant(clazz, constantName, constantType);
-        }
-
-        if (attributes.containsKey(FXMLConstants.FX_VALUE_ATTRIBUTE)) {
-            String val = attributes.get(FXMLConstants.FX_VALUE_ATTRIBUTE);
-            Optional<FXMLIdentifier> id = resolveOptionalIdentifier(attributes);
-            return new FXMLValue(id, clazz, val);
-        }
-
-        return convertObject(imports, structure, internalCounter, false, definitions, scripts);
-    }
-
-    /// Converts a [ParsedXMLStructure] `fx:script` element into an [FXMLScript].
-    ///
-    /// @param structure the XML structure representing the script element.
-    /// @return the converted [FXMLScript].
-    private FXMLScript convertScript(ParsedXMLStructure structure) {
-        Map<String, String> attributes = structure.properties();
-        if (attributes.containsKey(FXMLConstants.SOURCE_ATTRIBUTE)) {
-            String source = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
-            String charsetName = attributes.getOrDefault(FXMLConstants.CHARSET_ATTRIBUTE, StandardCharsets.UTF_8.name());
-            Charset charset = Charset.forName(charsetName);
-            return new FXMLFileScript(Path.of(source), charset);
-        }
-        String scriptContent = attributes.get("#text");
-        if (scriptContent != null && !scriptContent.isBlank()) {
-            return new FXMLSourceScript(scriptContent);
-        }
-        return new FXMLSourceScript("");
     }
 
     /// Parses an attribute value string into an [AbstractFXMLValue].
@@ -694,15 +655,15 @@ public record FXMLDocumentParser(Log log) {
             return new FXMLResource(value.substring(1));
         }
         if (value.startsWith(FXMLConstants.METHOD_REFERENCE_PREFIX)) {
-            return new FXMLMethod(value.substring(1), List.of(), void.class, Map.of());
+            return new FXMLMethod(value.substring(1), List.of(), new FXMLClassType(void.class));
         }
         if (value.startsWith(FXMLConstants.EXPRESSION_PREFIX)) {
             return new FXMLExpression(value.substring(1));
         }
         if (value.startsWith(FXMLConstants.ESCAPE_PREFIX)) {
-            return new FXMLValue(Optional.empty(), String.class, value.substring(1));
+            return new FXMLValue(Optional.empty(), new FXMLClassType(String.class), value.substring(1));
         }
-        return new FXMLValue(Optional.empty(), String.class, value);
+        return new FXMLValue(Optional.empty(), new FXMLClassType(String.class), value);
     }
 
     /// Resolves the [Type] of a constant field on the given class.
