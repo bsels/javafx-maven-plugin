@@ -1,7 +1,14 @@
 package com.github.bsels.javafx.maven.plugin.io;
 
+import com.github.bsels.javafx.maven.plugin.TestHelpers;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.FXMLConstants;
 import org.apache.maven.monitor.logging.DefaultLog;
 import org.apache.maven.plugin.MojoExecutionException;
+import org.assertj.core.api.InstanceOfAssertFactories;
+import org.assertj.core.api.InstanceOfAssertFactory;
+import org.assertj.core.api.ListAssert;
+import org.assertj.core.api.MapAssert;
+import org.assertj.core.api.OptionalAssert;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,12 +21,12 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.stream.Gatherer;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -387,6 +394,130 @@ class FXMLReaderTests {
                         .cause()
                         .hasMessage("Test exception");
             }
+        }
+    }
+
+    @Nested
+    class ExamplesTest {
+
+        @SuppressWarnings("rawtypes") // Suppress raw type warning because of the assertion factory
+        private static final InstanceOfAssertFactory<List, ListAssert<ParsedXMLStructure>> PARSED_XML_STRUCTURE_LIST_ASSERT_FACTORY =
+                InstanceOfAssertFactories.list(ParsedXMLStructure.class);
+        @SuppressWarnings("rawtypes") // Suppress raw type warning because of the assertion factory
+        private static final InstanceOfAssertFactory<Map, MapAssert<String, String>> STRING_STRING_MAP_ASSERT_FACTORY =
+                InstanceOfAssertFactories.map(String.class, String.class);
+        @SuppressWarnings("rawtypes") // Suppress raw type warning because of the assertion factory
+        private static final InstanceOfAssertFactory<Optional, OptionalAssert<String>> STRING_OPTIONAL_ASSERT_FACTORY =
+                InstanceOfAssertFactories.optional(String.class);
+
+        @Test
+        void inMemoryScript_ReturnExpectedIncludingPlainText() throws MojoExecutionException {
+            // Prepare
+            Path fxmlFile = TestHelpers.getTestResourcePath("/examples/InMemoryScript.fxml");
+
+            // Act
+            ParsedFXML result = fxmlReader.readFXML(fxmlFile);
+
+            // Assert
+            assertThat(result)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("scriptNamespace", Optional.of("javascript"))
+                    .hasFieldOrPropertyWithValue("className", "InMemoryScript")
+                    .satisfies(
+                            parsedFXML -> assertThat(parsedFXML.imports())
+                                    .hasSize(2)
+                                    .containsExactlyInAnyOrder("javafx.scene.control.*", "javafx.scene.layout.*")
+                    )
+                    // Verify the root node
+                    .extracting(ParsedFXML::root)
+                    .hasFieldOrPropertyWithValue("name", "VBox")
+                    .hasFieldOrPropertyWithValue("properties", Map.of())
+                    .hasFieldOrPropertyWithValue("comments", List.of())
+                    .returns(Optional.empty(), ParsedXMLStructure::textValue)
+                    // Verify the children
+                    .extracting(ParsedXMLStructure::children, PARSED_XML_STRUCTURE_LIST_ASSERT_FACTORY)
+                    .hasSize(2)
+                    .satisfiesExactly(
+                            first -> assertThat(first)
+                                    .hasFieldOrPropertyWithValue("name", FXMLConstants.FX_SCRIPT_ELEMENT)
+                                    .hasFieldOrPropertyWithValue("properties", Map.of())
+                                    .hasFieldOrPropertyWithValue("children", List.of())
+                                    .hasFieldOrPropertyWithValue("comments", List.of())
+                                    .extracting(ParsedXMLStructure::textValue, STRING_OPTIONAL_ASSERT_FACTORY)
+                                    .isPresent()
+                                    .get(InstanceOfAssertFactories.STRING)
+                                    .isEqualTo("""
+                                            function handleButtonAction(event) {
+                                                java.lang.System.out.println('You clicked me!');
+                                            }
+                                            """),
+                            second -> assertThat(second)
+                                    .hasFieldOrPropertyWithValue("name", "children")
+                                    .hasFieldOrPropertyWithValue("properties", Map.of())
+                                    .hasFieldOrPropertyWithValue("comments", List.of())
+                                    .returns(Optional.empty(), ParsedXMLStructure::textValue)
+                                    .extracting(ParsedXMLStructure::children, PARSED_XML_STRUCTURE_LIST_ASSERT_FACTORY)
+                                    .hasSize(1)
+                                    .first()
+                                    .hasFieldOrPropertyWithValue("name", "Button")
+                                    .hasFieldOrPropertyWithValue("children", List.of())
+                                    .hasFieldOrPropertyWithValue("comments", List.of())
+                                    .returns(Optional.empty(), ParsedXMLStructure::textValue)
+                                    .extracting(ParsedXMLStructure::properties, STRING_STRING_MAP_ASSERT_FACTORY)
+                                    .hasSize(2)
+                                    .containsEntry("text", "Click Me!")
+                                    .containsEntry("onAction", "handleButtonAction(event);")
+                    );
+        }
+
+        @Test
+        void externalScript_ReturnExpectedNonPlainText() throws MojoExecutionException {
+            // Prepare
+            Path fxmlFile = TestHelpers.getTestResourcePath("/examples/ExternalScript.fxml");
+
+            // Act
+            ParsedFXML result = fxmlReader.readFXML(fxmlFile);
+
+            // Assert
+            assertThat(result)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("scriptNamespace", Optional.of("javascript"))
+                    .hasFieldOrPropertyWithValue("className", "ExternalScript")
+                    .satisfies(
+                            parsedFXML -> assertThat(parsedFXML.imports())
+                                    .hasSize(2)
+                                    .containsExactlyInAnyOrder("javafx.scene.control.Button", "javafx.scene.layout.VBox")
+                    )
+                    // Verify the root node
+                    .extracting(ParsedFXML::root)
+                    .hasFieldOrPropertyWithValue("name", "VBox")
+                    .hasFieldOrPropertyWithValue("properties", Map.of())
+                    .hasFieldOrPropertyWithValue("comments", List.of())
+                    .returns(Optional.empty(), ParsedXMLStructure::textValue)
+                    // Verify the children
+                    .extracting(ParsedXMLStructure::children, PARSED_XML_STRUCTURE_LIST_ASSERT_FACTORY)
+                    .hasSize(2)
+                    .satisfiesExactly(
+                            first -> assertThat(first)
+                                    .hasFieldOrPropertyWithValue("name", FXMLConstants.FX_SCRIPT_ELEMENT)
+                                    .hasFieldOrPropertyWithValue("children", List.of())
+                                    .hasFieldOrPropertyWithValue("comments", List.of())
+                                    .returns(Optional.empty(), ParsedXMLStructure::textValue)
+                                    .extracting(ParsedXMLStructure::properties, STRING_STRING_MAP_ASSERT_FACTORY)
+                                    .hasSize(2)
+                                    .containsEntry("charset", "utf8")
+                                    .containsEntry("source", "example.js"),
+                            second -> assertThat(second)
+                                    .hasFieldOrPropertyWithValue("name", "Button")
+                                    .hasFieldOrPropertyWithValue("children", List.of())
+                                    .hasFieldOrPropertyWithValue("comments", List.of())
+                                    .returns(Optional.empty(), ParsedXMLStructure::textValue)
+                                    .extracting(ParsedXMLStructure::properties, STRING_STRING_MAP_ASSERT_FACTORY)
+                                    .hasSize(2)
+                                    .containsEntry("text", "Click Me!")
+                                    .containsEntry("onAction", "handleButtonAction(event);")
+                    )
+            ;
         }
     }
 }

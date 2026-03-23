@@ -185,8 +185,8 @@ public record FXMLReader(Log log) {
                         .mapToObj(childNodes::item)
                         .filter(childNode -> Node.TEXT_NODE == childNode.getNodeType() || Node.CDATA_SECTION_NODE == childNode.getNodeType())
                         .map(Node::getNodeValue)
-                        .collect(Collectors.collectingAndThen(Collectors.joining(), String::strip))
-        );
+                        .collect(Collectors.collectingAndThen(Collectors.joining(), Utils::stripIndentNonBlankLines))
+        ).filter(Predicate.not(String::isBlank));
     }
 
     /// Derives the class name corresponding to the given FXML file path.

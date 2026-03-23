@@ -173,7 +173,6 @@ public final class Utils {
         return (Gatherer<? super Optional<T>, Void, T>) OPTIONAL;
     }
 
-
     /// Returns a [Gatherer] instance that works with [Optional] values.
     /// This method is designed to handle Optional instances by facilitating operations on their contained
     /// values in a generic and type-safe manner.
@@ -184,6 +183,62 @@ public final class Utils {
     public static <T> Gatherer<? super Optional<T>, Void, T> optional(Class<T> clazz) {
         Objects.requireNonNull(clazz, "clazz cannot be null");
         return optional();
+    }
+
+    /// Creates a sequential [Gatherer] that collects elements into a list and then processes them in reverse order.
+    ///
+    /// @param <T> the type of elements to be processed
+    /// @return a [Gatherer] that accumulates elements into a list and outputs them in reverse order during downstream processing
+    public static <T> Gatherer<T, List<T>, T> reverse() {
+        return Gatherer.ofSequential(
+                ArrayList::new,
+                (state, line, _) -> state.add(line),
+                (state, downstream) -> {
+                    int i = state.size() - 1;
+                    while (i >= 0 && downstream.push(state.get(i))) {
+                        i--;
+                    }
+                }
+        );
+    }
+
+    /// Removes leading whitespace common to all non-blank lines in the given text.
+    /// The method ensures that the indentation is uniformly stripped while maintaining the relative structure
+    /// of the text.
+    ///
+    /// @param text the input string containing multiple lines of text, which may include leading or trailing whitespace.
+    /// @return a new string with the common leading whitespace removed from all non-blank lines. Blank lines will remain unaltered.
+    public static String stripIndentNonBlankLines(String text) {
+        int firstNonWhitespace = text.lines()
+                .filter(Predicate.not(String::isBlank))
+                .mapToInt(line -> {
+                    int length = line.length();
+                    int i = 0;
+                    while (i < length && Character.isWhitespace(line.charAt(i))) {
+                        i++;
+                    }
+                    return i;
+                })
+                .min()
+                .orElse(Integer.MAX_VALUE);
+
+        return text.lines()
+                .dropWhile(String::isBlank)
+                .map(line -> {
+                    if (line.isBlank()) {
+                        return "";
+                    } else {
+                        int lastNonWhitespace = line.length() - 1;
+                        while (lastNonWhitespace >= 0 && Character.isWhitespace(line.charAt(lastNonWhitespace))) {
+                            lastNonWhitespace--;
+                        }
+                        return line.substring(firstNonWhitespace, lastNonWhitespace + 1);
+                    }
+                })
+                .gather(Utils.reverse())
+                .dropWhile(String::isBlank)
+                .gather(Utils.reverse())
+                .collect(Collectors.joining("\n", "", "\n"));
     }
 
     /// Identifies and retrieves the single functional method of a given class if the class represents a functional interface.
@@ -223,7 +278,7 @@ public final class Utils {
     /// @param typeName the name of the type to be resolved; may be a simple name or fully qualified name
     /// @return the resolved [Class<?>] object corresponding to the typeName
     /// @throws InternalClassNotFoundException if the type cannot be resolved or if multiple types are found
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       for a given name in wildcard imports
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     for a given name in wildcard imports
     public static Class<?> findType(List<String> imports, String typeName) {
         if (typeName.contains(".")) {
             return findTypeForName(typeName)
@@ -392,7 +447,7 @@ public final class Utils {
     /// @return the return type of the validated getter method
     /// @throws NoSuchMethodException if the specified getter method does not exist in the class
     /// @throws IllegalStateException if the method's return type is not a collection,
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             or its generic type is incompatible with the given parameter type
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         or its generic type is incompatible with the given parameter type
     public static Class<?> findCollectionGetterWithAllowedReturnType(
             Class<?> clazz,
             String identifier,
@@ -435,7 +490,7 @@ public final class Utils {
     /// @param imports   a collection of fully qualified class names representing the current imports
     /// @param parameter the fully qualified class name of the parameter to be processed
     /// @return a simplified class name if the parameter can be reduced using the import set,
-    ///                                                                                 otherwise the original fully qualified class name of the parameter
+    ///                                                                                                 otherwise the original fully qualified class name of the parameter
     public static String improveImportForParameter(Collection<String> imports, String parameter) {
         String simpleName = parameter.substring(parameter.lastIndexOf('.') + 1);
         if (imports.contains(parameter)) {
