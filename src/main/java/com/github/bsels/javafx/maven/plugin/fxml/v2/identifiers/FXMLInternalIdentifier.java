@@ -8,10 +8,10 @@ public record FXMLInternalIdentifier(int internalId) implements FXMLIdentifier {
     /// Compact constructor to validate the internal identifier.
     ///
     /// @param internalId The internal index.
-    /// @throws IllegalArgumentException if the identifier is negative.
+    /// @throws IllegalArgumentException if `internalId` is negative.
     public FXMLInternalIdentifier {
         if (internalId < 0) {
-            throw new IllegalArgumentException("Internal identifier must be non-negative");
+            throw new IllegalArgumentException("`internalId` must be non-negative");
         }
     }
 

@@ -10,13 +10,13 @@ import java.util.Objects;
 /// @param sourceFile The source file to include.
 public record FXMLInclude(FXMLIdentifier identifier, String sourceFile) implements AbstractFXMLValue {
 
-    /// Compact constructor to validate the source file.
+    /// Compact constructor to validate the identifier and source file.
     ///
-    /// @param identifier The identifier of to include.
+    /// @param identifier The identifier of the include.
     /// @param sourceFile The source file to include.
-    /// @throws NullPointerException if the source file is null.
+    /// @throws NullPointerException if `identifier` or `sourceFile` is `null`.
     public FXMLInclude {
-        Objects.requireNonNull(identifier, "`identifier` cannot be null");
-        Objects.requireNonNull(sourceFile, "`sourceFile` cannot be null");
+        Objects.requireNonNull(identifier, "`identifier` must not be null");
+        Objects.requireNonNull(sourceFile, "`sourceFile` must not be null");
     }
 }

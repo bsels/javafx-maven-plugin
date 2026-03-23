@@ -12,12 +12,12 @@ public record FXMLExposedIdentifier(String name) implements FXMLIdentifier {
     /// Compact constructor to validate the identifier name.
     ///
     /// @param name The name of the identifier.
-    /// @throws NullPointerException     if the name is null.
-    /// @throws IllegalArgumentException if the name is not a valid Java identifier.
+    /// @throws NullPointerException     if `name` is null.
+    /// @throws IllegalArgumentException if `name` is not a valid Java identifier.
     public FXMLExposedIdentifier {
-        Objects.requireNonNull(name, "Name must not be null");
+        Objects.requireNonNull(name, "`name` must not be null");
         if (Utils.isInvalidIdentifierName(name)) {
-            throw new IllegalArgumentException("Name must be a valid Java identifier: %s".formatted(name));
+            throw new IllegalArgumentException("`name` must be a valid Java identifier: %s".formatted(name));
         }
     }
 

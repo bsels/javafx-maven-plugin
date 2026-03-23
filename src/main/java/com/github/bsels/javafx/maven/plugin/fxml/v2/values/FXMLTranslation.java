@@ -10,12 +10,12 @@ public record FXMLTranslation(String translationKey) implements AbstractFXMLValu
     /// Compact constructor to validate the translation key.
     ///
     /// @param translationKey The translation key.
-    /// @throws NullPointerException     if the translation key is null.
-    /// @throws IllegalArgumentException if the translation key is blank.
+    /// @throws NullPointerException     if `translationKey` is `null`.
+    /// @throws IllegalArgumentException if `translationKey` is blank.
     public FXMLTranslation {
-        Objects.requireNonNull(translationKey, "translationKey cannot be null");
+        Objects.requireNonNull(translationKey, "`translationKey` must not be null");
         if (translationKey.isBlank()) {
-            throw new IllegalArgumentException("translationKey cannot be blank");
+            throw new IllegalArgumentException("`translationKey` must not be blank");
         }
     }
 }

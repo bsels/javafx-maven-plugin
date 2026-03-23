@@ -29,7 +29,7 @@ public final class FXMLRootIdentifier implements FXMLIdentifier {
     /// Compares this root identifier to another object.
     ///
     /// @param obj The object to compare with.
-    /// @return true if the object is an instance of `FXMLRootIdentifier`, false otherwise.
+    /// @return `true` if the object is an instance of `FXMLRootIdentifier`, `false` otherwise.
     @Override
     public boolean equals(Object obj) {
         return obj instanceof FXMLRootIdentifier;

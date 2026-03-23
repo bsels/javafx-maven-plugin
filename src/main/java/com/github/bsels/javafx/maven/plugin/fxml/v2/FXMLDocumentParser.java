@@ -59,17 +59,17 @@ public record FXMLDocumentParser(Log log) {
 
     /// Compact constructor to validate the log dependency.
     ///
-    /// @param log the logging instance used for diagnostic output. Must not be null.
-    /// @throws NullPointerException if the log is null.
+    /// @param log The logging instance used for diagnostic output.
+    /// @throws NullPointerException if `log` is `null`.
     public FXMLDocumentParser {
         Objects.requireNonNull(log, "`log` must not be null");
     }
 
-    /// Parses the provided [ParsedFXML] instance and constructs an [FXMLDocument]`.
+    /// Parses the provided [ParsedFXML] instance and constructs an [FXMLDocument].
     ///
-    /// @param parsedFXML the [ParsedFXML] object to be parsed; must not be null
-    /// @return an [FXMLDocument] that represents the parsed structure of the given [ParsedFXML]
-    /// @throws NullPointerException if `parsedFXML` is null
+    /// @param parsedFXML The [ParsedFXML] object to be parsed.
+    /// @return An [FXMLDocument] that represents the parsed structure of the given [ParsedFXML].
+    /// @throws NullPointerException if `parsedFXML` is `null`.
     public FXMLDocument parse(ParsedFXML parsedFXML) {
         Objects.requireNonNull(parsedFXML, "`parsedFXML` must not be null");
         ParsedXMLStructure rootStructure = parsedFXML.root();
@@ -92,6 +92,13 @@ public record FXMLDocumentParser(Log log) {
         );
     }
 
+    /// Parses an XML structure into an FXML object.
+    ///
+    /// @param structure    The parsed XML structure.
+    /// @param buildContext The context used during the building process.
+    /// @param isRoot       Whether the object is the root of the FXML document.
+    /// @return An [AbstractFXMLObject] representing the parsed XML structure.
+    /// @throws IllegalStateException if the parsing fails.
     private AbstractFXMLObject parseObject(ParsedXMLStructure structure, BuildContext buildContext, boolean isRoot)
             throws IllegalStateException {
         Map<String, String> properties = structure.properties();
@@ -168,32 +175,42 @@ public record FXMLDocumentParser(Log log) {
         }
     }
 
+    /// Parses an XML structure into an FXML value.
+    ///
+    /// @param structure    The parsed XML structure.
+    /// @param buildContext The context used during the building process.
+    /// @return The parsed [AbstractFXMLValue].
     private AbstractFXMLValue parseValue(ParsedXMLStructure structure, BuildContext buildContext) {
+        String nodeName = structure.name();
         throw new UnsupportedOperationException("Not yet implemented");
     }
 
     /// Determines if the given string has a skippable prefix.
     ///
-    /// @param key the string to check for skippable prefixes
-    /// @return true if the string starts with a skippable prefix; false otherwise
+    /// @param key The string to check for skippable prefixes.
+    /// @return `true` if the string starts with a skippable prefix; `false` otherwise.
     private boolean hasSkippablePrefix(String key) {
         return key.startsWith(FXMLConstants.FX_PREFIX) || key.startsWith(FXMLConstants.XML_NAMESPACE_PREFIX);
     }
 
+    /// Parses an XML structure into an FXML script.
+    ///
+    /// @param structure The parsed XML structure.
+    /// @return The parsed [FXMLScript].
     private FXMLScript parseScript(ParsedXMLStructure structure) {
         return null; // TODO
     }
 
-    /// Resolves and returns an [ClassAndIdentifier] object based on the given node name, attributes, and context.
+    /// Resolves and returns a [ClassAndIdentifier] object based on the given node name, attributes, and context.
     /// This method identifies the class type and identifier for the specified node in an FXML document.
     ///
-    /// @param nodeName     the name of the node being processed, typically the FXML element name
-    /// @param attributes   a map of attributes associated with the node, typically derived from the FXML element's attributes
-    /// @param buildContext the context in which the FXML document is being built; provides necessary utilities and metadata
-    /// @param isRoot       a boolean indicating whether the node is the root of the FXML document
-    /// @return a [ClassAndIdentifier] containing the resolved class type and identifier for the node
-    /// @throws IllegalStateException if the node is labeled as fx:root but is not the document root
-    /// @throws IllegalStateException if fx:root is missing the required "type" attribute
+    /// @param nodeName     The name of the node being processed.
+    /// @param attributes   A map of attributes associated with the node.
+    /// @param buildContext The context in which the FXML document is being built.
+    /// @param isRoot       Whether the node is the root of the FXML document.
+    /// @return A [ClassAndIdentifier] containing the resolved class type and identifier for the node.
+    /// @throws IllegalStateException    if the node is labeled as `fx:root` but is not the document root, or if `fx:root` is missing the required `type` attribute.
+    /// @throws IllegalArgumentException if the class type cannot be resolved.
     private ClassAndIdentifier resolveClassAndIdentifier(
             String nodeName,
             Map<String, String> attributes,
@@ -690,19 +707,19 @@ public record FXMLDocumentParser(Log log) {
 
     /// Resolves the [Type] of a constant field on the given class.
     ///
-    /// @param clazz        the class defining the constant.
-    /// @param constantName the name of the constant field.
-    /// @return the [Type] of the constant field.
+    /// @param clazz        The class defining the constant.
+    /// @param constantName The name of the constant field.
+    /// @return The [Type] of the constant field.
     /// @throws IllegalArgumentException if the field does not exist or is not static.
     private Type resolveConstantType(Class<?> clazz, String constantName) {
         try {
             Field field = clazz.getField(constantName);
             if (!Modifier.isStatic(field.getModifiers())) {
-                throw new IllegalArgumentException("Field '%s' on '%s' is not static".formatted(constantName, clazz.getName()));
+                throw new IllegalArgumentException("Field `%s` on `%s` is not static".formatted(constantName, clazz.getName()));
             }
             return field.getGenericType();
         } catch (NoSuchFieldException e) {
-            throw new IllegalArgumentException("No such constant field '%s' on '%s'".formatted(constantName, clazz.getName()), e);
+            throw new IllegalArgumentException("No such constant field `%s` on `%s`".formatted(constantName, clazz.getName()), e);
         }
     }
 
@@ -711,8 +728,8 @@ public record FXMLDocumentParser(Log log) {
     /// If the attributes contain an [FXMLConstants#FX_ID_ATTRIBUTE] entry, an
     /// [FXMLExposedIdentifier] is returned. Otherwise, an empty [Optional] is returned.
     ///
-    /// @param attributes the XML attributes map.
-    /// @return an [Optional] containing the identifier, or empty if no `fx:id` is present.
+    /// @param attributes The XML attributes map.
+    /// @return An [Optional] containing the identifier, or empty if no `fx:id` is present.
     private Optional<FXMLIdentifier> resolveOptionalIdentifier(
             Map<String, String> attributes
     ) {
@@ -724,8 +741,8 @@ public record FXMLDocumentParser(Log log) {
 
     /// Extracts generic type names from XML comments (e.g., `<!-- generic 0: java.util.List<String> -->`).
     ///
-    /// @param comments the list of XML comments on the element.
-    /// @return the list of extracted generic type strings.
+    /// @param comments The list of XML comments on the element.
+    /// @return The list of extracted generic type strings.
     private List<String> extractGenericsFromComments(List<String> comments) {
         List<String> generics = new ArrayList<>();
         for (String comment : comments) {
@@ -742,11 +759,11 @@ public record FXMLDocumentParser(Log log) {
 
     /// Adds a value to an existing [FXMLMultipleProperties] entry or creates a new one.
     ///
-    /// @param properties  the current list of properties to update.
-    /// @param propName    the property name.
-    /// @param getterName  the getter method name for the list property.
-    /// @param elementType the element type of the list.
-    /// @param value       the value to add.
+    /// @param properties  The current list of properties to update.
+    /// @param propName    The property name.
+    /// @param getterName  The getter method name for the list property.
+    /// @param elementType The element type of the list.
+    /// @param value       The value to add.
     private void addValueToMultipleProperty(
             List<FXMLProperty<?>> properties,
             String propName,
@@ -769,13 +786,28 @@ public record FXMLDocumentParser(Log log) {
         properties.add(new FXMLMultipleProperties(propName, Optional.of(accessorName), elementType, values));
     }
 
+    /// Holds a class and its associated FXML identifier.
+    ///
+    /// @param clazz      The class type.
+    /// @param identifier The FXML identifier.
     private record ClassAndIdentifier(Class<?> clazz, FXMLIdentifier identifier) {
+        /// Compact constructor to validate the class and identifier.
+        ///
+        /// @param clazz      The class type.
+        /// @param identifier The FXML identifier.
+        /// @throws NullPointerException if `clazz` or `identifier` is `null`.
         private ClassAndIdentifier {
             Objects.requireNonNull(clazz, "`clazz` must not be null");
             Objects.requireNonNull(identifier, "`identifier` must not be null");
         }
     }
 
+    /// Holds the state and context during the FXML document building process.
+    ///
+    /// @param internalCounter The counter for generating internal identifiers.
+    /// @param imports         The list of imports.
+    /// @param definitions     The list of definitions.
+    /// @param scripts         The list of scripts.
     private record BuildContext(
             AtomicInteger internalCounter,
             List<String> imports,
@@ -783,6 +815,13 @@ public record FXMLDocumentParser(Log log) {
             List<FXMLScript> scripts
     ) {
 
+        /// Compact constructor to validate the build context components.
+        ///
+        /// @param internalCounter The counter for generating internal identifiers.
+        /// @param imports         The list of imports.
+        /// @param definitions     The list of definitions.
+        /// @param scripts         The list of scripts.
+        /// @throws NullPointerException if `internalCounter`, `imports`, `definitions`, or `scripts` is `null`.
         public BuildContext {
             Objects.requireNonNull(internalCounter, "`internalCounter` must not be null");
             Objects.requireNonNull(imports, "`imports` must not be null");
@@ -790,6 +829,9 @@ public record FXMLDocumentParser(Log log) {
             Objects.requireNonNull(scripts, "`scripts` must not be null");
         }
 
+        /// Constructs a new build context with the provided imports.
+        ///
+        /// @param imports The list of imports.
         public BuildContext(List<String> imports) {
             this(new AtomicInteger(), imports, new ArrayList<>(), new ArrayList<>());
         }

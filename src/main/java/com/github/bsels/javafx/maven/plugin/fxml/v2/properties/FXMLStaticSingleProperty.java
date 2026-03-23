@@ -27,7 +27,7 @@ public record FXMLStaticSingleProperty(
     /// @param staticSetter The name of the static setter method.
     /// @param type         The property type.
     /// @param value        The property value.
-    /// @throws NullPointerException if any required parameter is null.
+    /// @throws NullPointerException if `name`, `clazz`, `staticSetter`, `type`, or `value` is `null`.
     public FXMLStaticSingleProperty {
         Objects.requireNonNull(name, "`name` must not be null");
         Objects.requireNonNull(clazz, "`clazz` must not be null");

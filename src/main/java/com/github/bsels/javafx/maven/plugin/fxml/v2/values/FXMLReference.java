@@ -12,12 +12,12 @@ public record FXMLReference(String name) implements AbstractFXMLValue {
     /// Compact constructor to validate the reference name.
     ///
     /// @param name The name of the referenced object.
-    /// @throws NullPointerException     if the name is null.
-    /// @throws IllegalArgumentException if the name is not a valid Java identifier.
+    /// @throws NullPointerException     if `name` is `null`.
+    /// @throws IllegalArgumentException if `name` is not a valid Java identifier.
     public FXMLReference {
-        Objects.requireNonNull(name, "name cannot be null");
+        Objects.requireNonNull(name, "`name` must not be null");
         if (Utils.isInvalidIdentifierName(name)) {
-            throw new IllegalArgumentException("name must be a valid Java identifier: %s".formatted(name));
+            throw new IllegalArgumentException("`name` must be a valid Java identifier: %s".formatted(name));
         }
     }
 }

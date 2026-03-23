@@ -17,7 +17,7 @@ import java.util.Optional;
 /// @param scripts      The list of scripts associated with this object.
 public record FXMLDocument(
         AbstractFXMLObject root,
-        Optional<String> controller,
+        Optional<Class<?>> controller,
         Optional<String> scriptEngine,
         List<String> imports,
         List<AbstractFXMLObject> definitions,
@@ -31,7 +31,7 @@ public record FXMLDocument(
     /// @param imports      The list of imported classes or packages.
     /// @param definitions  The list of objects defined within this object.
     /// @param scripts      The list of scripts associated with this object.
-    /// @throws NullPointerException if any required parameter is null.
+    /// @throws NullPointerException if `root`, `controller`, or `scriptEngine` is `null`.
     public FXMLDocument {
         Objects.requireNonNull(root, "`root` must not be null");
         Objects.requireNonNull(controller, "`controller` must not be null");

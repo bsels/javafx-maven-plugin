@@ -19,21 +19,23 @@ public final class Utils {
         // No instances needed
     }
 
-    /// Returns true if the name is not a valid Java identifier.
+    /// Checks if the provided name is an invalid Java identifier.
     ///
     /// @param name The name to check.
-    /// @return true if the name is invalid, false otherwise.
+    /// @return `true` if the name is invalid, `false` otherwise.
+    /// @throws NullPointerException if `name` is `null`.
     public static boolean isInvalidIdentifierName(String name) {
-        Objects.requireNonNull(name);
+        Objects.requireNonNull(name, "`name` must not be null");
         return !VALID_NAME_PATTERN.test(name);
     }
 
-    /// Returns true if the name is not a valid chained Java identifier (e.g., "com.example.Class").
+    /// Checks if the provided name is an invalid chained Java identifier (e.g., "com.example.Class").
     ///
     /// @param name The name to check.
-    /// @return true if the name is invalid, false otherwise.
+    /// @return `true` if the name is invalid, `false` otherwise.
+    /// @throws NullPointerException if `name` is `null`.
     public static boolean isInvalidChainedIdentifierName(String name) {
-        Objects.requireNonNull(name);
+        Objects.requireNonNull(name, "`name` must not be null");
         return !VALID_CHAINED_IDENTIFIER_PATTERN.test(name);
     }
 }

@@ -25,7 +25,7 @@ public record FXMLSingleProperty(
     /// @param setter The name of the setter method, if any.
     /// @param type   The property type.
     /// @param value  The property value.
-    /// @throws NullPointerException if any required parameter is null.
+    /// @throws NullPointerException if `name`, `setter`, `type`, or `value` is `null`.
     public FXMLSingleProperty {
         Objects.requireNonNull(name, "`name` must not be null");
         Objects.requireNonNull(setter, "`setter` must not be null");
