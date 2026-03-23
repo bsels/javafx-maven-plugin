@@ -769,7 +769,7 @@ class FXMLProcessorTest {
                                     .hasFieldOrPropertyWithValue("name", "styleClass")
                                     .hasFieldOrPropertyWithValue("value", "my-class")
                                     .hasFieldOrPropertyWithValue("type", String.class)
-                                    .hasFieldOrPropertyWithValue("getter", "getStyleClass().add")
+                                    .hasFieldOrPropertyWithValue("setter", "getStyleClass().add")
                     );
         }
 

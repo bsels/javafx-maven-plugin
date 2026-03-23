@@ -1028,6 +1028,144 @@ class UtilsTest {
     }
 
     @Nested
+    class FindGetterMapAndReturnValueTypeTest {
+
+        @Test
+        void shouldReturnValueTypeFromParameterizedMap() throws NoSuchMethodException {
+            // Given
+            Class<?> testClass = TestClassWithMapGetters.class;
+            String methodName = "getStringToIntegerMap";
+
+            // When
+            Type result = Utils.findGetterMapAndReturnValueType(testClass, methodName);
+
+            // Then
+            assertThat(result).isEqualTo(Integer.class);
+        }
+
+        @Test
+        void shouldReturnObjectForRawMap() throws NoSuchMethodException {
+            // Given
+            Class<?> testClass = TestClassWithMapGetters.class;
+            String methodName = "getRawMap";
+
+            // When
+            Type result = Utils.findGetterMapAndReturnValueType(testClass, methodName);
+
+            // Then
+            assertThat(result).isEqualTo(Object.class);
+        }
+
+        @Test
+        void shouldThrowExceptionWhenMethodDoesNotExist() {
+            // Given
+            Class<?> testClass = TestClassWithMapGetters.class;
+            String methodName = "getNonExistentMethod";
+
+            // When & Then
+            assertThatThrownBy(() -> Utils.findGetterMapAndReturnValueType(testClass, methodName))
+                    .isInstanceOf(NoSuchMethodException.class);
+        }
+
+        @Test
+        void shouldThrowExceptionWhenMethodDoesNotReturnMap() {
+            // Given
+            Class<?> testClass = TestClassWithMapGetters.class;
+            String methodName = "getNonMapMethod";
+
+            // When & Then
+            assertThatThrownBy(() -> Utils.findGetterMapAndReturnValueType(testClass, methodName))
+                    .isInstanceOf(NoSuchMethodException.class)
+                    .hasMessage("Not a map getter: getNonMapMethod");
+        }
+
+        @Test
+        void shouldHandleWildcardValueWithUpperBound() throws NoSuchMethodException {
+            // Given
+            Class<?> testClass = TestClassWithMapGetters.class;
+            String methodName = "getWildcardUpperBoundMap";
+
+            // When
+            Type result = Utils.findGetterMapAndReturnValueType(testClass, methodName);
+
+            // Then
+            assertThat(result).isEqualTo(Number.class);
+        }
+
+        @Test
+        void shouldHandleWildcardValueWithLowerBound() throws NoSuchMethodException {
+            // Given
+            Class<?> testClass = TestClassWithMapGetters.class;
+            String methodName = "getWildcardLowerBoundMap";
+
+            // When
+            Type result = Utils.findGetterMapAndReturnValueType(testClass, methodName);
+
+            // Then
+            assertThat(result).isEqualTo(Integer.class);
+        }
+
+        @Test
+        void shouldHandleConcreteMapSubtype() throws NoSuchMethodException {
+            // Given
+            Class<?> testClass = TestClassWithMapGetters.class;
+            String methodName = "getTreeMap";
+
+            // When
+            Type result = Utils.findGetterMapAndReturnValueType(testClass, methodName);
+
+            // Then
+            assertThat(result).isEqualTo(String.class);
+        }
+
+        @Test
+        void shouldHandleNestedGenericValueType() throws NoSuchMethodException {
+            // Given
+            Class<?> testClass = TestClassWithMapGetters.class;
+            String methodName = "getNestedGenericMap";
+
+            // When
+            Type result = Utils.findGetterMapAndReturnValueType(testClass, methodName);
+
+            // Then
+            assertThat(result).isInstanceOf(ParameterizedType.class);
+        }
+
+        // Helper test class with various map getter methods
+        static class TestClassWithMapGetters {
+
+            public Map<String, Integer> getStringToIntegerMap() {
+                return new HashMap<>();
+            }
+
+            @SuppressWarnings("rawtypes")
+            public Map getRawMap() {
+                return new HashMap();
+            }
+
+            public String getNonMapMethod() {
+                return "not a map";
+            }
+
+            public Map<String, ? extends Number> getWildcardUpperBoundMap() {
+                return new HashMap<>();
+            }
+
+            public Map<String, ? super Integer> getWildcardLowerBoundMap() {
+                return new HashMap<>();
+            }
+
+            public TreeMap<String, String> getTreeMap() {
+                return new TreeMap<>();
+            }
+
+            public Map<String, List<Integer>> getNestedGenericMap() {
+                return new HashMap<>();
+            }
+        }
+    }
+
+    @Nested
     class IsAssignableFromTest {
 
         @ParameterizedTest

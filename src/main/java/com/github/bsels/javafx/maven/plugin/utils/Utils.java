@@ -339,6 +339,34 @@ public final class Utils {
         return Object.class;
     }
 
+    /// Finds a getter method in the specified class that returns a map and determines the value type of the map.
+    ///
+    /// @param clazz          the class to inspect for the specified getter method
+    /// @param mapGetterName  the name of the getter method that returns a map
+    /// @return the value type of the map returned by the getter method
+    /// @throws NoSuchMethodException if the specified method does not exist, or if the method does not return a map
+    public static Type findGetterMapAndReturnValueType(Class<?> clazz, String mapGetterName) throws NoSuchMethodException {
+        Method method = clazz.getMethod(mapGetterName);
+        if (!Map.class.isAssignableFrom(method.getReturnType())) {
+            throw new NoSuchMethodException("Not a map getter: %s".formatted(mapGetterName));
+        }
+        Type returnType = method.getGenericReturnType();
+        if (returnType instanceof ParameterizedType parameterizedType) {
+            Type[] typeArgs = parameterizedType.getActualTypeArguments();
+            if (typeArgs.length == 2) {
+                Type valueType = typeArgs[1];
+                if (valueType instanceof WildcardType wildcardType) {
+                    return Stream.of(wildcardType.getLowerBounds())
+                            .findFirst()
+                            .or(() -> Stream.of(wildcardType.getUpperBounds()).findFirst())
+                            .orElse(valueType);
+                }
+                return valueType;
+            }
+        }
+        return Object.class;
+    }
+
     /// Returns a binary operator that always selects the first argument, ignoring the second argument.
     ///
     /// @param <T> the type of the operands and result of the operator

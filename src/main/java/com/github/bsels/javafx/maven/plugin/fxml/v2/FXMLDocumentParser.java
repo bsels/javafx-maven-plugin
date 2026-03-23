@@ -5,6 +5,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticObjectProperty;
@@ -531,10 +532,15 @@ public record FXMLDocumentParser(Log log) {
         return Optional.of(new FXMLStaticObjectProperty(propName, staticClass, setterName, paramType, fxmlValue));
     }
 
-    /// Converts an instance attribute property (e.g., `text="Hello"`) into an [FXMLObjectProperty].
+    /// Converts an instance attribute property (e.g., `text="Hello"`) into an [FXMLProperty].
     ///
-    /// If the getter's parameter type is `EventHandler`, the value may be an inline script (no prefix),
-    /// an expression (`$`), or a method reference (`#`), all of which are handled accordingly.
+    /// Resolution is attempted in the following order:
+    /// 1. A setter method is looked up; if found, an [FXMLObjectProperty] is returned.
+    ///    If the setter's parameter type is `EventHandler`, the value may be an inline script (no prefix),
+    ///    an expression (`$`), or a method reference (`#`), all of which are handled accordingly.
+    /// 2. A collection getter is looked up; if found, an [FXMLCollectionProperties] is returned.
+    /// 3. A map getter is looked up; if found, an [FXMLMapProperty] is returned with the attribute name
+    ///    as the single entry key and the parsed value as the entry value.
     ///
     /// @param buildContext  the build context for class resolution.
     /// @param clazz         the class owning the property.
@@ -565,7 +571,14 @@ public record FXMLDocumentParser(Log log) {
             AbstractFXMLValue fxmlValue = parseValueString(value);
             return Optional.of(new FXMLCollectionProperties(attributeName, getterName, elementType, List.of(fxmlValue), List.of()));
         } catch (NoSuchMethodException _) {
-            log.debug("No getter or list getter found for '%s' on '%s', skipping".formatted(attributeName, clazz.getName()));
+            // not a collection getter, try map getter
+        }
+        try {
+            Type valueType = Utils.findGetterMapAndReturnValueType(clazz, getterName);
+            AbstractFXMLValue fxmlValue = parseValueString(value);
+            return Optional.of(new FXMLMapProperty(attributeName, getterName, valueType, Map.of(attributeName, fxmlValue)));
+        } catch (NoSuchMethodException _) {
+            log.debug("No getter, list getter, or map getter found for '%s' on '%s', skipping".formatted(attributeName, clazz.getName()));
             return Optional.empty();
         }
     }
@@ -606,6 +619,13 @@ public record FXMLDocumentParser(Log log) {
 
     /// Converts an instance property child element into an [FXMLProperty].
     ///
+    /// Resolution is attempted in the following order:
+    /// 1. A setter method is looked up; if found and a single value is present, an [FXMLObjectProperty] is returned;
+    ///    if multiple values are present, an [FXMLCollectionProperties] is returned.
+    /// 2. A collection getter is looked up; if found, an [FXMLCollectionProperties] is returned.
+    /// 3. A map getter is looked up; if found, an [FXMLMapProperty] is returned with child element names
+    ///    as keys and parsed child values as entries.
+    ///
     /// @param buildContext the build context for class resolution.
     /// @param clazz        the class owning the property.
     /// @param propName     the property name.
@@ -639,7 +659,14 @@ public record FXMLDocumentParser(Log log) {
             Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
             return Optional.of(new FXMLCollectionProperties(propName, getterName, elementType, values, List.of()));
         } catch (NoSuchMethodException _) {
-            log.debug("No getter or list getter found for property element '%s' on '%s', skipping".formatted(propName, clazz.getName()));
+            // not a collection getter, try map getter
+        }
+        try {
+            Type valueType = Utils.findGetterMapAndReturnValueType(clazz, getterName);
+            Map<String, AbstractFXMLValue> entries = parseChildrenToMapEntries(buildContext, child);
+            return Optional.of(new FXMLMapProperty(propName, getterName, valueType, entries));
+        } catch (NoSuchMethodException _) {
+            log.debug("No getter, list getter, or map getter found for property element '%s' on '%s', skipping".formatted(propName, clazz.getName()));
             return Optional.empty();
         }
     }
@@ -658,6 +685,28 @@ public record FXMLDocumentParser(Log log) {
             values.add(parseValue(child, buildContext));
         }
         return values;
+    }
+
+    /// Converts the attributes and children of a map property element into a map of string keys to [AbstractFXMLValue] values.
+    ///
+    /// Attribute names and values are parsed first using [#parseValueString(String)], followed by child element names
+    /// mapped to their parsed [AbstractFXMLValue]. Child entries override attribute entries with the same key.
+    ///
+    /// @param buildContext    the build context for class resolution.
+    /// @param propertyElement the property element whose attributes and children are to be converted.
+    /// @return the map of attribute/child names to parsed values.
+    private Map<String, AbstractFXMLValue> parseChildrenToMapEntries(
+            BuildContext buildContext,
+            ParsedXMLStructure propertyElement
+    ) {
+        Map<String, AbstractFXMLValue> entries = new LinkedHashMap<>();
+        for (Map.Entry<String, String> attribute : propertyElement.properties().entrySet()) {
+            entries.put(attribute.getKey(), parseValueString(attribute.getValue()));
+        }
+        for (ParsedXMLStructure child : propertyElement.children()) {
+            entries.put(child.name(), parseValue(child, buildContext));
+        }
+        return entries;
     }
 
     /// Parses an attribute value string into an [AbstractFXMLValue].
