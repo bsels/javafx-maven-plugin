@@ -34,6 +34,7 @@ import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import com.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
 import com.github.bsels.javafx.maven.plugin.utils.Utils;
 import javafx.beans.DefaultProperty;
+import javafx.event.EventHandler;
 import org.apache.maven.plugin.logging.Log;
 
 import java.lang.reflect.Field;
@@ -51,6 +52,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 /// Parses a [ParsedFXML] raw XML structure into a [FXMLDocument] V2 model.
 ///
@@ -172,8 +174,16 @@ public record FXMLDocumentParser(Log log) {
             entries.put(key, parseValueString(entry.getValue()));
         }
         for (ParsedXMLStructure child : structure.children()) {
-            // TODO filter script elements and define elements from it
-            entries.put(child.name(), parseValue(child, buildContext));
+            String childName = child.name();
+            if (FXMLConstants.FX_DEFINE_ELEMENT.equals(childName)) {
+                child.children().stream()
+                        .map(defChild -> parseObject(defChild, buildContext, false))
+                        .forEach(buildContext.definitions()::add);
+            } else if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(childName)) {
+                buildContext.scripts().add(parseScript(child));
+            } else if (!hasSkippablePrefix(childName)) {
+                entries.put(childName, parseValue(child, buildContext));
+            }
         }
         return new FXMLMap(
                 classAndIdentifier.identifier(),
@@ -194,7 +204,6 @@ public record FXMLDocumentParser(Log log) {
             BuildContext buildContext,
             ClassAndIdentifier classAndIdentifier
     ) {
-        // TODO: Check implementation
         Class<?> clazz = classAndIdentifier.clazz();
         FXMLType type = buildFXMLType(clazz, extractGenericsFromComments(structure.comments()), buildContext);
         Map<String, String> attributes = structure.properties();
@@ -337,7 +346,6 @@ public record FXMLDocumentParser(Log log) {
     /// @param buildContext The context used during the building process.
     /// @return The parsed [AbstractFXMLValue].
     private AbstractFXMLValue parseValue(ParsedXMLStructure structure, BuildContext buildContext) {
-        // TODO: Check implementation
         String nodeName = structure.name();
         Map<String, String> attributes = structure.properties();
 
@@ -480,11 +488,10 @@ public record FXMLDocumentParser(Log log) {
             String attributeName,
             String value
     ) {
-        // TODO: Make a difference for setters that accepts an javafx.event.EventHandler can contain an inline script (no prefix), expression or method reference
         if (attributeName.contains(".")) {
             return parseStaticAttributeProperty(buildContext, attributeName, value);
         } else {
-            return parseInstanceAttributeProperty(clazz, attributeName, value);
+            return parseInstanceAttributeProperty(buildContext, clazz, attributeName, value);
         }
     }
 
@@ -527,16 +534,20 @@ public record FXMLDocumentParser(Log log) {
 
     /// Converts an instance attribute property (e.g., `text="Hello"`) into an [FXMLSingleProperty].
     ///
+    /// If the setter's parameter type is `EventHandler`, the value may be an inline script (no prefix),
+    /// an expression (`$`), or a method reference (`#`), all of which are handled accordingly.
+    ///
+    /// @param buildContext  the build context for class resolution.
     /// @param clazz         the class owning the property.
     /// @param attributeName the attribute name.
     /// @param value         the attribute value string.
     /// @return an [Optional] containing the property, or empty if unresolvable.
     private Optional<FXMLProperty<?>> parseInstanceAttributeProperty(
+            BuildContext buildContext,
             Class<?> clazz,
             String attributeName,
             String value
     ) {
-        AbstractFXMLValue fxmlValue = parseValueString(value);
         String setterName = Utils.getSetterName(attributeName);
         List<Method> setters = Utils.findObjectSetters(clazz, setterName);
         if (!setters.isEmpty()) {
@@ -546,11 +557,13 @@ public record FXMLDocumentParser(Log log) {
             }
             Method setter = setters.getFirst();
             Type paramType = setter.getGenericParameterTypes()[0];
+            AbstractFXMLValue fxmlValue = parseValueString(value, Utils.getClassType(paramType), buildContext);
             return Optional.of(new FXMLSingleProperty(attributeName, Optional.of(setterName), paramType, fxmlValue));
         }
         String getterName = Utils.getGetterName(attributeName);
         try {
             Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
+            AbstractFXMLValue fxmlValue = parseValueString(value);
             return Optional.of(new FXMLSingleProperty(attributeName, Optional.of(getterName + "().add"), elementType, fxmlValue));
         } catch (NoSuchMethodException _) {
             log.debug("No setter or list getter found for '%s' on '%s', skipping".formatted(attributeName, clazz.getName()));
@@ -660,6 +673,30 @@ public record FXMLDocumentParser(Log log) {
     /// @param value the raw attribute value string.
     /// @return the corresponding [AbstractFXMLValue].
     private AbstractFXMLValue parseValueString(String value) {
+        return parseValueString(value, null, null);
+    }
+
+    /// Parses an attribute value string into an [AbstractFXMLValue], with awareness of the expected setter
+    /// parameter type and build context.
+    ///
+    /// When the expected `paramType` is a functional interface (e.g., `EventHandler`), a method reference
+    /// (`#handler`) without a prefix is treated as a method reference rather than a plain string literal.
+    /// The return type of the method reference is resolved from the functional interface's method signature.
+    ///
+    /// The following prefixes are handled:
+    /// - [FXMLConstants#TRANSLATION_PREFIX] (`%`) — translation key, returns [FXMLTranslation].
+    /// - [FXMLConstants#LOCATION_PREFIX] (`@`) — resource/location reference, returns [FXMLResource].
+    /// - [FXMLConstants#METHOD_REFERENCE_PREFIX] (`#`) — method reference, returns [FXMLMethod].
+    /// - [FXMLConstants#EXPRESSION_PREFIX] (`$`) — binding expression, returns [FXMLExpression].
+    /// - [FXMLConstants#ESCAPE_PREFIX] (`\`) — escaped literal, strips the prefix and returns [FXMLValue].
+    /// - No prefix with `paramType` assignable to [EventHandler] — treated as inline script, returns [FXMLInlineScript].
+    /// - No prefix — plain string value, returns [FXMLValue].
+    ///
+    /// @param value        the raw attribute value string.
+    /// @param paramType    the expected setter parameter type, used to detect functional interfaces; may be `null`.
+    /// @param buildContext the build context used for type resolution; may be `null`.
+    /// @return the corresponding [AbstractFXMLValue].
+    private AbstractFXMLValue parseValueString(String value, Class<?> paramType, BuildContext buildContext) {
         if (value.startsWith(FXMLConstants.TRANSLATION_PREFIX)) {
             return new FXMLTranslation(value.substring(1));
         }
@@ -667,8 +704,7 @@ public record FXMLDocumentParser(Log log) {
             return new FXMLResource(value.substring(1));
         }
         if (value.startsWith(FXMLConstants.METHOD_REFERENCE_PREFIX)) {
-            // TODO: Check typing for method reference and properly include it, also includes type name mapping also respecting the generics of the parent
-            return new FXMLMethod(value.substring(1), List.of(), new FXMLClassType(void.class));
+            return resolveMethodReference(value.substring(1), paramType);
         }
         if (value.startsWith(FXMLConstants.EXPRESSION_PREFIX)) {
             return new FXMLExpression(value.substring(1));
@@ -676,7 +712,64 @@ public record FXMLDocumentParser(Log log) {
         if (value.startsWith(FXMLConstants.ESCAPE_PREFIX)) {
             return new FXMLValue(Optional.empty(), new FXMLClassType(String.class), value.substring(1));
         }
+        if (paramType != null && isEventHandlerType(paramType)) {
+            return new FXMLInlineScript(value);
+        }
         return new FXMLValue(Optional.empty(), new FXMLClassType(String.class), value);
+    }
+
+    /// Resolves a method reference value string into an [FXMLMethod].
+    ///
+    /// If `paramType` is a functional interface, the return type is resolved from its single abstract method.
+    /// Otherwise, `void` is used as the return type.
+    ///
+    /// @param methodName the method name (without the `#` prefix).
+    /// @param paramType  the expected setter parameter type; may be `null`.
+    /// @return the corresponding [FXMLMethod].
+    private FXMLMethod resolveMethodReference(String methodName, Class<?> paramType) {
+        FXMLType returnType;
+        if (paramType != null && isFunctionalInterface(paramType)) {
+            try {
+                Method functionalMethod = Utils.getFunctionalMethod(paramType);
+                returnType = new FXMLClassType(functionalMethod.getReturnType());
+            } catch (IllegalStateException _) {
+                returnType = new FXMLClassType(void.class);
+            }
+        } else {
+            returnType = new FXMLClassType(void.class);
+        }
+        return new FXMLMethod(methodName, List.of(), returnType);
+    }
+
+    /// Checks whether the given class is or extends `javafx.event.EventHandler`.
+    ///
+    /// Uses class name comparison to avoid a hard compile-time dependency on the JavaFX event module.
+    ///
+    /// @param clazz the class to check.
+    /// @return `true` if the class is assignable to `javafx.event.EventHandler`; `false` otherwise.
+    private boolean isEventHandlerType(Class<?> clazz) {
+        return EventHandler.class.isAssignableFrom(clazz);
+    }
+
+    /// Checks whether the given class is a functional interface.
+    ///
+    /// Used to determine the return type of method reference from the functional interface's
+    /// single abstract method. A functional interface is an interface annotated with
+    /// [@FunctionalInterface] or one that has exactly one abstract method.
+    ///
+    /// @param clazz the class to check.
+    /// @return `true` if the class is a functional interface; `false` otherwise.
+    private boolean isFunctionalInterface(Class<?> clazz) {
+        if (!clazz.isInterface()) {
+            return false;
+        }
+        if (clazz.isAnnotationPresent(FunctionalInterface.class)) {
+            return true;
+        }
+        long abstractMethodCount = Stream.of(clazz.getMethods())
+                .filter(m -> Modifier.isAbstract(m.getModifiers()))
+                .count();
+        return abstractMethodCount == 1;
     }
 
     /// Resolves the [Type] of a constant field on the given class.
