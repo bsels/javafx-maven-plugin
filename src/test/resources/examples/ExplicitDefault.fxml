@@ -1,0 +1,10 @@
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.layout.VBox?>
+<VBox>
+    <children>
+        <Button text="Button 1"/>
+        <Separator orientation="VERTICAL"/>
+        <Button text="Button 2"/>
+    </children>
+</VBox>

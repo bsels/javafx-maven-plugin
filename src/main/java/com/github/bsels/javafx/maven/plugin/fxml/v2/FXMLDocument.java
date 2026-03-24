@@ -9,6 +9,7 @@ import java.util.Optional;
 
 /// Represents a parsed FXML document.
 ///
+/// @param className    The name of the class associated with this document.
 /// @param root         The root object of the document.
 /// @param controller   The controller class name, if any.
 /// @param scriptEngine The script engine name, if any.
@@ -16,6 +17,7 @@ import java.util.Optional;
 /// @param definitions  The list of objects defined within this object.
 /// @param scripts      The list of scripts associated with this object.
 public record FXMLDocument(
+        String className,
         AbstractFXMLObject root,
         Optional<Class<?>> controller,
         Optional<String> scriptEngine,
@@ -25,14 +27,16 @@ public record FXMLDocument(
 ) {
     /// Compact constructor to validate the FXML document components.
     ///
+    /// @param className    The name of the class associated with this document.
     /// @param root         The root object of the document.
     /// @param controller   The controller class name, if any.
     /// @param scriptEngine The script engine name, if any.
     /// @param imports      The list of imported classes or packages.
     /// @param definitions  The list of objects defined within this object.
     /// @param scripts      The list of scripts associated with this object.
-    /// @throws NullPointerException if `root`, `controller`, or `scriptEngine` is `null`.
+    /// @throws NullPointerException if `className`, `root`, `controller`, or `scriptEngine` is `null`.
     public FXMLDocument {
+        Objects.requireNonNull(className, "`className` must not be null");
         Objects.requireNonNull(root, "`root` must not be null");
         Objects.requireNonNull(controller, "`controller` must not be null");
         Objects.requireNonNull(scriptEngine, "`scriptEngine` must not be null");

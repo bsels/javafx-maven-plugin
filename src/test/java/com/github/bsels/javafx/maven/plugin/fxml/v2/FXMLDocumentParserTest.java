@@ -6,19 +6,23 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifi
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLFileScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLSourceScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInlineScript;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLLiteral;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLObject;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
 import com.github.bsels.javafx.maven.plugin.io.FXMLReader;
 import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
+import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
+import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.Separator;
 import javafx.scene.layout.VBox;
 import org.apache.maven.monitor.logging.DefaultLog;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -31,8 +35,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
@@ -80,7 +87,7 @@ public class FXMLDocumentParserTest {
     class ExamplesTest {
 
         @Test
-        void inMemoryScript_ReturnExpected() throws MojoExecutionException {
+        void inMemoryScript() throws MojoExecutionException {
             // Prepare
             ParsedFXML parsedFXML = readFXML("/examples/InMemoryScript.fxml");
 
@@ -91,6 +98,7 @@ public class FXMLDocumentParserTest {
             assertThat(document)
                     // Validate document
                     .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "InMemoryScript")
                     .hasFieldOrPropertyWithValue("controller", Optional.empty())
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.of("javascript"))
                     .hasFieldOrPropertyWithValue("definitions", List.of())
@@ -126,7 +134,7 @@ public class FXMLDocumentParserTest {
                     .extracting(FXMLCollectionProperties.class::cast)
                     .hasFieldOrPropertyWithValue("name", "children")
                     .hasFieldOrPropertyWithValue("getter", "getChildren")
-                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Node.class))
+                    .hasFieldOrPropertyWithValue("type", new FXMLGenericType(ObservableList.class, new FXMLClassType(Node.class)))
                     .hasFieldOrPropertyWithValue("properties", List.of())
                     // Validate root property values
                     .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
@@ -150,20 +158,187 @@ public class FXMLDocumentParserTest {
                                     .hasFieldOrPropertyWithValue("name", "onAction")
                                     .hasFieldOrPropertyWithValue("setter", "setOnAction")
                                     .hasFieldOrPropertyWithValue("type", new FXMLGenericType(EventHandler.class, new FXMLClassType(ActionEvent.class)))
-                                    .extracting(FXMLProperty::value)
-                                    .isInstanceOf(FXMLInlineScript.class)
-                                    .hasFieldOrPropertyWithValue("script", "handleButtonAction(event);"),
+                                    .hasFieldOrPropertyWithValue("value", new FXMLInlineScript("handleButtonAction(event);")),
                             second -> assertThat(second)
                                     .hasFieldOrPropertyWithValue("name", "text")
                                     .hasFieldOrPropertyWithValue("setter", "setText")
                                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
-                                    .extracting(FXMLProperty::value)
-                                    .isInstanceOf(FXMLValue.class)
-                                    .hasFieldOrPropertyWithValue("value", "Click Me!")
-                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
-                                    .hasFieldOrPropertyWithValue("identifier", Optional.empty())
+                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("Click Me!"))
                     );
         }
 
+        @Test
+        void externalScript() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/ExternalScript.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML);
+
+            // Assert
+            assertThat(document)
+                    // Validate document
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "ExternalScript")
+                    .hasFieldOrPropertyWithValue("controller", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scriptEngine", Optional.of("javascript"))
+                    .hasFieldOrPropertyWithValue("definitions", List.of())
+                    .satisfies(
+                            doc -> assertThat(doc.scripts())
+                                    .hasSize(1)
+                                    .satisfiesExactly(
+                                            script -> assertThat(script)
+                                                    .isInstanceOf(FXMLFileScript.class)
+                                                    .hasFieldOrPropertyWithValue("path", "example.js")
+                                                    .hasFieldOrPropertyWithValue("charset", StandardCharsets.UTF_8)
+                                    ),
+                            doc -> assertThat(doc.imports())
+                                    .hasSize(2)
+                                    .containsExactly("javafx.scene.control.Button", "javafx.scene.layout.VBox")
+                    )
+                    // Validate root
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(VBox.class))
+                    // Validate root properties
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLCollectionProperties.class)
+                    .extracting(FXMLCollectionProperties.class::cast)
+                    .hasFieldOrPropertyWithValue("name", "children")
+                    .hasFieldOrPropertyWithValue("getter", "getChildren")
+                    .hasFieldOrPropertyWithValue("type", new FXMLGenericType(ObservableList.class, new FXMLClassType(Node.class)))
+                    .hasFieldOrPropertyWithValue("properties", List.of())
+                    // Validate root property values
+                    .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Button.class))
+                    .satisfies(
+                            object -> assertThat(object.identifier())
+                                    .isInstanceOf(FXMLInternalIdentifier.class)
+                    )
+                    // Validate button properties
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(2)
+                    .hasOnlyElementsOfType(FXMLObjectProperty.class)
+                    .extracting(FXMLObjectProperty.class::cast)
+                    .satisfiesExactlyInAnyOrder(
+                            first -> assertThat(first)
+                                    .hasFieldOrPropertyWithValue("name", "onAction")
+                                    .hasFieldOrPropertyWithValue("setter", "setOnAction")
+                                    .hasFieldOrPropertyWithValue("type", new FXMLGenericType(EventHandler.class, new FXMLClassType(ActionEvent.class)))
+                                    .hasFieldOrPropertyWithValue("value", new FXMLInlineScript("handleButtonAction(event);")),
+                            second -> assertThat(second)
+                                    .hasFieldOrPropertyWithValue("name", "text")
+                                    .hasFieldOrPropertyWithValue("setter", "setText")
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
+                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("Click Me!"))
+                    );
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"ImplicitDefault", "ExplicitDefault"})
+        void implicitExplicitDefault(String className) throws MojoExecutionException {
+
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/%s.fxml".formatted(className));
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML);
+
+            // Assert
+            assertThat(document)
+                    // Validate document
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", className)
+                    .hasFieldOrPropertyWithValue("controller", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
+                    .hasFieldOrPropertyWithValue("definitions", List.of())
+                    .hasFieldOrPropertyWithValue("scripts", List.of())
+                    .satisfies(
+                            doc -> assertThat(doc.imports())
+                                    .hasSize(3)
+                                    .containsExactly(
+                                            "javafx.scene.control.Button",
+                                            "javafx.scene.control.Separator",
+                                            "javafx.scene.layout.VBox"
+                                    )
+                    )
+                    // Validate root
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(VBox.class))
+                    // Validate root properties
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLCollectionProperties.class)
+                    .extracting(FXMLCollectionProperties.class::cast)
+                    .hasFieldOrPropertyWithValue("name", "children")
+                    .hasFieldOrPropertyWithValue("getter", "getChildren")
+                    .hasFieldOrPropertyWithValue("type", new FXMLGenericType(ObservableList.class, new FXMLClassType(Node.class)))
+                    .hasFieldOrPropertyWithValue("properties", List.of())
+                    // Validate children values
+                    .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
+                    .hasSize(3)
+                    .hasOnlyElementsOfType(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .allSatisfy(
+                            object -> assertThat(object.identifier())
+                                    .isInstanceOf(FXMLInternalIdentifier.class)
+                    )
+                    .allSatisfy(
+                            object -> assertThat(object.factoryMethod())
+                                    .isNotPresent()
+                    )
+                    .satisfiesExactly(
+                            first -> assertThat(first)
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Button.class))
+                                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                                    .hasSize(1)
+                                    .hasOnlyElementsOfType(FXMLObjectProperty.class)
+                                    .extracting(FXMLObjectProperty.class::cast)
+                                    .first()
+                                    .hasFieldOrPropertyWithValue("name", "text")
+                                    .hasFieldOrPropertyWithValue("setter", "setText")
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
+                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("Button 1")),
+                            second -> assertThat(second)
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Separator.class))
+                                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                                    .hasSize(1)
+                                    .hasOnlyElementsOfType(FXMLObjectProperty.class)
+                                    .extracting(FXMLObjectProperty.class::cast)
+                                    .first()
+                                    .hasFieldOrPropertyWithValue("name", "orientation")
+                                    .hasFieldOrPropertyWithValue("setter", "setOrientation")
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Orientation.class))
+                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("VERTICAL")),
+                            third -> assertThat(third)
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Button.class))
+                                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                                    .hasSize(1)
+                                    .hasOnlyElementsOfType(FXMLObjectProperty.class)
+                                    .extracting(FXMLObjectProperty.class::cast)
+                                    .first()
+                                    .hasFieldOrPropertyWithValue("name", "text")
+                                    .hasFieldOrPropertyWithValue("setter", "setText")
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
+                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("Button 2"))
+                    );
+        }
     }
 }

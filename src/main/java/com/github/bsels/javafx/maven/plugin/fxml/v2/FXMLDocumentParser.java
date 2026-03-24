@@ -26,6 +26,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCopy;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLExpression;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInclude;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInlineScript;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLLiteral;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMap;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLObject;
@@ -114,6 +115,7 @@ public record FXMLDocumentParser(Log log) {
         AbstractFXMLObject root = parseObject(rootStructure, buildContext, true);
 
         return new FXMLDocument(
+                parsedFXML.className(),
                 root,
                 controller,
                 parsedFXML.scriptNamespace(),
@@ -267,8 +269,9 @@ public record FXMLDocumentParser(Log log) {
                 Optional<String> defaultPropName = resolveDefaultPropertyName(clazz);
                 String getterName = Utils.getGetterName(defaultPropName.orElseThrow());
                 try {
+                    Method getter = clazz.getMethod(getterName);
                     Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
-                    addValueToMultipleProperty(buildContext, properties, defaultPropName.orElseThrow(), getterName, elementType, fxValue);
+                    addValueToMultipleProperty(buildContext, properties, defaultPropName.orElseThrow(), getterName, getter.getGenericReturnType(), elementType, fxValue);
                 } catch (NoSuchMethodException _) {
                     log.debug("No default list property found on %s for %s, skipping".formatted(clazz.getSimpleName(), childName));
                 }
@@ -314,8 +317,9 @@ public record FXMLDocumentParser(Log log) {
                         if (defaultPropName.isPresent()) {
                             String defaultGetterName = Utils.getGetterName(defaultPropName.get());
                             try {
+                                Method getter = clazz.getMethod(defaultGetterName);
                                 Type elementType = Utils.findGetterListAndReturnElementType(clazz, defaultGetterName);
-                                addValueToMultipleProperty(buildContext, properties, defaultPropName.get(), defaultGetterName, elementType, childObject);
+                                addValueToMultipleProperty(buildContext, properties, defaultPropName.get(), defaultGetterName, getter.getGenericReturnType(), elementType, childObject);
                             } catch (NoSuchMethodException _) {
                                 log.debug("No default list property found on %s for child %s, skipping".formatted(clazz.getSimpleName(), childName));
                             }
@@ -805,18 +809,18 @@ public record FXMLDocumentParser(Log log) {
         }
         String getterName = Utils.getGetterName(attributeName);
         try {
-            Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
+            Method getter = clazz.getMethod(getterName);
             AbstractFXMLValue fxmlValue = parseValueString(value);
-            FXMLType fxmlType = buildFXMLType(elementType, List.of(), buildContext, buildContext.typeMapping());
-            return Optional.of(new FXMLCollectionProperties(attributeName, getterName, fxmlType, List.of(fxmlValue), List.of()));
+            FXMLType fxmlCollectionType = buildFXMLType(getter.getGenericReturnType(), List.of(), buildContext, buildContext.typeMapping());
+            return Optional.of(new FXMLCollectionProperties(attributeName, getterName, fxmlCollectionType, List.of(fxmlValue), List.of()));
         } catch (NoSuchMethodException _) {
             // not a collection getter, try map getter
         }
         try {
-            Type valueType = Utils.findGetterMapAndReturnValueType(clazz, getterName);
+            Method getter = clazz.getMethod(getterName);
             AbstractFXMLValue fxmlValue = parseValueString(value);
-            FXMLType fxmlType = buildFXMLType(valueType, List.of(), buildContext, buildContext.typeMapping());
-            return Optional.of(new FXMLMapProperty(attributeName, getterName, fxmlType, Map.of(attributeName, fxmlValue)));
+            FXMLType fxmlMapType = buildFXMLType(getter.getGenericReturnType(), List.of(), buildContext, buildContext.typeMapping());
+            return Optional.of(new FXMLMapProperty(attributeName, getterName, fxmlMapType, Map.of(attributeName, fxmlValue)));
         } catch (NoSuchMethodException _) {
             log.debug("No getter, list getter, or map getter found for '%s' on '%s', skipping".formatted(attributeName, clazz.getName()));
             return Optional.empty();
@@ -898,17 +902,17 @@ public record FXMLDocumentParser(Log log) {
 
         String getterName = Utils.getGetterName(propName);
         try {
-            Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
-            FXMLType fxmlType = buildFXMLType(elementType, List.of(), buildContext, buildContext.typeMapping());
-            return Optional.of(new FXMLCollectionProperties(propName, getterName, fxmlType, values, List.of()));
+            Method getter = clazz.getMethod(getterName);
+            FXMLType fxmlCollectionType = buildFXMLType(getter.getGenericReturnType(), List.of(), buildContext, buildContext.typeMapping());
+            return Optional.of(new FXMLCollectionProperties(propName, getterName, fxmlCollectionType, values, List.of()));
         } catch (NoSuchMethodException _) {
             // not a collection getter, try map getter
         }
         try {
-            Type valueType = Utils.findGetterMapAndReturnValueType(clazz, getterName);
+            Method getter = clazz.getMethod(getterName);
             Map<String, AbstractFXMLValue> entries = parseChildrenToMapEntries(buildContext, child);
-            FXMLType fxmlType = buildFXMLType(valueType, List.of(), buildContext, buildContext.typeMapping());
-            return Optional.of(new FXMLMapProperty(propName, getterName, fxmlType, entries));
+            FXMLType fxmlMapType = buildFXMLType(getter.getGenericReturnType(), List.of(), buildContext, buildContext.typeMapping());
+            return Optional.of(new FXMLMapProperty(propName, getterName, fxmlMapType, entries));
         } catch (NoSuchMethodException _) {
             log.debug("No getter, list getter, or map getter found for property element '%s' on '%s', skipping".formatted(propName, clazz.getName()));
             return Optional.empty();
@@ -1002,12 +1006,12 @@ public record FXMLDocumentParser(Log log) {
             return new FXMLExpression(value.substring(1));
         }
         if (value.startsWith(FXMLConstants.ESCAPE_PREFIX)) {
-            return new FXMLValue(Optional.empty(), new FXMLClassType(paramType), value.substring(1));
+            return new FXMLLiteral(value.substring(1));
         }
         if (paramType != null && isEventHandlerType(paramType)) {
             return new FXMLInlineScript(value);
         }
-        return new FXMLValue(Optional.empty(), new FXMLClassType(paramType), value);
+        return new FXMLLiteral(value);
     }
 
     /// Resolves a method reference value string into an [FXMLMethod].
@@ -1120,31 +1124,33 @@ public record FXMLDocumentParser(Log log) {
     /// Adds a value to an existing [FXMLCollectionProperties] entry or creates a new one.
     ///
     /// @param properties  The current list of properties to update.
-    /// @param propName    The property name.
-    /// @param getterName  The getter method name for the list property.
-    /// @param elementType The element type of the list.
-    /// @param value       The value to add.
+    /// @param propName       The property name.
+    /// @param getterName     The getter method name for the list property.
+    /// @param collectionType The type of the collection itself.
+    /// @param elementType    The element type of the list.
+    /// @param value          The value to add.
     private void addValueToMultipleProperty(
             BuildContext buildContext,
             List<FXMLProperty<?>> properties,
             String propName,
             String getterName,
+            Type collectionType,
             Type elementType,
             AbstractFXMLValue value
     ) {
-        FXMLType fxmlType = buildFXMLType(elementType, List.of(), buildContext, buildContext.typeMapping());
+        FXMLType fxmlCollectionType = buildFXMLType(collectionType, List.of(), buildContext, buildContext.typeMapping());
         for (int i = 0; i < properties.size(); i++) {
             FXMLProperty<?> existing = properties.get(i);
             if (existing instanceof FXMLCollectionProperties mp && mp.name().equals(propName)) {
                 List<AbstractFXMLValue> newValues = new ArrayList<>(mp.value());
                 newValues.add(value);
-                properties.set(i, new FXMLCollectionProperties(propName, getterName, fxmlType, newValues, List.of()));
+                properties.set(i, new FXMLCollectionProperties(propName, getterName, fxmlCollectionType, newValues, List.of()));
                 return;
             }
         }
         List<AbstractFXMLValue> values = new ArrayList<>();
         values.add(value);
-        properties.add(new FXMLCollectionProperties(propName, getterName, fxmlType, values, List.of()));
+        properties.add(new FXMLCollectionProperties(propName, getterName, fxmlCollectionType, values, List.of()));
     }
 
     /// Holds a class and its associated FXML identifier.
