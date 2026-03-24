@@ -4,7 +4,9 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLWildCardType;
 
 import java.util.Map;
 import java.util.Objects;
@@ -39,16 +41,16 @@ public record FXMLMap(
         switch (type) {
             case FXMLClassType(Class<?> clazz) -> {
                 if (!Map.class.isAssignableFrom(clazz)) {
-                    throw new IllegalArgumentException("`type` must be a Collection: %s".formatted(clazz));
+                    throw new IllegalArgumentException("`type` must be a Map: %s".formatted(clazz));
                 }
             }
             case FXMLGenericType(Class<?> clazz, _) -> {
                 if (!Map.class.isAssignableFrom(clazz)) {
-                    throw new IllegalArgumentException("`type` must be a Collection: %s".formatted(clazz));
+                    throw new IllegalArgumentException("`type` must be a Map: %s".formatted(clazz));
                 }
             }
-            case FXMLUncompiledGenericType _ -> {
-                // The type is not yet compiled or available in the current classloader;
+            case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildCardType _ -> {
+                // The type is not yet compiled or available in the current classloader, or is a wildcard;
                 // map assignability cannot be verified at this point.
             }
         }

@@ -6,7 +6,7 @@ import java.util.Objects;
 ///
 /// This record stores the underlying class of the FXML type.
 ///
-/// @param clazz The class type.
+/// @param clazz The class type. Must not be `null`.
 public record FXMLClassType(Class<?> clazz) implements FXMLType {
 
     /// Compact constructor to validate the class type.

@@ -9,8 +9,8 @@ import java.util.Objects;
 /// which might not yet be resolved or compiled.
 /// It can include a list of type arguments, which are other FXML types.
 ///
-/// @param name          The name of the uncompiled generic type. Must not be null.
-/// @param typeArguments The list of type arguments. If null, an empty list is used. The resulting list is immutable to ensure thread safety.
+/// @param name          The name of the uncompiled generic type. Must not be `null`.
+/// @param typeArguments The list of type arguments. If `null`, an empty list is used.
 public record FXMLUncompiledGenericType(String name, List<FXMLType> typeArguments)
         implements FXMLType {
 

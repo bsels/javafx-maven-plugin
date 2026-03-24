@@ -516,8 +516,7 @@ class FXMLReaderTests {
                                     .hasSize(2)
                                     .containsEntry("text", "Click Me!")
                                     .containsEntry("onAction", "handleButtonAction(event);")
-                    )
-            ;
+                    );
         }
     }
 }

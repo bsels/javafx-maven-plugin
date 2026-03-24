@@ -1,8 +1,8 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.properties;
 
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 
-import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
 
@@ -16,7 +16,7 @@ import java.util.Objects;
 public record FXMLCollectionProperties(
         String name,
         String getter,
-        Type type,
+        FXMLType type,
         List<AbstractFXMLValue> value,
         List<FXMLProperty<?>> properties
 ) implements FXMLProperty<List<AbstractFXMLValue>> {

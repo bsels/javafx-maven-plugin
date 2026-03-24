@@ -12,10 +12,10 @@ public final class FXMLRootIdentifier implements FXMLIdentifier {
 
     /// Returns a string representation of the root identifier.
     ///
-    /// @return "root".
+    /// @return "this".
     @Override
     public String toString() {
-        return "root";
+        return "this";
     }
 
     /// Returns a hash code for the root identifier.

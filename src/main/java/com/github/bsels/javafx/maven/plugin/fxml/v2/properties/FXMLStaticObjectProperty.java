@@ -1,9 +1,8 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.properties;
 
-import com.github.bsels.javafx.maven.plugin.fxml.FXMLObjectProperty;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 
-import java.lang.reflect.Type;
 import java.util.Objects;
 
 /// Represents a static (attached) FXML property that has a single value.
@@ -17,7 +16,7 @@ public record FXMLStaticObjectProperty(
         String name,
         Class<?> clazz,
         String setter,
-        Type type,
+        FXMLType type,
         AbstractFXMLValue value
 ) implements FXMLProperty<AbstractFXMLValue> {
 

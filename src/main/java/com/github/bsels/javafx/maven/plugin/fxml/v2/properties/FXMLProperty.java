@@ -1,6 +1,6 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.properties;
 
-import java.lang.reflect.Type;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 
 /// Base interface for FXML properties.
 ///
@@ -15,7 +15,7 @@ public sealed interface FXMLProperty<T>
     /// Returns the type of the property.
     ///
     /// @return The property type.
-    Type type();
+    FXMLType type();
 
     /// Returns the value(s) of the property.
     ///
