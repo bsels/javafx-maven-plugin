@@ -6,7 +6,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 ///
 /// @param <T> The value type of the property.
 public sealed interface FXMLProperty<T>
-        permits FXMLCollectionProperties, FXMLMapProperty, FXMLObjectProperty, FXMLStaticObjectProperty {
+        permits FXMLCollectionProperties, FXMLConstructorProperty, FXMLMapProperty, FXMLObjectProperty, FXMLStaticObjectProperty {
     /// Returns the name of the property.
     ///
     /// @return The property name.

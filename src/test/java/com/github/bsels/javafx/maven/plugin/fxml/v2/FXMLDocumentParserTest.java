@@ -6,6 +6,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMetho
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLFileScript;
@@ -32,6 +33,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Separator;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import org.apache.maven.monitor.logging.DefaultLog;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.assertj.core.api.InstanceOfAssertFactories;
@@ -479,5 +481,85 @@ public class FXMLDocumentParserTest {
                     );
         }
 
+        @Test
+        void colorDefinitions() throws MojoExecutionException {
+
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/ColorDefinitions.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML);
+
+            // Assert
+            assertThat(document)
+                    // Validate document
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "ColorDefinitions")
+                    .hasFieldOrPropertyWithValue("controller", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scripts", List.of())
+                    .satisfies(
+                            doc -> assertThat(doc.imports())
+                                    .hasSize(2)
+                                    .containsExactly("javafx.scene.paint.Color", "java.lang.Object"),
+                            doc -> assertThat(doc.root())
+                                    .isInstanceOf(FXMLObject.class)
+                                    .extracting(FXMLObject.class::cast)
+                                    .isNotNull()
+                                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Object.class))
+                                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                                    .hasFieldOrPropertyWithValue("properties", List.of()),
+                            doc -> assertThat(doc.definitions())
+                                    .hasSize(2)
+                                    .hasOnlyElementsOfType(FXMLObject.class)
+                                    .extracting(FXMLObject.class::cast)
+                                    .satisfiesExactly(
+                                            first -> assertThat(first)
+                                                    .hasFieldOrPropertyWithValue("identifier", new FXMLExposedIdentifier("attributes"))
+                                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Color.class))
+                                                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                                                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                                                    .hasSize(3)
+                                                    .hasOnlyElementsOfType(FXMLConstructorProperty.class)
+                                                    .satisfiesExactlyInAnyOrder(
+                                                            firstProp -> assertThat(firstProp)
+                                                                    .hasFieldOrPropertyWithValue("name", "red")
+                                                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(double.class))
+                                                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("1.0")),
+                                                            secondProp -> assertThat(secondProp)
+                                                                    .hasFieldOrPropertyWithValue("name", "green")
+                                                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(double.class))
+                                                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("0.5")),
+                                                            thirdProp -> assertThat(thirdProp)
+                                                                    .hasFieldOrPropertyWithValue("name", "blue")
+                                                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(double.class))
+                                                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("0.01"))
+                                                    ),
+                                            second -> assertThat(second)
+                                                    .hasFieldOrPropertyWithValue("identifier", new FXMLExposedIdentifier("elements"))
+                                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Color.class))
+                                                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                                                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                                                    .hasSize(3)
+                                                    .hasOnlyElementsOfType(FXMLConstructorProperty.class)
+                                                    .satisfiesExactlyInAnyOrder(
+                                                            firstProp -> assertThat(firstProp)
+                                                                    .hasFieldOrPropertyWithValue("name", "red")
+                                                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(double.class))
+                                                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("0.5")),
+                                                            secondProp -> assertThat(secondProp)
+                                                                    .hasFieldOrPropertyWithValue("name", "green")
+                                                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(double.class))
+                                                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("1.0")),
+                                                            thirdProp -> assertThat(thirdProp)
+                                                                    .hasFieldOrPropertyWithValue("name", "blue")
+                                                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(double.class))
+                                                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("0.5"))
+                                                    )
+                                    )
+                    )
+            ;
+        }
     }
 }
