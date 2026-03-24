@@ -218,7 +218,11 @@ public record FXMLDocumentParser(Log log) {
             } else if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(childName)) {
                 buildContext.scripts().add(parseScript(child));
             } else if (!hasSkippablePrefix(childName)) {
-                entries.put(childName, parseValue(child, buildContext));
+                List<ParsedXMLStructure> grandChildren = child.children();
+                if (grandChildren.size() != 1) {
+                    throw new IllegalArgumentException("Map entry element `%s` must have exactly one child element representing the value".formatted(childName));
+                }
+                entries.put(childName, parseValue(grandChildren.get(0), buildContext));
             }
         }
         return new FXMLMap(

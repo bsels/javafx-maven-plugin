@@ -13,9 +13,13 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInlineScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLLiteral;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCopy;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMap;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLObject;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLReference;
 import com.github.bsels.javafx.maven.plugin.io.FXMLReader;
 import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
@@ -41,6 +45,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
@@ -248,7 +253,6 @@ public class FXMLDocumentParserTest {
         @ParameterizedTest
         @ValueSource(strings = {"ImplicitDefault", "ExplicitDefault"})
         void implicitExplicitDefault(String className) throws MojoExecutionException {
-
             // Prepare
             ParsedFXML parsedFXML = readFXML("/examples/%s.fxml".formatted(className));
 
@@ -338,6 +342,78 @@ public class FXMLDocumentParserTest {
                                     .hasFieldOrPropertyWithValue("setter", "setText")
                                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
                                     .hasFieldOrPropertyWithValue("value", new FXMLLiteral("Button 2"))
+                    );
+        }
+
+        @Test
+        void myHashMap() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/MyHashMap.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML);
+
+            // Assert
+            assertThat(document)
+                    // Validate document
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "MyHashMap")
+                    .hasFieldOrPropertyWithValue("controller", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
+                    .hasFieldOrPropertyWithValue("definitions", List.of())
+                    .hasFieldOrPropertyWithValue("scripts", List.of())
+                    .satisfies(
+                            doc -> assertThat(doc.imports())
+                                    .hasSize(2)
+                                    .containsExactly("java.lang.String", "java.util.HashMap")
+                    )
+                    // Validate root
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLMap.class)
+                    .extracting(FXMLMap.class::cast)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                    .hasFieldOrPropertyWithValue("type", new FXMLGenericType(HashMap.class, List.of(new FXMLClassType(String.class), new FXMLClassType(String.class))))
+                    .satisfies(
+                            map -> assertThat(map.entries())
+                                    .hasSize(3)
+                                    .containsEntry("foo", new FXMLLiteral("123"))
+                                    .containsEntry("bar", new FXMLLiteral("456"))
+                                    .satisfies(
+                                            entries -> assertThat(entries.get("test"))
+                                                    .isInstanceOf(FXMLValue.class)
+                                                    .hasFieldOrPropertyWithValue("value", "Dummy")
+                                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
+                                    )
+                    );
+        }
+
+        @Test
+        void mapWithReferences() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/MapWithReferences.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML);
+
+            // Assert
+            assertThat(document)
+                    .isNotNull()
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLMap.class)
+                    .extracting(FXMLMap.class::cast)
+                    .satisfies(
+                            map -> assertThat(map.entries())
+                                    .hasSize(2)
+                                    .containsEntry("refEntry", new FXMLReference("myButton"))
+                                    .satisfies(
+                                            entries -> assertThat(entries.get("copyEntry"))
+                                                    .isInstanceOf(FXMLCopy.class)
+                                                    .extracting(FXMLCopy.class::cast)
+                                                    .hasFieldOrPropertyWithValue("name", "myButton")
+                                                    .extracting(FXMLCopy::identifier)
+                                                    .isInstanceOf(FXMLInternalIdentifier.class)
+                                    )
                     );
         }
     }

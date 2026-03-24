@@ -1,0 +1,9 @@
+<?import java.lang.String?>
+<?import java.util.HashMap?>
+<HashMap foo="123" bar="456" xmlns:fx="http://javafx.com/fxml">
+    <!-- generic 0: String -->
+    <!-- generic 1: String -->
+    <test>
+        <String fx:value="Dummy"/>
+    </test>
+</HashMap>
