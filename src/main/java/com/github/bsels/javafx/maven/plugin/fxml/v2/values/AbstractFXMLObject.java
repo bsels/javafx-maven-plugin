@@ -1,5 +1,6 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
+import com.github.bsels.javafx.maven.plugin.fxml.v2.FXMLFactoryMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 
@@ -18,9 +19,9 @@ public sealed interface AbstractFXMLObject extends AbstractFXMLValue permits FXM
     /// @return The FXMLType representing the class or generic type of the object.
     FXMLType type();
 
-    /// Retrieves an optional factory method name associated with the FXML object.
+    /// Retrieves an optional factory method associated with the FXML object.
     /// The factory method, if present, is expected to be a valid Java identifier.
     ///
-    /// @return An `Optional` containing the factory method name if specified, or an empty `Optional` if not present.
-    Optional<String> factoryMethod();
+    /// @return An `Optional` containing the factory method if specified, or an empty `Optional` if not present.
+    Optional<FXMLFactoryMethod> factoryMethod();
 }

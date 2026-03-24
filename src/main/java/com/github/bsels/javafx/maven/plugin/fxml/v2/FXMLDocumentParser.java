@@ -137,7 +137,18 @@ public record FXMLDocumentParser(Log log) {
         Map<String, String> properties = structure.properties();
         String nodeName = structure.name();
         ClassAndIdentifier classAndIdentifier = resolveClassAndIdentifier(nodeName, properties, buildContext, isRoot);
-        Map<String, FXMLType> typeMapping = resolveTypeMapping(classAndIdentifier.clazz(), buildContext.typeMapping());
+
+        Class<?> clazz = classAndIdentifier.clazz();
+        String factoryMethodName = properties.get(FXMLConstants.FX_FACTORY_ATTRIBUTE);
+        Optional<FXMLFactoryMethod> factoryMethod = Optional.ofNullable(factoryMethodName)
+                .map(method -> new FXMLFactoryMethod(clazz, method));
+
+        Type actualType = clazz;
+        if (factoryMethodName != null) {
+            actualType = findFactoryMethodReturnType(clazz, factoryMethodName);
+        }
+
+        Map<String, FXMLType> typeMapping = resolveTypeMapping(Utils.getClassType(actualType), buildContext.typeMapping());
         BuildContext localContext = new BuildContext(
                 buildContext.internalCounter(),
                 buildContext.imports(),
@@ -145,13 +156,33 @@ public record FXMLDocumentParser(Log log) {
                 buildContext.scripts(),
                 typeMapping
         );
-        if (Collection.class.isAssignableFrom(classAndIdentifier.clazz())) {
-            return parseCollection(structure, localContext, classAndIdentifier);
-        } else if (Map.class.isAssignableFrom(classAndIdentifier.clazz())) {
-            return parseMap(structure, localContext, classAndIdentifier);
+
+        FXMLType fxmlType = buildFXMLType(actualType, extractGenericsFromComments(structure.comments()), localContext, localContext.typeMapping());
+        Class<?> actualClass = Utils.getClassType(actualType);
+
+        if (Collection.class.isAssignableFrom(actualClass)) {
+            return parseCollection(structure, localContext, classAndIdentifier, fxmlType, factoryMethod);
+        } else if (Map.class.isAssignableFrom(actualClass)) {
+            return parseMap(structure, localContext, classAndIdentifier, fxmlType, factoryMethod);
         } else {
-            return parsePlainObject(structure, localContext, classAndIdentifier);
+            return parsePlainObject(structure, localContext, classAndIdentifier, fxmlType, factoryMethod);
         }
+    }
+
+    /// Finds the return type of a static factory method.
+    ///
+    /// @param clazz             The class declaring the factory method.
+    /// @param factoryMethodName The name of the factory method.
+    /// @return The return [Type] of the factory method.
+    /// @throws IllegalArgumentException if the factory method cannot be found.
+    private Type findFactoryMethodReturnType(Class<?> clazz, String factoryMethodName) {
+        return Stream.of(clazz.getMethods())
+                .filter(method -> Modifier.isStatic(method.getModifiers()))
+                .filter(method -> method.getName().equals(factoryMethodName))
+                .filter(method -> method.getParameterCount() == 0)
+                .map(Method::getGenericReturnType)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("No static factory method '%s' found on '%s'".formatted(factoryMethodName, clazz.getName())));
     }
 
     /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLCollection] object.
@@ -159,15 +190,16 @@ public record FXMLDocumentParser(Log log) {
     /// @param structure          The [ParsedXMLStructure] representing the XML to be parsed.
     /// @param buildContext       The [BuildContext] that provides the context during the parsing process.
     /// @param classAndIdentifier The [ClassAndIdentifier] containing the class type and identifier for the collection.
+    /// @param type               The resolved [FXMLType] of the collection.
+    /// @param factoryMethod      The optional factory method used for instantiation.
     /// @return An [FXMLCollection] object constructed from the parsed XML structure, generics, factory method, and child values.
     private FXMLCollection parseCollection(
             ParsedXMLStructure structure,
             BuildContext buildContext,
-            ClassAndIdentifier classAndIdentifier
+            ClassAndIdentifier classAndIdentifier,
+            FXMLType type,
+            Optional<FXMLFactoryMethod> factoryMethod
     ) {
-        Map<String, String> properties = structure.properties();
-        FXMLType type = buildFXMLType(classAndIdentifier.clazz(), extractGenericsFromComments(structure.comments()), buildContext, buildContext.typeMapping());
-        Optional<String> factoryMethod = Optional.ofNullable(properties.get(FXMLConstants.FX_FACTORY_ATTRIBUTE));
         List<AbstractFXMLValue> values = structure.children()
                 .stream()
                 .map(parseValueChild(buildContext))
@@ -192,15 +224,17 @@ public record FXMLDocumentParser(Log log) {
     /// @param structure          The [ParsedXMLStructure] representing the XML to be parsed.
     /// @param buildContext       The [BuildContext] that provides the context during the parsing process.
     /// @param classAndIdentifier The [ClassAndIdentifier] containing the class type and identifier for the map.
+    /// @param type               The resolved [FXMLType] of the map.
+    /// @param factoryMethod      The optional factory method used for instantiation.
     /// @return An [FXMLMap] object constructed from the parsed XML structure.
     private FXMLMap parseMap(
             ParsedXMLStructure structure,
             BuildContext buildContext,
-            ClassAndIdentifier classAndIdentifier
+            ClassAndIdentifier classAndIdentifier,
+            FXMLType type,
+            Optional<FXMLFactoryMethod> factoryMethod
     ) {
         Map<String, String> properties = structure.properties();
-        FXMLType type = buildFXMLType(classAndIdentifier.clazz(), extractGenericsFromComments(structure.comments()), buildContext, buildContext.typeMapping());
-        Optional<String> factoryMethod = Optional.ofNullable(properties.get(FXMLConstants.FX_FACTORY_ATTRIBUTE));
         Map<String, AbstractFXMLValue> entries = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : properties.entrySet()) {
             String key = entry.getKey();
@@ -212,9 +246,7 @@ public record FXMLDocumentParser(Log log) {
         for (ParsedXMLStructure child : structure.children()) {
             String childName = child.name();
             if (FXMLConstants.FX_DEFINE_ELEMENT.equals(childName)) {
-                child.children().stream()
-                        .map(defChild -> parseObject(defChild, buildContext, false))
-                        .forEach(buildContext.definitions()::add);
+                parseDefinitions(buildContext, child);
             } else if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(childName)) {
                 buildContext.scripts().add(parseScript(child));
             } else if (!hasSkippablePrefix(childName)) {
@@ -222,7 +254,7 @@ public record FXMLDocumentParser(Log log) {
                 if (grandChildren.size() != 1) {
                     throw new IllegalArgumentException("Map entry element `%s` must have exactly one child element representing the value".formatted(childName));
                 }
-                entries.put(childName, parseValue(grandChildren.get(0), buildContext));
+                entries.put(childName, parseValue(grandChildren.getFirst(), buildContext));
             }
         }
         return new FXMLMap(
@@ -233,21 +265,34 @@ public record FXMLDocumentParser(Log log) {
         );
     }
 
+    /// Parses the provided child element's structure and adds the definitions to the build context.
+    ///
+    /// @param buildContext the context containing the definitions and related metadata
+    /// @param child        the parsed XML structure representing a parent element
+    private void parseDefinitions(BuildContext buildContext, ParsedXMLStructure child) {
+        child.children()
+                .stream()
+                .map(defChild -> parseObject(defChild, buildContext, false))
+                .forEach(buildContext.definitions()::add);
+    }
+
     /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLObject].
     ///
     /// @param structure          The [ParsedXMLStructure] representing the XML to be parsed.
     /// @param buildContext       The [BuildContext] that provides the context during the parsing process.
     /// @param classAndIdentifier The [ClassAndIdentifier] containing the class type and identifier for the object.
+    /// @param type               The resolved [FXMLType] of the object.
+    /// @param factoryMethod      The optional factory method used for instantiation.
     /// @return An [FXMLObject] constructed from the parsed XML structure.
     private FXMLObject parsePlainObject(
             ParsedXMLStructure structure,
             BuildContext buildContext,
-            ClassAndIdentifier classAndIdentifier
+            ClassAndIdentifier classAndIdentifier,
+            FXMLType type,
+            Optional<FXMLFactoryMethod> factoryMethod
     ) {
         Class<?> clazz = classAndIdentifier.clazz();
-        FXMLType type = buildFXMLType(clazz, extractGenericsFromComments(structure.comments()), buildContext, buildContext.typeMapping());
         Map<String, String> attributes = structure.properties();
-        Optional<String> factoryMethod = Optional.ofNullable(attributes.get(FXMLConstants.FX_FACTORY_ATTRIBUTE));
         List<FXMLProperty<?>> properties = new ArrayList<>();
 
         for (Map.Entry<String, String> entry : attributes.entrySet()) {
@@ -261,11 +306,15 @@ public record FXMLDocumentParser(Log log) {
         for (ParsedXMLStructure child : structure.children()) {
             String childName = child.name();
             if (FXMLConstants.FX_DEFINE_ELEMENT.equals(childName)) {
-                child.children().stream()
-                        .map(defChild -> parseObject(defChild, buildContext, false))
-                        .forEach(buildContext.definitions()::add);
+                parseDefinitions(buildContext, child);
             } else if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(childName)) {
                 buildContext.scripts().add(parseScript(child));
+            } else if (factoryMethod.isPresent() && !hasSkippablePrefix(childName)) {
+                // If there's a factory method, we parse the child as an object and add it to the properties.
+                // In FXML, when using fx:factory, children are typically added to the resulting object.
+                // Since we don't know the exact type returned by the factory method at this point,
+                // we treat them as values that might be added to a collection if the result is one.
+                properties.add(new FXMLCollectionProperties("", "", FXMLWildCardType.INSTANCE, List.of(parseValue(child, buildContext)), List.of()));
             } else if (FXMLConstants.FX_INCLUDE_ELEMENT.equals(childName)
                     || FXMLConstants.FX_REFERENCE_ELEMENT.equals(childName)
                     || FXMLConstants.FX_COPY_ELEMENT.equals(childName)) {
@@ -569,10 +618,7 @@ public record FXMLDocumentParser(Log log) {
     private Optional<AbstractFXMLValue> parseValueChild(ParsedXMLStructure structure, BuildContext buildContext) {
         String nodeName = structure.name();
         if (FXMLConstants.FX_DEFINE_ELEMENT.equals(nodeName)) {
-            structure.children()
-                    .stream()
-                    .map(child -> parseObject(child, buildContext, false))
-                    .forEach(buildContext.definitions()::add);
+            parseDefinitions(buildContext, structure);
             return Optional.empty();
         } else if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(nodeName)) {
             buildContext.scripts()
@@ -1112,6 +1158,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param comments The list of XML comments on the element.
     /// @return The list of extracted generic type strings.
     private List<String> extractGenericsFromComments(List<String> comments) {
+        // TODO: Be more strict with generic comment parsing
         List<String> generics = new ArrayList<>();
         for (String comment : comments) {
             String stripped = comment.strip();

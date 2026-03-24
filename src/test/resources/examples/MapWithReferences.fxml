@@ -1,6 +1,7 @@
 <?import java.util.HashMap?>
 <?import javafx.scene.control.Button?>
 <HashMap xmlns:fx="http://javafx.com/fxml">
+    <!-- No type information -->
     <fx:define>
         <Button fx:id="myButton" text="Original"/>
     </fx:define>

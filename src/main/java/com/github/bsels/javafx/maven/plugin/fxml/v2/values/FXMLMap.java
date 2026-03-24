@@ -1,5 +1,6 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
+import com.github.bsels.javafx.maven.plugin.fxml.v2.FXMLFactoryMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
@@ -17,12 +18,12 @@ import java.util.Optional;
 ///
 /// @param identifier    The identifier of the map.
 /// @param type          The type of the map.
-/// @param factoryMethod The optional factory method name.
+/// @param factoryMethod The optional factory method.
 /// @param entries       A collection of key-value mappings representing the entries in the map.
 public record FXMLMap(
         FXMLIdentifier identifier,
         FXMLType type,
-        Optional<String> factoryMethod,
+        Optional<FXMLFactoryMethod> factoryMethod,
         Map<String, AbstractFXMLValue> entries
 ) implements AbstractFXMLValue, AbstractFXMLObject {
 

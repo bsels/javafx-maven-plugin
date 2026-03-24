@@ -1,6 +1,7 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2;
 
 import com.github.bsels.javafx.maven.plugin.TestHelpers;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
@@ -11,15 +12,17 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLSourceScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCopy;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInlineScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLLiteral;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCopy;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMap;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLObject;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLReference;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
 import com.github.bsels.javafx.maven.plugin.io.FXMLReader;
 import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
+import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
@@ -402,6 +405,8 @@ public class FXMLDocumentParserTest {
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLMap.class)
                     .extracting(FXMLMap.class::cast)
+                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                    .hasFieldOrPropertyWithValue("type", new FXMLGenericType(HashMap.class, List.of(new FXMLClassType(Object.class), new FXMLClassType(Object.class))))
                     .satisfies(
                             map -> assertThat(map.entries())
                                     .hasSize(2)
@@ -416,5 +421,62 @@ public class FXMLDocumentParserTest {
                                     )
                     );
         }
+
+        @Test
+        void observableListDefinition() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/ObservableListDefinition.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML);
+
+            // Assert
+            assertThat(document)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "ObservableListDefinition")
+                    .hasFieldOrPropertyWithValue("controller", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scripts", List.of())
+                    .satisfies(
+                            doc -> assertThat(doc.imports())
+                                    .hasSize(3)
+                                    .containsExactly("javafx.collections.FXCollections", "java.lang.Object", "java.lang.String"),
+                            doc -> assertThat(doc.root())
+                                    .isInstanceOf(FXMLObject.class)
+                                    .extracting(FXMLObject.class::cast)
+                                    .isNotNull()
+                                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Object.class))
+                                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                                    .hasFieldOrPropertyWithValue("properties", List.of()),
+                            doc -> assertThat(doc.definitions())
+                                    .hasSize(1)
+                                    .first()
+                                    .isInstanceOf(FXMLCollection.class)
+                                    .extracting(FXMLCollection.class::cast)
+                                    .hasFieldOrPropertyWithValue("identifier", new FXMLExposedIdentifier("myList"))
+                                    .hasFieldOrPropertyWithValue("type", new FXMLGenericType(ObservableList.class, new FXMLClassType(String.class)))
+                                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.of(new FXMLFactoryMethod(FXCollections.class, "observableArrayList")))
+                                    .extracting(FXMLCollection::values, LIST_VALUE_ASSERT_FACTORY)
+                                    .hasSize(3)
+                                    .hasOnlyElementsOfType(FXMLValue.class)
+                                    .extracting(FXMLValue.class::cast)
+                                    .satisfiesExactly(
+                                            first -> assertThat(first)
+                                                    .hasFieldOrPropertyWithValue("identifier", Optional.empty())
+                                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
+                                                    .hasFieldOrPropertyWithValue("value", "A"),
+                                            second -> assertThat(second)
+                                                    .hasFieldOrPropertyWithValue("identifier", Optional.empty())
+                                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
+                                                    .hasFieldOrPropertyWithValue("value", "B"),
+                                            third -> assertThat(third)
+                                                    .hasFieldOrPropertyWithValue("identifier", Optional.empty())
+                                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
+                                                    .hasFieldOrPropertyWithValue("value", "C")
+                                    )
+                    );
+        }
+
     }
 }
