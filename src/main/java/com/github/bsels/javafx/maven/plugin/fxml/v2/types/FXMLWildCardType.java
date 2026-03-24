@@ -7,7 +7,7 @@ public final class FXMLWildCardType implements FXMLType {
     /// The singleton instance of [FXMLWildCardType].
     public static final FXMLWildCardType INSTANCE = new FXMLWildCardType();
 
-    /// Private constructor to enforce singleton pattern.
+    /// Private constructor to enforce a singleton pattern.
     private FXMLWildCardType() {
         // Singleton constructor
     }
