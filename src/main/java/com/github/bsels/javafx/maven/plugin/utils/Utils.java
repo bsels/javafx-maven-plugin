@@ -180,7 +180,7 @@ public final class Utils {
     /// @param <T>   the type of the element contained within the [Optional]
     /// @param clazz the class of the element contained within the [Optional]
     /// @return a [Gatherer] instance that processes Optional values
-    public static <T> Gatherer<? super Optional<T>, Void, T> optional(Class<T> clazz) {
+    public static <T> Gatherer<? super Optional<T>, Void, T> optional(Class<? super T> clazz) {
         Objects.requireNonNull(clazz, "clazz cannot be null");
         return optional();
     }
@@ -278,7 +278,7 @@ public final class Utils {
     /// @param typeName the name of the type to be resolved; may be a simple name or fully qualified name
     /// @return the resolved [Class<?>] object corresponding to the typeName
     /// @throws InternalClassNotFoundException if the type cannot be resolved or if multiple types are found
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     for a given name in wildcard imports
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            for a given name in wildcard imports
     public static Class<?> findType(List<String> imports, String typeName) {
         if (typeName.contains(".")) {
             return findTypeForName(typeName)
@@ -341,8 +341,8 @@ public final class Utils {
 
     /// Finds a getter method in the specified class that returns a map and determines the value type of the map.
     ///
-    /// @param clazz          the class to inspect for the specified getter method
-    /// @param mapGetterName  the name of the getter method that returns a map
+    /// @param clazz         the class to inspect for the specified getter method
+    /// @param mapGetterName the name of the getter method that returns a map
     /// @return the value type of the map returned by the getter method
     /// @throws NoSuchMethodException if the specified method does not exist, or if the method does not return a map
     public static Type findGetterMapAndReturnValueType(Class<?> clazz, String mapGetterName) throws NoSuchMethodException {
@@ -373,6 +373,18 @@ public final class Utils {
     /// @return a binary operator that returns the first of its input arguments
     public static <T> BinaryOperator<T> getFirstLambda() {
         return (a, _) -> a;
+    }
+
+    /// Returns a [BinaryOperator] that throws an [IllegalStateException] in case of duplicates.
+    /// This method can be used as a merge function in collectors
+    /// or other operations where duplicates are not permitted.
+    ///
+    /// @param <T> the type of the input arguments to the operator
+    /// @return a [BinaryOperator] that throws an [IllegalStateException] when a duplicate is detected
+    public static <T> BinaryOperator<T> duplicateThrowException() {
+        return (_, _) -> {
+            throw new IllegalStateException("Duplicate key not allowed in set or map");
+        };
     }
 
     /// Returns a binary operator that applies the given bi-function to its inputs and always
@@ -475,7 +487,7 @@ public final class Utils {
     /// @return the return type of the validated getter method
     /// @throws NoSuchMethodException if the specified getter method does not exist in the class
     /// @throws IllegalStateException if the method's return type is not a collection,
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         or its generic type is incompatible with the given parameter type
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       or its generic type is incompatible with the given parameter type
     public static Class<?> findCollectionGetterWithAllowedReturnType(
             Class<?> clazz,
             String identifier,
@@ -518,7 +530,7 @@ public final class Utils {
     /// @param imports   a collection of fully qualified class names representing the current imports
     /// @param parameter the fully qualified class name of the parameter to be processed
     /// @return a simplified class name if the parameter can be reduced using the import set,
-    ///                                                                                                 otherwise the original fully qualified class name of the parameter
+    ///                                                                                                         otherwise the original fully qualified class name of the parameter
     public static String improveImportForParameter(Collection<String> imports, String parameter) {
         String simpleName = parameter.substring(parameter.lastIndexOf('.') + 1);
         if (imports.contains(parameter)) {

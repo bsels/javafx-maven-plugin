@@ -53,6 +53,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -65,6 +66,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /// Parses a [ParsedFXML] raw XML structure into a [FXMLDocument] V2 model.
@@ -235,14 +237,15 @@ public record FXMLDocumentParser(Log log) {
             Optional<FXMLFactoryMethod> factoryMethod
     ) {
         Map<String, String> properties = structure.properties();
-        Map<String, AbstractFXMLValue> entries = new LinkedHashMap<>();
-        for (Map.Entry<String, String> entry : properties.entrySet()) {
-            String key = entry.getKey();
-            if (hasSkippablePrefix(key) || FXMLConstants.FX_FACTORY_ATTRIBUTE.equals(key)) {
-                continue;
-            }
-            entries.put(key, parseValueString(entry.getValue()));
-        }
+        Map<String, AbstractFXMLValue> entries = properties.entrySet()
+                .stream()
+                .filter(entry -> !hasSkippablePrefix(entry.getKey()))
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> parseValueString(entry.getValue()),
+                        Utils.duplicateThrowException(),
+                        HashMap::new
+                ));
         for (ParsedXMLStructure child : structure.children()) {
             String childName = child.name();
             if (FXMLConstants.FX_DEFINE_ELEMENT.equals(childName)) {
@@ -293,15 +296,12 @@ public record FXMLDocumentParser(Log log) {
     ) {
         Class<?> clazz = classAndIdentifier.clazz();
         Map<String, String> attributes = structure.properties();
-        List<FXMLProperty<?>> properties = new ArrayList<>();
-
-        for (Map.Entry<String, String> entry : attributes.entrySet()) {
-            String key = entry.getKey();
-            if (hasSkippablePrefix(key)) {
-                continue;
-            }
-            parseAttributeProperty(buildContext, clazz, key, entry.getValue()).ifPresent(properties::add);
-        }
+        List<FXMLProperty<?>> properties = attributes.entrySet()
+                .stream()
+                .filter(entry -> !hasSkippablePrefix(entry.getKey()))
+                .map(entry -> parseAttributeProperty(buildContext, clazz, entry.getKey(), entry.getValue()))
+                .<FXMLProperty<?>>gather(Utils.optional())
+                .collect(Collectors.toCollection(ArrayList::new));
 
         for (ParsedXMLStructure child : structure.children()) {
             String childName = child.name();
@@ -309,12 +309,6 @@ public record FXMLDocumentParser(Log log) {
                 parseDefinitions(buildContext, child);
             } else if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(childName)) {
                 buildContext.scripts().add(parseScript(child));
-            } else if (factoryMethod.isPresent() && !hasSkippablePrefix(childName)) {
-                // If there's a factory method, we parse the child as an object and add it to the properties.
-                // In FXML, when using fx:factory, children are typically added to the resulting object.
-                // Since we don't know the exact type returned by the factory method at this point,
-                // we treat them as values that might be added to a collection if the result is one.
-                properties.add(new FXMLCollectionProperties("", "", FXMLWildCardType.INSTANCE, List.of(parseValue(child, buildContext)), List.of()));
             } else if (FXMLConstants.FX_INCLUDE_ELEMENT.equals(childName)
                     || FXMLConstants.FX_REFERENCE_ELEMENT.equals(childName)
                     || FXMLConstants.FX_COPY_ELEMENT.equals(childName)) {
@@ -323,7 +317,6 @@ public record FXMLDocumentParser(Log log) {
                 String getterName = Utils.getGetterName(defaultPropName.orElseThrow());
                 try {
                     Method getter = clazz.getMethod(getterName);
-                    Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
                     addValueToMultipleProperty(buildContext, properties, defaultPropName.orElseThrow(), getterName, getter.getGenericReturnType(), fxValue);
                 } catch (NoSuchMethodException _) {
                     log.debug("No default list property found on %s for %s, skipping".formatted(clazz.getSimpleName(), childName));
@@ -397,7 +390,7 @@ public record FXMLDocumentParser(Log log) {
     private Optional<String> resolveDefaultPropertyName(Class<?> clazz) {
         Class<?> current = clazz;
         while (current != null) {
-            DefaultProperty annotation = current.getAnnotation(DefaultProperty.class);
+            DefaultProperty annotation = current.getDeclaredAnnotation(DefaultProperty.class);
             if (annotation != null) {
                 return Optional.of(annotation.value());
             }
