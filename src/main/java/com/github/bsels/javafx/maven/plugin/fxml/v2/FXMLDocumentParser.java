@@ -271,7 +271,7 @@ public record FXMLDocumentParser(Log log) {
                 try {
                     Method getter = clazz.getMethod(getterName);
                     Type elementType = Utils.findGetterListAndReturnElementType(clazz, getterName);
-                    addValueToMultipleProperty(buildContext, properties, defaultPropName.orElseThrow(), getterName, getter.getGenericReturnType(), elementType, fxValue);
+                    addValueToMultipleProperty(buildContext, properties, defaultPropName.orElseThrow(), getterName, getter.getGenericReturnType(), fxValue);
                 } catch (NoSuchMethodException _) {
                     log.debug("No default list property found on %s for %s, skipping".formatted(clazz.getSimpleName(), childName));
                 }
@@ -319,7 +319,7 @@ public record FXMLDocumentParser(Log log) {
                             try {
                                 Method getter = clazz.getMethod(defaultGetterName);
                                 Type elementType = Utils.findGetterListAndReturnElementType(clazz, defaultGetterName);
-                                addValueToMultipleProperty(buildContext, properties, defaultPropName.get(), defaultGetterName, getter.getGenericReturnType(), elementType, childObject);
+                                addValueToMultipleProperty(buildContext, properties, defaultPropName.get(), defaultGetterName, getter.getGenericReturnType(), childObject);
                             } catch (NoSuchMethodException _) {
                                 log.debug("No default list property found on %s for child %s, skipping".formatted(clazz.getSimpleName(), childName));
                             }
@@ -418,8 +418,8 @@ public record FXMLDocumentParser(Log log) {
 
     /// Resolves the type mapping for a given class by inspecting its hierarchy.
     ///
-    /// @param clazz        The class to resolve the mapping for.
-    /// @param baseMapping  The base mapping to start from.
+    /// @param clazz       The class to resolve the mapping for.
+    /// @param baseMapping The base mapping to start from.
     /// @return A map of type variable names to their resolved [FXMLType]s.
     private Map<String, FXMLType> resolveTypeMapping(Class<?> clazz, Map<String, FXMLType> baseMapping) {
         Map<String, FXMLType> mapping = new LinkedHashMap<>(baseMapping);
@@ -829,11 +829,11 @@ public record FXMLDocumentParser(Log log) {
 
     /// Converts a static property child element into an [FXMLProperty].
     ///
-    /// @param buildContext     the build context for class resolution.
-    /// @param clazz      the class defining the static property.
-    /// @param setterName the name of the static setter method.
-    /// @param propName   the property name.
-    /// @param child      the child XML structure containing the property values.
+    /// @param buildContext the build context for class resolution.
+    /// @param clazz        the class defining the static property.
+    /// @param setterName   the name of the static setter method.
+    /// @param propName     the property name.
+    /// @param child        the child XML structure containing the property values.
     /// @return an [Optional] containing the property, or empty if unresolvable.
     private Optional<FXMLProperty<?>> parseStaticPropertyElement(
             BuildContext buildContext,
@@ -989,8 +989,8 @@ public record FXMLDocumentParser(Log log) {
     /// - No prefix with `paramType` assignable to [EventHandler] — treated as inline script, returns [FXMLInlineScript].
     /// - No prefix — plain string value, returns [FXMLValue].
     ///
-    /// @param value        the raw attribute value string.
-    /// @param paramType    the expected getter parameter type, used to detect functional interfaces, may be `null`.
+    /// @param value     the raw attribute value string.
+    /// @param paramType the expected getter parameter type, used to detect functional interfaces, may be `null`.
     /// @return the corresponding [AbstractFXMLValue].
     private AbstractFXMLValue parseValueString(String value, Class<?> paramType) {
         if (value.startsWith(FXMLConstants.TRANSLATION_PREFIX)) {
@@ -1123,11 +1123,11 @@ public record FXMLDocumentParser(Log log) {
 
     /// Adds a value to an existing [FXMLCollectionProperties] entry or creates a new one.
     ///
-    /// @param properties  The current list of properties to update.
+    /// @param buildContext   The build context for class resolution.
+    /// @param properties     The current list of properties to update.
     /// @param propName       The property name.
     /// @param getterName     The getter method name for the list property.
     /// @param collectionType The type of the collection itself.
-    /// @param elementType    The element type of the list.
     /// @param value          The value to add.
     private void addValueToMultipleProperty(
             BuildContext buildContext,
@@ -1135,7 +1135,6 @@ public record FXMLDocumentParser(Log log) {
             String propName,
             String getterName,
             Type collectionType,
-            Type elementType,
             AbstractFXMLValue value
     ) {
         FXMLType fxmlCollectionType = buildFXMLType(collectionType, List.of(), buildContext, buildContext.typeMapping());
