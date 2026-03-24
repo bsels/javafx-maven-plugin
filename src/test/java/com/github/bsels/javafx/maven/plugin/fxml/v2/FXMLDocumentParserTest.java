@@ -2,6 +2,7 @@ package com.github.bsels.javafx.maven.plugin.fxml.v2;
 
 import com.github.bsels.javafx.maven.plugin.TestHelpers;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;

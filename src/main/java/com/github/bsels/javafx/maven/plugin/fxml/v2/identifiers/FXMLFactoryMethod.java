@@ -1,4 +1,6 @@
-package com.github.bsels.javafx.maven.plugin.fxml.v2;
+package com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers;
+
+import com.github.bsels.javafx.maven.plugin.fxml.v2.Utils;
 
 import java.util.Objects;
 
