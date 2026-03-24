@@ -184,7 +184,7 @@ public record FXMLDocumentParser(Log log) {
     /// Entries are collected from two sources:
     /// - Attributes on the map element (skipping `fx:` and `xmlns` prefixes as well as `fx:factory`),
     ///   each parsed via [#parseValueString(String)].
-    /// - Child elements, where the element name is used as the key and the child is parsed via
+    /// - Child elements, where the element name is used as the key and the children are parsed via
     ///   [#parseValue(ParsedXMLStructure, BuildContext)].
     ///
     /// @param structure          The [ParsedXMLStructure] representing the XML to be parsed.
@@ -349,10 +349,6 @@ public record FXMLDocumentParser(Log log) {
         return Optional.empty();
     }
 
-    private FXMLType buildFXMLType(Type type, List<String> generics, BuildContext buildContext) {
-        return buildFXMLType(type, generics, buildContext, Map.of());
-    }
-
     /// Builds an [FXMLType] from a [Type] and a list of generic type name strings.
     ///
     /// If the generics list is empty, it attempts to resolve the type from the provided [Type]:
@@ -361,7 +357,7 @@ public record FXMLDocumentParser(Log log) {
     /// - [TypeVariable]: resolves via `typeMapping`, or returns [FXMLWildCardType] if not found.
     /// - [WildcardType]: returns the resolved upper or lower bound type, or [FXMLWildCardType] for unbounded wildcards.
     ///
-    /// If the generics list is not empty (e.g. from XML comments), it uses those instead,
+    /// If the generics list is not empty (e.g., from XML comments), it uses those instead,
     /// recursively parsing each generic string into an [FXMLType] tree.
     ///
     /// @param type         The base type.
@@ -443,8 +439,8 @@ public record FXMLDocumentParser(Log log) {
             if (superclass != null) {
                 resolveTypeMappingInternal(superclass, mapping, visited);
             }
-            for (Type iface : clazz.getGenericInterfaces()) {
-                resolveTypeMappingInternal(iface, mapping, visited);
+            for (Type genericInterface : clazz.getGenericInterfaces()) {
+                resolveTypeMappingInternal(genericInterface, mapping, visited);
             }
         } else if (type instanceof ParameterizedType pt) {
             Class<?> rawClass = (Class<?>) pt.getRawType();
@@ -452,26 +448,27 @@ public record FXMLDocumentParser(Log log) {
             Type[] actualTypeArguments = pt.getActualTypeArguments();
             for (int i = 0; i < typeParameters.length && i < actualTypeArguments.length; i++) {
                 Type arg = actualTypeArguments[i];
-                if (arg instanceof TypeVariable<?> tv) {
-                    FXMLType resolved = mapping.get(tv.getName());
-                    if (resolved != null) {
-                        mapping.put(typeParameters[i].getName(), resolved);
+                switch (arg) {
+                    case TypeVariable<?> tv -> {
+                        FXMLType resolved = mapping.get(tv.getName());
+                        if (resolved != null) {
+                            mapping.put(typeParameters[i].getName(), resolved);
+                        }
                     }
-                } else if (arg instanceof Class<?> argClass) {
-                    mapping.put(typeParameters[i].getName(), new FXMLClassType(argClass));
-                } else if (arg instanceof ParameterizedType argPt) {
-                    Class<?> argRawClass = (Class<?>) argPt.getRawType();
-                    List<FXMLType> argTypeArgs = Stream.of(argPt.getActualTypeArguments())
-                            .map(innerArg -> {
-                                if (innerArg instanceof Class<?> innerClass) {
-                                    return (FXMLType) new FXMLClassType(innerClass);
-                                }
-                                return (FXMLType) FXMLWildCardType.INSTANCE;
-                            })
-                            .toList();
-                    mapping.put(typeParameters[i].getName(), new FXMLGenericType(argRawClass, argTypeArgs));
-                } else {
-                    mapping.put(typeParameters[i].getName(), FXMLWildCardType.INSTANCE);
+                    case Class<?> argClass -> mapping.put(typeParameters[i].getName(), new FXMLClassType(argClass));
+                    case ParameterizedType argPt -> {
+                        Class<?> argRawClass = (Class<?>) argPt.getRawType();
+                        List<FXMLType> argTypeArgs = Stream.of(argPt.getActualTypeArguments())
+                                .map(innerArg -> {
+                                    if (innerArg instanceof Class<?> innerClass) {
+                                        return new FXMLClassType(innerClass);
+                                    }
+                                    return FXMLWildCardType.INSTANCE;
+                                })
+                                .toList();
+                        mapping.put(typeParameters[i].getName(), new FXMLGenericType(argRawClass, argTypeArgs));
+                    }
+                    case null, default -> mapping.put(typeParameters[i].getName(), FXMLWildCardType.INSTANCE);
                 }
             }
             resolveTypeMappingInternal(rawClass, mapping, visited);
@@ -668,14 +665,10 @@ public record FXMLDocumentParser(Log log) {
             Charset charset = Charset.forName(charsetName);
             return new FXMLFileScript(source, charset);
         }
-        String scriptContent = structure.getTextValue();
-        if (!scriptContent.isBlank()) {
-            return new FXMLSourceScript(scriptContent);
-        }
-        return new FXMLSourceScript(scriptContent);
+        return new FXMLSourceScript(structure.getTextValue());
     }
 
-    /// Resolves and returns a [ClassAndIdentifier] object based on the given node name, attributes, and context.
+    /// Resolves and returns an [ClassAndIdentifier] object based on the given node name, attributes, and context.
     /// This method identifies the class type and identifier for the specified node in an FXML document.
     ///
     /// @param nodeName     The name of the node being processed.
@@ -806,7 +799,7 @@ public record FXMLDocumentParser(Log log) {
             }
             Method setter = setters.getFirst();
             Type paramType = setter.getGenericParameterTypes()[0];
-            AbstractFXMLValue fxmlValue = parseValueString(value, Utils.getClassType(paramType), buildContext);
+            AbstractFXMLValue fxmlValue = parseValueString(value, Utils.getClassType(paramType));
             FXMLType fxmlType = buildFXMLType(paramType, List.of(), buildContext, buildContext.typeMapping());
             return Optional.of(new FXMLObjectProperty(attributeName, setterName, fxmlType, fxmlValue));
         }
@@ -973,7 +966,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param value the raw attribute value string.
     /// @return the corresponding [AbstractFXMLValue].
     private AbstractFXMLValue parseValueString(String value) {
-        return parseValueString(value, null, null);
+        return parseValueString(value, null);
     }
 
     /// Parses an attribute value string into an [AbstractFXMLValue], with awareness of the expected getter
@@ -993,10 +986,9 @@ public record FXMLDocumentParser(Log log) {
     /// - No prefix — plain string value, returns [FXMLValue].
     ///
     /// @param value        the raw attribute value string.
-    /// @param paramType    the expected getter parameter type, used to detect functional interfaces; may be `null`.
-    /// @param buildContext the build context used for type resolution; may be `null`.
+    /// @param paramType    the expected getter parameter type, used to detect functional interfaces, may be `null`.
     /// @return the corresponding [AbstractFXMLValue].
-    private AbstractFXMLValue parseValueString(String value, Class<?> paramType, BuildContext buildContext) {
+    private AbstractFXMLValue parseValueString(String value, Class<?> paramType) {
         if (value.startsWith(FXMLConstants.TRANSLATION_PREFIX)) {
             return new FXMLTranslation(value.substring(1));
         }
@@ -1010,12 +1002,12 @@ public record FXMLDocumentParser(Log log) {
             return new FXMLExpression(value.substring(1));
         }
         if (value.startsWith(FXMLConstants.ESCAPE_PREFIX)) {
-            return new FXMLValue(Optional.empty(), new FXMLClassType(String.class), value.substring(1));
+            return new FXMLValue(Optional.empty(), new FXMLClassType(paramType), value.substring(1));
         }
         if (paramType != null && isEventHandlerType(paramType)) {
             return new FXMLInlineScript(value);
         }
-        return new FXMLValue(Optional.empty(), new FXMLClassType(String.class), value);
+        return new FXMLValue(Optional.empty(), new FXMLClassType(paramType), value);
     }
 
     /// Resolves a method reference value string into an [FXMLMethod].

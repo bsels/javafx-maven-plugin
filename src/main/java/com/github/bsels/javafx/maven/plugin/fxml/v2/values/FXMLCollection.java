@@ -34,8 +34,7 @@ public record FXMLCollection(
     /// @param factoryMethod An optional factory method name used for instantiation.
     /// @param values        The collection of values.
     /// @throws NullPointerException     if `identifier`, `type`, `factoryMethod`, or `values` is `null`.
-    /// @throws IllegalArgumentException if `factoryMethod` is not a valid Java identifier or if `type` is a compiled type
-    ///                                  that is not a `Collection`.
+    /// @throws IllegalArgumentException if `factoryMethod` is not a valid Java identifier, or if `type` is a compiled type that is not a `Collection`.
     public FXMLCollection {
         Objects.requireNonNull(identifier, "`identifier` must not be null");
         Objects.requireNonNull(type, "`type` must not be null");
@@ -62,7 +61,7 @@ public record FXMLCollection(
                 }
             }
             case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildCardType _ -> {
-                // The type is not yet compiled or available in the current classloader, or is a wildcard;
+                // The type is not yet compiled or available in the current classloader or is a wildcard;
                 // collection assignability cannot be verified at this point.
             }
         }

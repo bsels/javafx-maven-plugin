@@ -50,7 +50,7 @@ public record FXMLMap(
                 }
             }
             case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildCardType _ -> {
-                // The type is not yet compiled or available in the current classloader, or is a wildcard;
+                // The type is not yet compiled or available in the current classloader or is a wildcard;
                 // map assignability cannot be verified at this point.
             }
         }
