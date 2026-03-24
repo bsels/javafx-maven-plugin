@@ -2,6 +2,7 @@ package com.github.bsels.javafx.maven.plugin.fxml.v2;
 
 import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 
 import java.util.List;
 import java.util.Objects;
@@ -22,7 +23,7 @@ public record FXMLDocument(
         Optional<Class<?>> controller,
         Optional<String> scriptEngine,
         List<String> imports,
-        List<AbstractFXMLObject> definitions,
+        List<AbstractFXMLValue> definitions,
         List<FXMLScript> scripts
 ) {
     /// Compact constructor to validate the FXML document components.

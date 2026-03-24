@@ -272,7 +272,7 @@ public final class Utils {
     /// Attempts to find a class type corresponding to the provided type name and imports list.
     /// This method resolves the type name to its fully qualified class name based on the given imports.
     /// It prefers explicitly imported classes, followed by wildcard imports. Additionally, it checks
-    /// in default Java package java.lang as a last resort.
+    /// in the default Java package java.lang as a last resort.
     ///
     /// @param imports  a list of strings representing imported packages or classes
     /// @param typeName the name of the type to be resolved; may be a simple name or fully qualified name
@@ -280,9 +280,21 @@ public final class Utils {
     /// @throws InternalClassNotFoundException if the type cannot be resolved or if multiple types are found
     ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            for a given name in wildcard imports
     public static Class<?> findType(List<String> imports, String typeName) {
+        return findTypeOptional(imports, typeName)
+                .orElseThrow(() -> new InternalClassNotFoundException("Unable to find type for name: %s".formatted(typeName)));
+    }
+
+    /// Attempts to find a class type corresponding to the provided type name and imports list.
+    /// This method resolves the type name to its fully qualified class name based on the given imports.
+    /// It prefers explicitly imported classes, followed by wildcard imports. Additionally, it checks
+    /// in the default Java package java.lang as a last resort.
+    ///
+    /// @param imports  a list of strings representing imported packages or classes
+    /// @param typeName the name of the type to be resolved; may be a simple name or fully qualified name
+    /// @return an [Optional] containing the resolved [Class<?>] object corresponding to the typeName, or empty if not found
+    public static Optional<Class<?>> findTypeOptional(List<String> imports, String typeName) {
         if (typeName.contains(".")) {
-            return findTypeForName(typeName)
-                    .orElseThrow(() -> new InternalClassNotFoundException("Unable to find type for name: %s".formatted(typeName)));
+            return findTypeForName(typeName);
         }
 
         String suffixTypeName = "." + typeName;
@@ -292,7 +304,7 @@ public final class Utils {
                 .findFirst();
 
         if (type.isPresent()) {
-            return type.get();
+            return Optional.of(type.get());
         }
 
         List<? extends Class<?>> types = imports.stream()
@@ -302,14 +314,13 @@ public final class Utils {
                 .toList();
         if (!types.isEmpty()) {
             if (types.size() == 1) {
-                return types.getFirst();
+                return Optional.of(types.getFirst());
             } else {
                 throw new InternalClassNotFoundException("Found multiple types for name: %s".formatted(typeName));
             }
         }
 
-        return findTypeForName("java.lang.%s".formatted(typeName))
-                .orElseThrow(() -> new InternalClassNotFoundException("Unable to find type for name: %s".formatted(typeName)));
+        return findTypeForName("java.lang.%s".formatted(typeName));
     }
 
     /// Finds a getter method in the specified class that returns a list and determines the element type of the list.
@@ -415,9 +426,9 @@ public final class Utils {
                 .map(Constructor::getParameters)
                 .map(List::of)
                 .filter(Predicate.not(List::isEmpty))
-                .filter(parameters -> parameters.stream().allMatch(parameter -> parameter.isAnnotationPresent(NamedArg.class)))
                 .map(
                         parameters -> parameters.stream()
+                                .filter(parameter -> parameter.isAnnotationPresent(NamedArg.class))
                                 .filter(parameter -> propertyName.equals(parameter.getAnnotation(NamedArg.class).value()))
                                 .findFirst()
                 )
@@ -475,6 +486,15 @@ public final class Utils {
         return PRIMITIVE_TYPE_AND_WRAPPER.stream()
                 .anyMatch(classes -> classes.contains(variable) && classes.contains(expression))
                 || variable.isAssignableFrom(expression);
+    }
+
+    /// Checks if a given class is a primitive type or its wrapper equivalent.
+    ///
+    /// @param clazz the class to be checked
+    /// @return `true` if the class is a primitive type or a wrapper; otherwise `false`
+    public static boolean isPrimitiveOrWrapper(Class<?> clazz) {
+        return PRIMITIVE_TYPE_AND_WRAPPER.stream()
+                .anyMatch(classes -> classes.contains(clazz));
     }
 
     /// Searches and validates a getter method in the specified class that matches the provided identifier,

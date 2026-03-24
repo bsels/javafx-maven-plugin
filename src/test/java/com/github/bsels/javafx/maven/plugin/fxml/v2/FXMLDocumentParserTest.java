@@ -511,11 +511,11 @@ public class FXMLDocumentParserTest {
                                     .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
                                     .hasFieldOrPropertyWithValue("properties", List.of()),
                             doc -> assertThat(doc.definitions())
-                                    .hasSize(2)
-                                    .hasOnlyElementsOfType(FXMLObject.class)
-                                    .extracting(FXMLObject.class::cast)
+                                    .hasSize(3)
                                     .satisfiesExactly(
                                             first -> assertThat(first)
+                                                    .isInstanceOf(FXMLObject.class)
+                                                    .extracting(FXMLObject.class::cast)
                                                     .hasFieldOrPropertyWithValue("identifier", new FXMLExposedIdentifier("attributes"))
                                                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(Color.class))
                                                     .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
@@ -537,6 +537,8 @@ public class FXMLDocumentParserTest {
                                                                     .hasFieldOrPropertyWithValue("value", new FXMLLiteral("0.01"))
                                                     ),
                                             second -> assertThat(second)
+                                                    .isInstanceOf(FXMLObject.class)
+                                                    .extracting(FXMLObject.class::cast)
                                                     .hasFieldOrPropertyWithValue("identifier", new FXMLExposedIdentifier("elements"))
                                                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(Color.class))
                                                     .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
@@ -556,7 +558,13 @@ public class FXMLDocumentParserTest {
                                                                     .hasFieldOrPropertyWithValue("name", "blue")
                                                                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(double.class))
                                                                     .hasFieldOrPropertyWithValue("value", new FXMLLiteral("0.5"))
-                                                    )
+                                                    ),
+                                            third -> assertThat(third)
+                                                    .isInstanceOf(FXMLValue.class)
+                                                    .extracting(FXMLValue.class::cast)
+                                                    .hasFieldOrPropertyWithValue("identifier", Optional.of(new FXMLExposedIdentifier("valueOfMethod")))
+                                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Color.class))
+                                                    .hasFieldOrPropertyWithValue("value", "#f0f0f0")
                                     )
                     )
             ;

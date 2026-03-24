@@ -6,6 +6,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
@@ -115,7 +116,12 @@ public record FXMLDocumentParser(Log log) {
                 rootStructure.properties().get(FXMLConstants.FX_CONTROLLER_ATTRIBUTE)
         ).map(name -> Utils.findType(buildContext.imports(), name));
 
-        AbstractFXMLObject root = parseObject(rootStructure, buildContext, true);
+        AbstractFXMLValue rootValue = parseObject(rootStructure, buildContext, true);
+        if (!(rootValue instanceof AbstractFXMLObject root)) {
+            throw new IllegalStateException(
+                    "Root object must be an instance of AbstractFXMLObject, but was %s".formatted(rootValue.getClass().getSimpleName())
+            );
+        }
 
         return new FXMLDocument(
                 parsedFXML.className(),
@@ -135,7 +141,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param isRoot       Whether the object is the root of the FXML document.
     /// @return An [AbstractFXMLObject] representing the parsed XML structure.
     /// @throws IllegalStateException if the parsing fails.
-    private AbstractFXMLObject parseObject(ParsedXMLStructure structure, BuildContext buildContext, boolean isRoot)
+    private AbstractFXMLValue parseObject(ParsedXMLStructure structure, BuildContext buildContext, boolean isRoot)
             throws IllegalStateException {
         Map<String, String> properties = structure.properties();
         String nodeName = structure.name();
@@ -196,7 +202,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param type               The resolved [FXMLType] of the collection.
     /// @param factoryMethod      The optional factory method used for instantiation.
     /// @return An [FXMLCollection] object constructed from the parsed XML structure, generics, factory method, and child values.
-    private FXMLCollection parseCollection(
+    private AbstractFXMLValue parseCollection(
             ParsedXMLStructure structure,
             BuildContext buildContext,
             ClassAndIdentifier classAndIdentifier,
@@ -230,7 +236,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param type               The resolved [FXMLType] of the map.
     /// @param factoryMethod      The optional factory method used for instantiation.
     /// @return An [FXMLMap] object constructed from the parsed XML structure.
-    private FXMLMap parseMap(
+    private AbstractFXMLValue parseMap(
             ParsedXMLStructure structure,
             BuildContext buildContext,
             ClassAndIdentifier classAndIdentifier,
@@ -288,7 +294,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param type               The resolved [FXMLType] of the object.
     /// @param factoryMethod      The optional factory method used for instantiation.
     /// @return An [FXMLObject] constructed from the parsed XML structure.
-    private FXMLObject parsePlainObject(
+    private AbstractFXMLValue parsePlainObject(
             ParsedXMLStructure structure,
             BuildContext buildContext,
             ClassAndIdentifier classAndIdentifier,
@@ -297,6 +303,18 @@ public record FXMLDocumentParser(Log log) {
     ) {
         Class<?> clazz = classAndIdentifier.clazz();
         Map<String, String> attributes = structure.properties();
+
+        if (attributes.containsKey(FXMLConstants.FX_CONSTANT_ATTRIBUTE)) {
+            String constantName = attributes.get(FXMLConstants.FX_CONSTANT_ATTRIBUTE);
+            FXMLType constantType = new FXMLClassType(Utils.getClassType(resolveConstantType(clazz, constantName)));
+            return new FXMLConstant(clazz, constantName, constantType);
+        }
+
+        if (attributes.containsKey(FXMLConstants.FX_VALUE_ATTRIBUTE)) {
+            String val = attributes.get(FXMLConstants.FX_VALUE_ATTRIBUTE);
+            return new FXMLValue(Optional.of(classAndIdentifier.identifier()), new FXMLClassType(clazz), val);
+        }
+
         List<FXMLProperty<?>> properties = attributes.entrySet()
                 .stream()
                 .filter(entry -> !hasSkippablePrefix(entry.getKey()))
@@ -338,7 +356,7 @@ public record FXMLDocumentParser(Log log) {
                 String setterName = Utils.getSetterName(childName);
                 List<Method> setters = Utils.findObjectSetters(clazz, setterName);
                 String getterName = Utils.getGetterName(childName);
-                if (!setters.isEmpty()) {
+                if (!setters.isEmpty() || !Utils.findParameterTypeForConstructors(clazz, childName).isEmpty()) {
                     parseInstancePropertyElement(buildContext, clazz, childName, child).ifPresent(properties::add);
                 } else {
                     boolean handled = false;
@@ -359,14 +377,14 @@ public record FXMLDocumentParser(Log log) {
                         }
                     }
                     if (!handled) {
-                        AbstractFXMLObject childObject = parseObject(child, buildContext, false);
+                        AbstractFXMLValue childValue = parseObject(child, buildContext, false);
                         Optional<String> defaultPropName = resolveDefaultPropertyName(clazz);
                         if (defaultPropName.isPresent()) {
                             String defaultGetterName = Utils.getGetterName(defaultPropName.get());
                             try {
                                 Method getter = clazz.getMethod(defaultGetterName);
-                                Type elementType = Utils.findGetterListAndReturnElementType(clazz, defaultGetterName);
-                                addValueToMultipleProperty(buildContext, properties, defaultPropName.get(), defaultGetterName, getter.getGenericReturnType(), childObject);
+                                Utils.findGetterListAndReturnElementType(clazz, defaultGetterName);
+                                addValueToMultipleProperty(buildContext, properties, defaultPropName.get(), defaultGetterName, getter.getGenericReturnType(), childValue);
                             } catch (NoSuchMethodException _) {
                                 log.debug("No default list property found on %s for child %s, skipping".formatted(clazz.getSimpleName(), childName));
                             }
@@ -634,6 +652,19 @@ public record FXMLDocumentParser(Log log) {
     /// @param buildContext The context used during the building process.
     /// @return The parsed [AbstractFXMLValue].
     private AbstractFXMLValue parseValue(ParsedXMLStructure structure, BuildContext buildContext) {
+        return parseValue(structure, buildContext, null);
+    }
+
+    /// Parses an XML structure into an FXML value, with an optional expected type.
+    ///
+    /// Handles `fx:include`, `fx:reference`, `fx:copy`, `fx:script` (inline), `fx:constant`,
+    /// `fx:value`, and plain object nodes.
+    ///
+    /// @param structure    The parsed XML structure.
+    /// @param buildContext The context used during the building process.
+    /// @param expectedType The expected [Type] of the value, used for primitive literals.
+    /// @return The parsed [AbstractFXMLValue].
+    private AbstractFXMLValue parseValue(ParsedXMLStructure structure, BuildContext buildContext, Type expectedType) {
         String nodeName = structure.name();
         Map<String, String> attributes = structure.properties();
 
@@ -673,18 +704,25 @@ public record FXMLDocumentParser(Log log) {
             throw new IllegalArgumentException("`fx:script` used as value must have inline content");
         }
 
-        Class<?> clazz = Utils.findType(buildContext.imports(), nodeName);
+        Optional<Class<?>> clazzOpt = Utils.findTypeOptional(buildContext.imports(), nodeName);
 
-        if (attributes.containsKey(FXMLConstants.FX_CONSTANT_ATTRIBUTE)) {
-            String constantName = attributes.get(FXMLConstants.FX_CONSTANT_ATTRIBUTE);
-            FXMLType constantType = new FXMLClassType(Utils.getClassType(resolveConstantType(clazz, constantName)));
-            return new FXMLConstant(clazz, constantName, constantType);
+        if (clazzOpt.isPresent()) {
+            Class<?> clazz = clazzOpt.get();
+            if (attributes.containsKey(FXMLConstants.FX_CONSTANT_ATTRIBUTE)) {
+                String constantName = attributes.get(FXMLConstants.FX_CONSTANT_ATTRIBUTE);
+                FXMLType constantType = new FXMLClassType(Utils.getClassType(resolveConstantType(clazz, constantName)));
+                return new FXMLConstant(clazz, constantName, constantType);
+            }
+
+            if (attributes.containsKey(FXMLConstants.FX_VALUE_ATTRIBUTE)) {
+                String val = attributes.get(FXMLConstants.FX_VALUE_ATTRIBUTE);
+                Optional<FXMLIdentifier> id = resolveOptionalIdentifier(attributes);
+                return new FXMLValue(id, new FXMLClassType(clazz), val);
+            }
         }
 
-        if (attributes.containsKey(FXMLConstants.FX_VALUE_ATTRIBUTE)) {
-            String val = attributes.get(FXMLConstants.FX_VALUE_ATTRIBUTE);
-            Optional<FXMLIdentifier> id = resolveOptionalIdentifier(attributes);
-            return new FXMLValue(id, new FXMLClassType(clazz), val);
+        if (expectedType != null && Utils.isPrimitiveOrWrapper(Utils.getClassType(expectedType)) && structure.children().isEmpty()) {
+            return new FXMLLiteral(structure.getTextValue());
         }
 
         return parseObject(structure, buildContext, false);
@@ -851,6 +889,17 @@ public record FXMLDocumentParser(Log log) {
             FXMLType fxmlType = buildFXMLType(paramType, List.of(), buildContext, buildContext.typeMapping());
             return Optional.of(new FXMLObjectProperty(attributeName, setterName, fxmlType, fxmlValue));
         }
+        List<Type> constructorParamTypes = Utils.findParameterTypeForConstructors(clazz, attributeName);
+        if (!constructorParamTypes.isEmpty()) {
+            if (constructorParamTypes.size() > 1) {
+                log.warn("Multiple constructor parameters found for '%s' on '%s', skipping".formatted(attributeName, clazz.getName()));
+                return Optional.empty();
+            }
+            Type paramType = constructorParamTypes.getFirst();
+            AbstractFXMLValue fxmlValue = parseValueString(value, Utils.getClassType(paramType));
+            FXMLType fxmlType = buildFXMLType(paramType, List.of(), buildContext, buildContext.typeMapping());
+            return Optional.of(new FXMLConstructorProperty(attributeName, fxmlType, fxmlValue));
+        }
         String getterName = Utils.getGetterName(attributeName);
         try {
             Method getter = clazz.getMethod(getterName);
@@ -897,7 +946,7 @@ public record FXMLDocumentParser(Log log) {
         }
         Method setter = setters.getFirst();
         Type paramType = setter.getGenericParameterTypes()[1];
-        List<AbstractFXMLValue> values = parseChildrenToValues(buildContext, child);
+        List<AbstractFXMLValue> values = parseChildrenToValues(buildContext, child, paramType);
         FXMLType fxmlType = buildFXMLType(paramType, List.of(), buildContext, buildContext.typeMapping());
         if (values.size() == 1) {
             return Optional.of(new FXMLStaticObjectProperty(propName, clazz, setterName, fxmlType, values.getFirst()));
@@ -928,23 +977,45 @@ public record FXMLDocumentParser(Log log) {
     ) {
         String setterName = Utils.getSetterName(propName);
         List<Method> setters = Utils.findObjectSetters(clazz, setterName);
-        List<AbstractFXMLValue> values = parseChildrenToValues(buildContext, child);
+        List<Type> constructorParamTypes = Utils.findParameterTypeForConstructors(clazz, propName);
 
+        Type paramType = null;
         if (!setters.isEmpty()) {
             if (setters.size() > 1) {
                 log.warn("Multiple setters '%s' found on '%s', skipping".formatted(setterName, clazz.getName()));
                 return Optional.empty();
             }
-            Method setter = setters.getFirst();
-            Type paramType = setter.getGenericParameterTypes()[0];
-            FXMLType fxmlType = buildFXMLType(paramType, List.of(), buildContext, buildContext.typeMapping());
-            if (values.size() == 1) {
-                return Optional.of(new FXMLObjectProperty(propName, setterName, fxmlType, values.getFirst()));
+            paramType = setters.getFirst().getGenericParameterTypes()[0];
+        } else if (!constructorParamTypes.isEmpty()) {
+            if (constructorParamTypes.size() > 1) {
+                log.warn("Multiple constructor parameters found for '%s' on '%s', skipping".formatted(propName, clazz.getName()));
+                return Optional.empty();
             }
-            return Optional.of(new FXMLCollectionProperties(propName, setterName, fxmlType, values, List.of()));
+            paramType = constructorParamTypes.getFirst();
+        }
+
+        if (paramType != null) {
+            List<AbstractFXMLValue> values = parseChildrenToValues(buildContext, child, paramType);
+            if (values.isEmpty() && !child.getTextValue().isEmpty()) {
+                values = List.of(parseValueString(child.getTextValue().strip(), Utils.getClassType(paramType)));
+            }
+            FXMLType fxmlType = buildFXMLType(paramType, List.of(), buildContext, buildContext.typeMapping());
+            if (!setters.isEmpty()) {
+                if (values.size() == 1) {
+                    return Optional.of(new FXMLObjectProperty(propName, setterName, fxmlType, values.getFirst()));
+                }
+                return Optional.of(new FXMLCollectionProperties(propName, setterName, fxmlType, values, List.of()));
+            } else {
+                if (values.size() == 1) {
+                    return Optional.of(new FXMLConstructorProperty(propName, fxmlType, values.getFirst()));
+                }
+                log.warn("Multiple values for constructor property '%s' on '%s' are not supported, skipping".formatted(propName, clazz.getName()));
+                return Optional.empty();
+            }
         }
 
         String getterName = Utils.getGetterName(propName);
+        List<AbstractFXMLValue> values = parseChildrenToValues(buildContext, child, null);
         try {
             Method getter = clazz.getMethod(getterName);
             FXMLType fxmlCollectionType = buildFXMLType(getter.getGenericReturnType(), List.of(), buildContext, buildContext.typeMapping());
@@ -967,14 +1038,16 @@ public record FXMLDocumentParser(Log log) {
     ///
     /// @param buildContext    the build context for class resolution.
     /// @param propertyElement the property element whose children are to be converted.
+    /// @param paramType       the expected parameter type for the property.
     /// @return the list of converted values.
     private List<AbstractFXMLValue> parseChildrenToValues(
             BuildContext buildContext,
-            ParsedXMLStructure propertyElement
+            ParsedXMLStructure propertyElement,
+            Type paramType
     ) {
         List<AbstractFXMLValue> values = new ArrayList<>();
         for (ParsedXMLStructure child : propertyElement.children()) {
-            values.add(parseValue(child, buildContext));
+            values.add(parseValue(child, buildContext, paramType));
         }
         return values;
     }
@@ -1223,7 +1296,7 @@ public record FXMLDocumentParser(Log log) {
     private record BuildContext(
             AtomicInteger internalCounter,
             List<String> imports,
-            List<AbstractFXMLObject> definitions,
+            List<AbstractFXMLValue> definitions,
             List<FXMLScript> scripts,
             Map<String, FXMLType> typeMapping
     ) {
