@@ -3,6 +3,7 @@ package com.github.bsels.javafx.maven.plugin.fxml.v2;
 import com.github.bsels.javafx.maven.plugin.TestHelpers;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
@@ -39,6 +40,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.assertj.core.api.InstanceOfAssertFactory;
 import org.assertj.core.api.ListAssert;
+import org.assertj.core.api.OptionalAssert;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +65,7 @@ public class FXMLDocumentParserTest {
     public static final InstanceOfAssertFactory<List, ListAssert<FXMLProperty>> PROPERTIES_ASSERT_FACTORY = InstanceOfAssertFactories.list(FXMLProperty.class);
     @SuppressWarnings("rawtypes") // The factory is generic, we can't use the type parameter here
     public static final InstanceOfAssertFactory<List, ListAssert<AbstractFXMLValue>> LIST_VALUE_ASSERT_FACTORY = InstanceOfAssertFactories.list(AbstractFXMLValue.class);
+    public static final InstanceOfAssertFactory<Optional, OptionalAssert<FXMLIdentifier>> OPTIONAL_IDENTIFIER_ASSERT_FACTORY = InstanceOfAssertFactories.optional(FXMLIdentifier.class);
 
     private String originalJavaHome;
     private FXMLReader fxmlReader;
@@ -466,17 +469,20 @@ public class FXMLDocumentParserTest {
                                     .extracting(FXMLValue.class::cast)
                                     .satisfiesExactly(
                                             first -> assertThat(first)
-                                                    .hasFieldOrPropertyWithValue("identifier", Optional.empty())
                                                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
-                                                    .hasFieldOrPropertyWithValue("value", "A"),
+                                                    .hasFieldOrPropertyWithValue("value", "A")
+                                                    .extracting(FXMLValue::identifier, OPTIONAL_IDENTIFIER_ASSERT_FACTORY)
+                                                    .containsInstanceOf(FXMLInternalIdentifier.class),
                                             second -> assertThat(second)
-                                                    .hasFieldOrPropertyWithValue("identifier", Optional.empty())
                                                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
-                                                    .hasFieldOrPropertyWithValue("value", "B"),
+                                                    .hasFieldOrPropertyWithValue("value", "B")
+                                                    .extracting(FXMLValue::identifier, OPTIONAL_IDENTIFIER_ASSERT_FACTORY)
+                                                    .containsInstanceOf(FXMLInternalIdentifier.class),
                                             third -> assertThat(third)
-                                                    .hasFieldOrPropertyWithValue("identifier", Optional.empty())
                                                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
                                                     .hasFieldOrPropertyWithValue("value", "C")
+                                                    .extracting(FXMLValue::identifier, OPTIONAL_IDENTIFIER_ASSERT_FACTORY)
+                                                    .containsInstanceOf(FXMLInternalIdentifier.class)
                                     )
                     );
         }
