@@ -19,5 +19,5 @@ package com.github.bsels.javafx.maven.plugin.fxml;
 /// various elements such as constants, objects, methods, and hierarchical relationships.
 public sealed interface FXMLNode
         permits FXMLConstantNode, FXMLIdentifiableNode, FXMLObjectNode, FXMLParentNode, FXMLStaticMethod, FXMLValueNode,
-        FXMLWrapperNode {
+                FXMLWrapperNode {
 }

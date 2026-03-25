@@ -6,7 +6,9 @@ import java.util.Objects;
 
 /// Base interface for all FXML values.
 public sealed interface AbstractFXMLValue
-        permits AbstractFXMLObject, FXMLCollection, FXMLConstant, FXMLCopy, FXMLExpression, FXMLInclude, FXMLInlineScript, FXMLLiteral, FXMLMap, FXMLMethod, FXMLObject, FXMLReference, FXMLResource, FXMLTranslation, FXMLValue {
+        permits AbstractFXMLObject, FXMLCollection, FXMLConstant, FXMLCopy, FXMLExpression, FXMLInclude,
+                FXMLInlineScript, FXMLLiteral, FXMLMap, FXMLMethod, FXMLObject, FXMLReference, FXMLResource,
+                FXMLTranslation, FXMLValue {
 
     /// Validates that the provided identifier is a valid Java identifier.
     ///

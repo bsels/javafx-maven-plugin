@@ -101,11 +101,13 @@ public final class OptimisticInMemoryCompiler {
         JavaCompiler javaCompiler = ToolProvider.getSystemJavaCompiler();
         try (
                 StandardJavaFileManager standardJavaFileManager = javaCompiler.getStandardFileManager(null, null, null);
-                InMemoryCompiledClassOutputJavaFileManager javaFileManager = new InMemoryCompiledClassOutputJavaFileManager(standardJavaFileManager)
+                InMemoryCompiledClassOutputJavaFileManager javaFileManager = new InMemoryCompiledClassOutputJavaFileManager(
+                        standardJavaFileManager)
         ) {
             boolean validCompilation = false;
             while (!sourceFiles.isEmpty() && !validCompilation) {
-                Iterable<? extends JavaFileObject> compilationUnits = standardJavaFileManager.getJavaFileObjectsFromPaths(sourceFiles);
+                Iterable<? extends JavaFileObject> compilationUnits = standardJavaFileManager.getJavaFileObjectsFromPaths(
+                        sourceFiles);
                 DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
                 JavaCompiler.CompilationTask javaCompilerTask = javaCompiler.getTask(
                         null, javaFileManager, diagnostics, options, null, compilationUnits

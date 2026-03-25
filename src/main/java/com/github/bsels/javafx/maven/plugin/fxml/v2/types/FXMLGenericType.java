@@ -25,8 +25,7 @@ public record FXMLGenericType(Class<?> type, List<FXMLType> typeArguments) imple
     /// and a variable number of type arguments.
     ///
     /// @param type          The base class type. Must not be `null`.
-    /// @param typeArguments The type arguments for the generic type. If no arguments
-    ///                      are provided, an empty list is used.
+    /// @param typeArguments The type arguments for the generic type. If no arguments are provided, an empty list is used.
     /// @throws NullPointerException if `type` is `null`.
     public FXMLGenericType(Class<?> type, FXMLType... typeArguments) {
         this(type, List.of(typeArguments));

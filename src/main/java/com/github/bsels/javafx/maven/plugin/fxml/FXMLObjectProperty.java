@@ -19,19 +19,19 @@ import java.util.Objects;
 ///
 /// All parameters in the constructor are validated to be non-null.
 ///
-/// @param name the name of the property; must not be null
+/// @param name   the name of the property; must not be null
 /// @param setter the getter method name associated with the property; must not be null
-/// @param type the type of the property; must not be null
-/// @param value the value of the property; must not be null
+/// @param type   the type of the property; must not be null
+/// @param value  the value of the property; must not be null
 public record FXMLObjectProperty(String name, String setter, Type type, String value) implements FXMLProperty {
 
     /// Constructs an instance of [FXMLObjectProperty], representing an object property in an FXML-related context.
     /// Ensures that all provided values are not null.
     ///
-    /// @param name the name of the property; must not be null
+    /// @param name   the name of the property; must not be null
     /// @param setter the getter method name associated with the property; must not be null
-    /// @param type the type of the property; must not be null
-    /// @param value the value of the property; must not be null
+    /// @param type   the type of the property; must not be null
+    /// @param value  the value of the property; must not be null
     /// @throws NullPointerException if any of the parameters (name, getter, type, or value) is null
     public FXMLObjectProperty {
         Objects.requireNonNull(name, "`name` must not be null");

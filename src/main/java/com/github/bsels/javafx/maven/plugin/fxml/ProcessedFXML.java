@@ -11,11 +11,11 @@ import java.util.Set;
 /// the root node, and the associated class name.
 /// It ensures immutability and validates that all provided properties are non-null.
 ///
-/// @param imports the set of import strings required in the FXML context; must not be null
-/// @param fields the list of FXML fields in the structure; must not be null
-/// @param methods the list of FXML methods in the structure; must not be null
-/// @param root the root [FXMLNode] representing the top-level node in the hierarchy; must not be null
-/// @param className the name of the class associated with the FXML structure; must not be null
+/// @param imports        the set of import strings required in the FXML context; must not be null
+/// @param fields         the list of FXML fields in the structure; must not be null
+/// @param methods        the list of FXML methods in the structure; must not be null
+/// @param root           the root [FXMLNode] representing the top-level node in the hierarchy; must not be null
+/// @param className      the name of the class associated with the FXML structure; must not be null
 /// @param fxmlController an optional containing the controller class if present
 public record ProcessedFXML(
         Set<String> imports,
@@ -29,11 +29,11 @@ public record ProcessedFXML(
     /// Constructs an instance of the [ProcessedFXML] record, encapsulating metadata about an FXML structure.
     /// Ensures that all provided parameters are non-null and creates immutable copies of the collections.
     ///
-    /// @param imports the set of import strings required in the FXML context; must not be null
-    /// @param fields the list of FXML fields in the structure; must not be null
-    /// @param methods the list of FXML methods in the structure; must not be null
-    /// @param root the root [FXMLNode] representing the top-level node in the hierarchy; must not be null
-    /// @param className the name of the class associated with the FXML structure; must not be null
+    /// @param imports        the set of import strings required in the FXML context; must not be null
+    /// @param fields         the list of FXML fields in the structure; must not be null
+    /// @param methods        the list of FXML methods in the structure; must not be null
+    /// @param root           the root [FXMLNode] representing the top-level node in the hierarchy; must not be null
+    /// @param className      the name of the class associated with the FXML structure; must not be null
     /// @param fxmlController an optional containing the controller class if present
     /// @throws NullPointerException if any of the parameters is null
     public ProcessedFXML {

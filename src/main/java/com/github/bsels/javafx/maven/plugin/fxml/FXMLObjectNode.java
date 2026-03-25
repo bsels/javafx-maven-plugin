@@ -11,12 +11,12 @@ import java.util.Objects;
 ///
 /// This class is immutable and ensures the integrity of its data by creating defensive copies of properties and child lists.
 ///
-/// @param internal a boolean indicating whether this node is internal
+/// @param internal   a boolean indicating whether this node is internal
 /// @param identifier the unique identifier for the object node; must not be null
-/// @param clazz the class associated with the object node; must not be null
+/// @param clazz      the class associated with the object node; must not be null
 /// @param properties the list of properties for the object node; must not be null
-/// @param children the list of child nodes for this object node; must not be null
-/// @param generics a list of generic types associated with the object node; must not be null
+/// @param children   the list of child nodes for this object node; must not be null
+/// @param generics   a list of generic types associated with the object node; must not be null
 public record FXMLObjectNode(
         boolean internal,
         String identifier,
@@ -30,12 +30,12 @@ public record FXMLObjectNode(
     /// Ensures that the provided values for identifier, clazz, properties, and children are non-null
     /// and creates immutable copies of the properties and children lists.
     ///
-    /// @param internal a boolean indicating whether this node is internal
+    /// @param internal   a boolean indicating whether this node is internal
     /// @param identifier the unique identifier for the object node; must not be null
-    /// @param clazz the class associated with the object node; must not be null
+    /// @param clazz      the class associated with the object node; must not be null
     /// @param properties the list of properties for the object node; must not be null
-    /// @param children the list of child nodes for this object node; must not be null
-    /// @param generics a list of generic types associated with the object node; must not be null
+    /// @param children   the list of child nodes for this object node; must not be null
+    /// @param generics   a list of generic types associated with the object node; must not be null
     /// @throws NullPointerException if identifier, clazz, properties, or children is null
     public FXMLObjectNode {
         Objects.requireNonNull(identifier, "`identifier` must not be null");

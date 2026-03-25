@@ -13,7 +13,7 @@ import java.util.Objects;
 /// This record enforces non-null constraints on its parameters to ensure the integrity and consistency of
 /// the FXML structure.
 ///
-/// @param name the name of the wrapper node; must not be null
+/// @param name     the name of the wrapper node; must not be null
 /// @param children the list of child nodes encapsulated by the wrapper node; must not be null
 public record FXMLWrapperNode(String name, List<FXMLNode> children) implements FXMLNode, FXMLParentNode {
 
@@ -21,7 +21,7 @@ public record FXMLWrapperNode(String name, List<FXMLNode> children) implements F
     /// containing a list of child nodes in the context of FXML processing.
     /// Ensures that the provided name and children are not null.
     ///
-    /// @param name the name of the wrapper node; must not be null
+    /// @param name     the name of the wrapper node; must not be null
     /// @param children the list of child nodes encapsulated by the wrapper node; must not be null
     /// @throws NullPointerException if the name or children is null
     public FXMLWrapperNode {

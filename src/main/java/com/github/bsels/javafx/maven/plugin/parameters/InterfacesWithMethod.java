@@ -86,8 +86,7 @@ public class InterfacesWithMethod {
     /// Returns a string representation of the [InterfacesWithMethod] object.
     /// The string includes the interface name and the method names.
     ///
-    /// @return a string representation of the object in the format
-    /// `InterfacesWithMethod[interfaceName='...', generics=..., methodNames=...]`
+    /// @return a string representation of the object in the format `InterfacesWithMethod[interfaceName='...', generics=..., methodNames=...]`
     @Override
     public String toString() {
         return "InterfacesWithMethod[interfaceName='%s', generics=%s, methodNames=%s]".formatted(

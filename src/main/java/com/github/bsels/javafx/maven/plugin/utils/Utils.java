@@ -235,7 +235,8 @@ public final class Utils {
                 .filter(getFunctionalInterfaceFilter())
                 .toList();
         if (methods.size() != 1) {
-            throw new IllegalStateException("Expected exactly one functional interface method, found %d".formatted(methods.size()));
+            throw new IllegalStateException("Expected exactly one functional interface method, found %d".formatted(
+                    methods.size()));
         }
         return methods.getFirst();
     }
@@ -260,11 +261,11 @@ public final class Utils {
     /// @param imports  a list of strings representing imported packages or classes
     /// @param typeName the name of the type to be resolved; may be a simple name or fully qualified name
     /// @return the resolved [Class<?>] object corresponding to the typeName
-    /// @throws InternalClassNotFoundException if the type cannot be resolved or if multiple types are found
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   for a given name in wildcard imports
+    /// @throws InternalClassNotFoundException if the type cannot be resolved or if multiple types are found for a given name in wildcard imports
     public static Class<?> findType(List<String> imports, String typeName) {
         return findTypeOptional(imports, typeName)
-                .orElseThrow(() -> new InternalClassNotFoundException("Unable to find type for name: %s".formatted(typeName)));
+                .orElseThrow(() -> new InternalClassNotFoundException("Unable to find type for name: %s".formatted(
+                        typeName)));
     }
 
     /// Attempts to find a class type corresponding to the provided type name and imports list.
@@ -489,8 +490,7 @@ public final class Utils {
     /// @param paramType      the parameter type to verify against the collection's generic type
     /// @return the return type of the validated getter method
     /// @throws NoSuchMethodException if the specified getter method does not exist in the class
-    /// @throws IllegalStateException if the method's return type is not a collection,
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     or its generic type is incompatible with the given parameter type
+    /// @throws IllegalStateException if the method's return type is not a collection, or its generic type is incompatible with the given parameter type
     public static Class<?> findCollectionGetterWithAllowedReturnType(
             Class<?> clazz,
             String identifier,
@@ -532,8 +532,7 @@ public final class Utils {
     ///
     /// @param imports   a collection of fully qualified class names representing the current imports
     /// @param parameter the fully qualified class name of the parameter to be processed
-    /// @return a simplified class name if the parameter can be reduced using the import set,
-    ///                                                                                                                 otherwise the original fully qualified class name of the parameter
+    /// @return a simplified class name if the parameter can be reduced using the import set, otherwise the original fully qualified class name of the parameter
     public static String improveImportForParameter(Collection<String> imports, String parameter) {
         String simpleName = parameter.substring(parameter.lastIndexOf('.') + 1);
         if (imports.contains(parameter)) {

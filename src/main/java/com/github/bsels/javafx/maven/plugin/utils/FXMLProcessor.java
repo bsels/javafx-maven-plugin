@@ -168,7 +168,8 @@ public record FXMLProcessor(Log log) {
                         getVisibility(method.getModifiers()),
                         method.getName(),
                         method.getGenericReturnType(),
-                        List.of(method.getGenericParameterTypes())),
+                        List.of(method.getGenericParameterTypes())
+                ),
                 _ -> true
         ).toList();
         return Optional.of(new FXMLController(controllerClass.getName(), controllerClass, fields, methods));
@@ -430,7 +431,10 @@ public record FXMLProcessor(Log log) {
                     }
                     type = field.getGenericType();
                 } catch (NoSuchFieldException e) {
-                    log.error("No such field '%s' found in class '%s'".formatted(constantFieldName, classType.getName()));
+                    log.error("No such field '%s' found in class '%s'".formatted(
+                            constantFieldName,
+                            classType.getName()
+                    ));
                     throw new RuntimeException(e);
                 }
                 return new FXMLConstantNode(classType, constantFieldName, type);
@@ -470,12 +474,19 @@ public record FXMLProcessor(Log log) {
         return comments.stream()
                 .map(String::strip)
                 .gather(Gatherer.ofSequential(
-                        (Void _, String input, Gatherer.Downstream<? super Generic> downStream) -> parseGeneric(input, downStream)
+                        (Void _, String input, Gatherer.Downstream<? super Generic> downStream) -> parseGeneric(
+                                input,
+                                downStream
+                        )
                 ))
                 .sorted(Comparator.comparing(Generic::index))
                 .gather(Gatherer.ofSequential(
                         AtomicInteger::new,
-                        (AtomicInteger state, Generic input, Gatherer.Downstream<? super Generic> downStream) -> validateGenericOrder(state, input, downStream)
+                        (AtomicInteger state, Generic input, Gatherer.Downstream<? super Generic> downStream) -> validateGenericOrder(
+                                state,
+                                input,
+                                downStream
+                        )
                 ))
                 .map(generic -> generic.optimize(type -> Utils.improveImportForParameter(imports, type)))
                 .map(Generic::toString)
@@ -504,14 +515,17 @@ public record FXMLProcessor(Log log) {
             if (generics != null) {
                 data = generics.chars()
                         .filter(c -> c == '<' || c == '>')
-                        .reduce(0, (sum, c) -> {
-                            if (c == '<') {
-                                return sum + 1;
-                            } else if (sum <= 0) {
-                                throw new IllegalStateException("Invalid generic definition: %s".formatted(generics));
-                            }
-                            return sum - 1;
-                        });
+                        .reduce(
+                                0, (sum, c) -> {
+                                    if (c == '<') {
+                                        return sum + 1;
+                                    } else if (sum <= 0) {
+                                        throw new IllegalStateException("Invalid generic definition: %s".formatted(
+                                                generics));
+                                    }
+                                    return sum - 1;
+                                }
+                        );
             }
             if (data != 0) {
                 throw new IllegalStateException("Invalid generic definition: %s".formatted(generics));
@@ -632,12 +646,19 @@ public record FXMLProcessor(Log log) {
                         propertyValue
                 ));
             } catch (NoSuchMethodException _) {
-                log.debug("No getter or getter list found for property %s on %s, potentially using constructor".formatted(propertyName, clazz));
+                log.debug("No getter or getter list found for property %s on %s, potentially using constructor".formatted(
+                        propertyName,
+                        clazz
+                ));
                 return getNamedConstructorProperty(clazz, propertyName, propertyValue);
             }
         }
         if (setters.size() > 1) {
-            log.warn("Multiple %d setters for property %s on %s, skipping".formatted(setters.size(), clazz, propertyName));
+            log.warn("Multiple %d setters for property %s on %s, skipping".formatted(
+                    setters.size(),
+                    clazz,
+                    propertyName
+            ));
             return Optional.empty();
         }
         log.debug("Found getter for property %s on %s: %s".formatted(propertyName, clazz, setterName));
@@ -658,8 +679,7 @@ public record FXMLProcessor(Log log) {
     /// it resolves the property into an [FXMLStaticProperty] object.
     ///
     /// @param imports  the list of import statements used to resolve the types referenced in property definitions
-    /// @param property a map entry representing the static property, where the key is the full property name
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 (including class and property name delimited by a dot ".") and the value is the property value to set
+    /// @param property a map entry representing the static property, where the key is the full property name (including class and property name delimited by a dot ".") and the value is the property value to set
     /// @return an [Optional] containing the resolved property as an [FXMLStaticProperty] object if successful, or an empty `Optional` if no valid static getter was found or if there were multiple matching setters
     private Optional<FXMLProperty> getStaticProperty(List<String> imports, Map.Entry<String, String> property) {
         String propertyName = property.getKey();
@@ -672,10 +692,18 @@ public record FXMLProcessor(Log log) {
             return Optional.empty();
         }
         if (staticSetters.size() > 1) {
-            log.warn("Multiple %d static setters for property %s on %s, skipping".formatted(staticSetters.size(), staticClass, propertyName));
+            log.warn("Multiple %d static setters for property %s on %s, skipping".formatted(
+                    staticSetters.size(),
+                    staticClass,
+                    propertyName
+            ));
             return Optional.empty();
         }
-        log.debug("Found static getter for property %s on %s: %s".formatted(propertyName, staticClass, staticSetterName));
+        log.debug("Found static getter for property %s on %s: %s".formatted(
+                propertyName,
+                staticClass,
+                staticSetterName
+        ));
         Method staticSetter = staticSetters.getFirst();
         Type parameterType = staticSetter.getGenericParameterTypes()[1];
         addImport(imports, parameterType);
@@ -708,7 +736,11 @@ public record FXMLProcessor(Log log) {
             return Optional.empty();
         }
         if (parameterTypes.size() > 1) {
-            log.warn("Multiple %d constructors that has the property %s with different types on %s, skipping".formatted(parameterTypes.size(), clazz, propertyName));
+            log.warn("Multiple %d constructors that has the property %s with different types on %s, skipping".formatted(
+                    parameterTypes.size(),
+                    clazz,
+                    propertyName
+            ));
             return Optional.empty();
         }
         return Optional.of(new FXMLConstructorProperty(propertyName, propertyValue, parameterTypes.getFirst()));

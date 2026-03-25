@@ -14,9 +14,9 @@ import java.util.Objects;
 /// The parameter list is securely wrapped in an immutable copy,
 /// ensuring thread safety and preserving the integrity of the data.
 ///
-/// @param name the name of the method; must not be null
-/// @param parameters the list of parameter types for the method; must not be null
-/// @param returnType the return type of the method; must not be null
+/// @param name          the name of the method; must not be null
+/// @param parameters    the list of parameter types for the method; must not be null
+/// @param returnType    the return type of the method; must not be null
 /// @param namedGenerics a map of generic type names to their resolved types; can be null or empty
 public record FXMLMethod(String name, List<Type> parameters, Type returnType, Map<String, String> namedGenerics) {
 
@@ -24,9 +24,9 @@ public record FXMLMethod(String name, List<Type> parameters, Type returnType, Ma
     /// Ensures that the provided values for name, parameters, and returnType are non-null
     /// and wraps the parameter list in an immutable copy for safe usage.
     ///
-    /// @param name the name of the method; must not be null
-    /// @param parameters the list of parameter types for the method; must not be null
-    /// @param returnType the return type of the method; must not be null
+    /// @param name          the name of the method; must not be null
+    /// @param parameters    the list of parameter types for the method; must not be null
+    /// @param returnType    the return type of the method; must not be null
     /// @param namedGenerics a map of generic type names to their resolved types; can be null or empty
     /// @throws NullPointerException if any of the parameters (name, parameters, or returnType) is null
     public FXMLMethod {

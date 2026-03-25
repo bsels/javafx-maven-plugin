@@ -244,8 +244,7 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
     /// Any errors occurring during the execution (e.g., invalid configurations, I/O issues, or process failure) will result
     /// in exceptions thrown with appropriate error messages.
     ///
-    /// @throws MojoExecutionException if a configuration is invalid, required paths or parameters are missing, or
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          an I/O error occurs during the process.
+    /// @throws MojoExecutionException if a configuration is invalid, required paths or parameters are missing, or an I/O error occurs during the process.
     /// @throws MojoFailureException   if the `jlink` command execution or linking process fails with a non-zero exit code.
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
@@ -299,9 +298,7 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
     /// to the determined binary folder location. Existing files in the target directory
     /// are replaced if duplicates exist, and file attributes are preserved during the copy.
     ///
-    /// @throws MojoExecutionException if an I/O error occurs during the copying process.
-    ///                                The exception includes details about the source and
-    ///                                destination paths that caused the failure.
+    /// @throws MojoExecutionException if an I/O error occurs during the copying process. The exception includes details about the source and destination paths that caused the failure.
     private void copyAdditionalBinariesToBinaryFolder() throws MojoExecutionException {
         if (isEmpty(additionalBinaries)) {
             return;
@@ -313,7 +310,12 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
             Path outputPath = binDirectory.resolve(inputPath.getFileName());
             try {
                 getLog().info("Copying additional binary: %s to %s".formatted(inputPath.toAbsolutePath(), outputPath));
-                Files.copy(inputPath, outputPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                Files.copy(
+                        inputPath,
+                        outputPath,
+                        StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.COPY_ATTRIBUTES
+                );
             } catch (IOException e) {
                 throw new MojoExecutionException("Unable to copy `%s` to `%s`".formatted(inputPath, outputPath), e);
             }
@@ -520,8 +522,7 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
     /// is appended to the configuration. If the file does not exist, a warning is logged, and
     /// the method terminates without performing any modifications.
     ///
-    /// @throws MojoExecutionException if an error occurs while reading or writing the logging
-    ///                                                                                                                                                                                                                                                                                        configuration file.
+    /// @throws MojoExecutionException if an error occurs while reading or writing the logging configuration file.
     private void patchLoggingFormat() throws MojoExecutionException {
         if (isEmpty(loggingFormat)) {
             return;
@@ -569,8 +570,7 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
     /// is not present, the original string is returned unchanged.
     ///
     /// @param line the command-line string to be processed; must not be null
-    /// @return the modified command-line string with substituted arguments if applicable;
-    ///         otherwise, the original string
+    /// @return the modified command-line string with substituted arguments if applicable; otherwise, the original string
     private String handleCommandLineArgs(String line) {
         if (line.stripTrailing().endsWith(COMMAND_ARGS_VAR)) {
             return line.replace(COMMAND_ARGS_VAR, commandlineArgs + " " + COMMAND_ARGS_VAR);

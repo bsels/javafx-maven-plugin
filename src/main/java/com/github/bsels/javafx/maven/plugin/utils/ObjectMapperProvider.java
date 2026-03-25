@@ -52,16 +52,18 @@ public final class ObjectMapperProvider {
                         .registerModule(new Jdk8Module())
                         .registerModule(
                                 new SimpleModule()
-                                        .addSerializer(Type.class, new JsonSerializer<>() {
-                                            @Override
-                                            public void serialize(
-                                                    Type type,
-                                                    JsonGenerator jsonGenerator,
-                                                    SerializerProvider serializerProvider
-                                            ) throws IOException {
-                                                jsonGenerator.writeString(type.toString());
-                                            }
-                                        })
+                                        .addSerializer(
+                                                Type.class, new JsonSerializer<>() {
+                                                    @Override
+                                                    public void serialize(
+                                                            Type type,
+                                                            JsonGenerator jsonGenerator,
+                                                            SerializerProvider serializerProvider
+                                                    ) throws IOException {
+                                                        jsonGenerator.writeString(type.toString());
+                                                    }
+                                                }
+                                        )
                         ));
         return OBJECT_MAPPER;
     }

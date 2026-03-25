@@ -230,7 +230,8 @@ public final class FXMLSourceCodeBuilder {
         }
         resourceBundleSet = true;
         addImport("java.util.ResourceBundle");
-        constants.add("private static final ResourceBundle RESOURCE_BUNDLE = %s;".formatted(resourceBundleStaticFieldPath));
+        constants.add("private static final ResourceBundle RESOURCE_BUNDLE = %s;".formatted(
+                resourceBundleStaticFieldPath));
         return this;
     }
 
@@ -443,7 +444,10 @@ public final class FXMLSourceCodeBuilder {
             builder.append(indent("} catch (Throwable e) {\n", 2))
                     .append(indent("throw new RuntimeException(e);\n", 3))
                     .append(indent("}\n\n", 2))
-                    .append(indent("// End reflection-based method handlers, continue with the rest of the constructor body\n\n", 2));
+                    .append(indent(
+                            "// End reflection-based method handlers, continue with the rest of the constructor body\n\n",
+                            2
+                    ));
         }
         constructorBody.forEach(f -> builder.append(indent(f, 2)).append("\n"));
         if (hasControllerInitializeMethod) {
@@ -482,7 +486,11 @@ public final class FXMLSourceCodeBuilder {
     /// @param field           the [FXMLField] instance representing the FXML field to bind to the controller field
     private void bindControllerField(ControllerField controllerField, FXMLField field) {
         if (canCallControllerWithoutReflection(controllerField.visibility())) {
-            constructorBody.add("%s.%s = %s;".formatted(INTERNAL_CONTROLLER_FIELD, controllerField.name(), field.name()));
+            constructorBody.add("%s.%s = %s;".formatted(
+                    INTERNAL_CONTROLLER_FIELD,
+                    controllerField.name(),
+                    field.name()
+            ));
         } else {
             String body = """
                     try {
@@ -570,7 +578,8 @@ public final class FXMLSourceCodeBuilder {
             Map<String, FXMLConstructorProperty> constructorProperties
     ) throws IllegalStateException {
         List<Parameter> minimalConstructorParameters = Stream.of(clazz.getConstructors())
-                .filter(constructor -> Stream.of(constructor.getParameters()).allMatch(parameter -> parameter.isAnnotationPresent(NamedArg.class)))
+                .filter(constructor -> Stream.of(constructor.getParameters()).allMatch(parameter -> parameter.isAnnotationPresent(
+                        NamedArg.class)))
                 .filter(c -> Set.copyOf(constructorParameterNames(c)).containsAll(constructorProperties.keySet()))
                 .map(c -> List.of(c.getParameters()))
                 .min(Comparator.comparing(List::size))
@@ -624,9 +633,18 @@ public final class FXMLSourceCodeBuilder {
                     case FXMLConstructorProperty _ -> {
                     }
                     case FXMLObjectProperty(_, String setter, Type type, String value) ->
-                            constructorBody.add("%s.%s(%s);".formatted(identifier, setter, encodeTypeValue(type, value)));
+                            constructorBody.add("%s.%s(%s);".formatted(
+                                    identifier,
+                                    setter,
+                                    encodeTypeValue(type, value)
+                            ));
                     case FXMLStaticProperty(_, Class<?> staticClass, String staticSetter, Type type, String value) ->
-                            constructorBody.add("%s.%s(%s, %s);".formatted(staticClass.getSimpleName(), staticSetter, identifier, encodeTypeValue(type, value)));
+                            constructorBody.add("%s.%s(%s, %s);".formatted(
+                                    staticClass.getSimpleName(),
+                                    staticSetter,
+                                    identifier,
+                                    encodeTypeValue(type, value)
+                            ));
                 }
             }
         }
@@ -728,7 +746,10 @@ public final class FXMLSourceCodeBuilder {
                     .append("(");
             handlerParameterSequence(builder, method).append(");\n");
         } else {
-            log.debug("Calling non-public method %s on %s using reflection".formatted(method.name(), controller.className()));
+            log.debug("Calling non-public method %s on %s using reflection".formatted(
+                    method.name(),
+                    controller.className()
+            ));
             String reflectionMethodName = getNewReflectionMethodName();
 
             fields.add("private final java.lang.reflect.Method %s;".formatted(reflectionMethodName));
@@ -994,13 +1015,22 @@ public final class FXMLSourceCodeBuilder {
             String setterForName = Utils.getSetterName(identifier);
             Optional<Method> method = Utils.findMethod(clazz, setterForName, paramType);
             if (method.isPresent()) {
-                constructorBody.add("%s.%s(%s);".formatted(objectIdentifier, setterForName, TypeEncoder.getIdentifier(children.getFirst())));
+                constructorBody.add("%s.%s(%s);".formatted(
+                        objectIdentifier,
+                        setterForName,
+                        TypeEncoder.getIdentifier(children.getFirst())
+                ));
                 return;
             }
         }
         try {
             String listGetterName = Utils.getGetterName(identifier);
-            Class<?> returnType = Utils.findCollectionGetterWithAllowedReturnType(clazz, identifier, listGetterName, paramType);
+            Class<?> returnType = Utils.findCollectionGetterWithAllowedReturnType(
+                    clazz,
+                    identifier,
+                    listGetterName,
+                    paramType
+            );
             if (ObservableList.class.isAssignableFrom(returnType)) {
                 constructorBody.add(
                         handleSequenceOfArguments(
@@ -1017,7 +1047,11 @@ public final class FXMLSourceCodeBuilder {
                 );
             } else {
                 for (FXMLNode child : children) {
-                    constructorBody.add("%s.%s().add(%s);".formatted(objectIdentifier, listGetterName, TypeEncoder.getIdentifier(child)));
+                    constructorBody.add("%s.%s().add(%s);".formatted(
+                            objectIdentifier,
+                            listGetterName,
+                            TypeEncoder.getIdentifier(child)
+                    ));
                 }
             }
         } catch (IllegalStateException | NoSuchMethodException e) {

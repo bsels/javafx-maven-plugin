@@ -1,12 +1,12 @@
 package com.github.bsels.javafx.maven.plugin.utils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLConstantNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLObjectNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLStaticMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLValueNode;
 import com.github.bsels.javafx.maven.plugin.fxml.FXMLWrapperNode;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -108,8 +108,7 @@ public final class TypeEncoder {
     /// Converts a given [Type] object to its corresponding string representation.
     ///
     /// @param type the [Type] object to be converted; must be an instance of [Class] or [TypeVariable]
-    /// @return a string representation of the input type; the simple name if the type is a [Class],
-    /// or the name if the type is a [TypeVariable]
+    /// @return a string representation of the input type; the simple name if the type is a [Class], or the name if the type is a [TypeVariable]
     /// @throws IllegalArgumentException if the provided type is unsupported
     public static String typeToTypeString(Type type) {
         return typeToTypeString(type, Map.of());
@@ -121,9 +120,7 @@ public final class TypeEncoder {
     ///
     /// @param type          the Type object to be converted; it may represent a class, a type variable, or a parameterized type
     /// @param namedGenerics a map containing named generics for type variables, where the key is the name of the type variable, and the value is its replacement string
-    /// @return a string representation of the type, where classes are represented by their simple names,
-    /// type variables by their names or mapped strings, and parameterized types by combining the raw type and their
-    /// type arguments
+    /// @return a string representation of the type, where classes are represented by their simple names, type variables by their names or mapped strings, and parameterized types by combining the raw type and their type arguments
     /// @throws IllegalArgumentException if the provided type is unsupported
     public static String typeToTypeString(Type type, Map<String, String> namedGenerics) {
         return switch (type) {
@@ -205,8 +202,7 @@ public final class TypeEncoder {
     /// Retrieves the identifier string associated with the given FXML node.
     ///
     /// @param fxmlNode the FXML node whose identifier is to be fetched
-    /// @return the identifier string if the node type has an identifier,
-    /// or a qualified identifier if the node is an [FXMLConstantNode]
+    /// @return the identifier string if the node type has an identifier, or a qualified identifier if the node is an [FXMLConstantNode]
     /// @throws IllegalStateException if the provided FXML node is an [FXMLWrapperNode]
     public static String getIdentifier(FXMLNode fxmlNode) {
         return switch (fxmlNode) {

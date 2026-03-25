@@ -114,14 +114,18 @@ public final class FXMLDocumentParser {
     /// - `fx:reference`: Maps to the `FXMLDocumentParser::parseFXReference` handler.
     /// - `fx:root`: Maps to the `FXMLDocumentParser::parseFXRoot` handler.
     /// - `fx:script`: Maps to the `FXMLDocumentParser::parseFXScript` handler.
-    private static final Map<String, SpecialFXElementHandler> SPECIAL_FX_ELEMENTS = Map.of(
-            FXMLConstants.FX_COPY_ELEMENT, FXMLDocumentParser::parseFXCopy,
-            FXMLConstants.FX_DEFINE_ELEMENT, FXMLDocumentParser::parseFXDefine,
-            FXMLConstants.FX_INCLUDE_ELEMENT, FXMLDocumentParser::parseFXInclude,
-            FXMLConstants.FX_REFERENCE_ELEMENT, FXMLDocumentParser::parseFXReference,
-            FXMLConstants.FX_ROOT_ELEMENT, FXMLDocumentParser::parseFXRoot,
-            FXMLConstants.FX_SCRIPT_ELEMENT, FXMLDocumentParser::parseFXScript
-    );
+    private static final Map<String, SpecialFXElementHandler> SPECIAL_FX_ELEMENTS_HANDLERS;
+
+    static {
+        SPECIAL_FX_ELEMENTS_HANDLERS = Map.ofEntries(
+                Map.entry(FXMLConstants.FX_COPY_ELEMENT, FXMLDocumentParser::parseFXCopy),
+                Map.entry(FXMLConstants.FX_DEFINE_ELEMENT, FXMLDocumentParser::parseFXDefine),
+                Map.entry(FXMLConstants.FX_INCLUDE_ELEMENT, FXMLDocumentParser::parseFXInclude),
+                Map.entry(FXMLConstants.FX_REFERENCE_ELEMENT, FXMLDocumentParser::parseFXReference),
+                Map.entry(FXMLConstants.FX_ROOT_ELEMENT, FXMLDocumentParser::parseFXRoot),
+                Map.entry(FXMLConstants.FX_SCRIPT_ELEMENT, FXMLDocumentParser::parseFXScript)
+        );
+    }
 
     /// Provides a logger instance for recording runtime information, debugging, and error messages.
     ///
@@ -202,7 +206,7 @@ public final class FXMLDocumentParser {
     private Optional<AbstractFXMLValue> parseElement(ParsedXMLStructure structure, BuildContext buildContext, boolean isRoot)
             throws IllegalStateException {
         String nodeName = structure.name();
-        if (SPECIAL_FX_ELEMENTS.containsKey(nodeName)) {
+        if (SPECIAL_FX_ELEMENTS_HANDLERS.containsKey(nodeName)) {
             return parseSpecialFXElements(structure, buildContext, isRoot);
         }
         ClassAndIdentifier classAndIdentifier = resolveClassAndIdentifier(structure, buildContext, isRoot);
@@ -240,7 +244,7 @@ public final class FXMLDocumentParser {
 
     /// Parses the given special FX element and returns its corresponding abstract FXML value.
     ///
-    /// The logic looks up the handler for the element's name in the [#SPECIAL_FX_ELEMENTS] map
+    /// The logic looks up the handler for the element's name in the [#SPECIAL_FX_ELEMENTS_HANDLERS] map
     /// and applies it to the current structure and build context.
     ///
     /// @param structure    The parsed XML structure representing the special FX element to be processed.
@@ -257,7 +261,7 @@ public final class FXMLDocumentParser {
         if (FXMLConstants.FX_ROOT_ELEMENT.equals(name) && !isRoot) {
             throw new IllegalStateException("%s must be the root element of the FXML document".formatted(name));
         }
-        return SPECIAL_FX_ELEMENTS.get(name)
+        return SPECIAL_FX_ELEMENTS_HANDLERS.get(name)
                 .handle(this, structure, buildContext)
                 .map(Function.identity());
     }
@@ -405,7 +409,9 @@ public final class FXMLDocumentParser {
             if (!hasSkippablePrefix(childName)) {
                 List<ParsedXMLStructure> grandChildren = child.children();
                 if (grandChildren.size() != 1) {
-                    throw new IllegalArgumentException("Map entry element `%s` must have exactly one child element representing the value".formatted(childName));
+                    throw new IllegalArgumentException(
+                            "Map entry element `%s` must have exactly one child element representing the value".formatted(
+                                    childName));
                 }
                 entries.put(childName, parseValue(grandChildren.getFirst(), buildContext));
             }
@@ -489,7 +495,12 @@ public final class FXMLDocumentParser {
                     if (!handled) {
                         try {
                             Utils.findGetterMapAndReturnValueType(clazz, getterName);
-                            parseInstancePropertyElement(buildContext, clazz, childName, child).ifPresent(properties::add);
+                            parseInstancePropertyElement(
+                                    buildContext,
+                                    clazz,
+                                    childName,
+                                    child
+                            ).ifPresent(properties::add);
                             handled = true;
                         } catch (NoSuchMethodException _) {
                             // not a map getter
@@ -504,12 +515,25 @@ public final class FXMLDocumentParser {
                             try {
                                 Method getter = clazz.getMethod(defaultGetterName);
                                 Utils.findGetterListAndReturnElementType(clazz, defaultGetterName);
-                                addValueToMultipleProperty(buildContext, properties, defaultPropName.get(), defaultGetterName, getter.getGenericReturnType(), childValue);
+                                addValueToMultipleProperty(
+                                        buildContext,
+                                        properties,
+                                        defaultPropName.get(),
+                                        defaultGetterName,
+                                        getter.getGenericReturnType(),
+                                        childValue
+                                );
                             } catch (NoSuchMethodException _) {
-                                log.debug("No default list property found on %s for child %s, skipping".formatted(clazz.getSimpleName(), childName));
+                                log.debug("No default list property found on %s for child %s, skipping".formatted(
+                                        clazz.getSimpleName(),
+                                        childName
+                                ));
                             }
                         } else {
-                            log.debug("No setter, getter, or default property found on %s for child %s, skipping".formatted(clazz.getSimpleName(), childName));
+                            log.debug("No setter, getter, or default property found on %s for child %s, skipping".formatted(
+                                    clazz.getSimpleName(),
+                                    childName
+                            ));
                         }
                     }
                 }
@@ -576,7 +600,10 @@ public final class FXMLDocumentParser {
                 .filter(method -> method.getParameterCount() == 0)
                 .map(Method::getGenericReturnType)
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("No static factory method '%s' found on '%s'".formatted(factoryMethodName, clazz.getName())));
+                .orElseThrow(() -> new IllegalArgumentException("No static factory method '%s' found on '%s'".formatted(
+                        factoryMethodName,
+                        clazz.getName()
+                )));
     }
 
     /// Resolves the default property name for a class using the [DefaultProperty] annotation.
@@ -919,7 +946,10 @@ public final class FXMLDocumentParser {
         Map<String, String> attributes = structure.properties();
         if (attributes.containsKey(FXMLConstants.SOURCE_ATTRIBUTE)) {
             String source = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
-            String charsetName = attributes.getOrDefault(FXMLConstants.CHARSET_ATTRIBUTE, StandardCharsets.UTF_8.name());
+            String charsetName = attributes.getOrDefault(
+                    FXMLConstants.CHARSET_ATTRIBUTE,
+                    StandardCharsets.UTF_8.name()
+            );
             Charset charset = Charset.forName(charsetName);
             return new FXMLFileScript(source, charset);
         }
@@ -1009,7 +1039,10 @@ public final class FXMLDocumentParser {
         try {
             staticClass = Utils.findType(buildContext.imports(), className);
         } catch (Exception e) {
-            log.warn("Could not resolve static property class '%s', skipping attribute '%s'".formatted(className, attributeName));
+            log.warn("Could not resolve static property class '%s', skipping attribute '%s'".formatted(
+                    className,
+                    attributeName
+            ));
             return Optional.empty();
         }
         String setterName = Utils.getSetterName(propName);
@@ -1019,7 +1052,10 @@ public final class FXMLDocumentParser {
             return Optional.empty();
         }
         if (setters.size() > 1) {
-            log.warn("Multiple static setters '%s' found on '%s', skipping".formatted(setterName, staticClass.getName()));
+            log.warn("Multiple static setters '%s' found on '%s', skipping".formatted(
+                    setterName,
+                    staticClass.getName()
+            ));
             return Optional.empty();
         }
         Method setter = setters.getFirst();
@@ -1064,7 +1100,10 @@ public final class FXMLDocumentParser {
         List<Type> constructorParamTypes = Utils.findParameterTypeForConstructors(clazz, attributeName);
         if (!constructorParamTypes.isEmpty()) {
             if (constructorParamTypes.size() > 1) {
-                log.warn("Multiple constructor parameters found for '%s' on '%s', skipping".formatted(attributeName, clazz.getName()));
+                log.warn("Multiple constructor parameters found for '%s' on '%s', skipping".formatted(
+                        attributeName,
+                        clazz.getName()
+                ));
                 return Optional.empty();
             }
             Type paramType = constructorParamTypes.getFirst();
@@ -1076,18 +1115,42 @@ public final class FXMLDocumentParser {
         try {
             Method getter = clazz.getMethod(getterName);
             AbstractFXMLValue fxmlValue = parseValueString(value);
-            FXMLType fxmlCollectionType = buildFXMLType(getter.getGenericReturnType(), List.of(), buildContext, buildContext.typeMapping());
-            return Optional.of(new FXMLCollectionProperties(attributeName, getterName, fxmlCollectionType, List.of(fxmlValue), List.of()));
+            FXMLType fxmlCollectionType = buildFXMLType(
+                    getter.getGenericReturnType(),
+                    List.of(),
+                    buildContext,
+                    buildContext.typeMapping()
+            );
+            return Optional.of(new FXMLCollectionProperties(
+                    attributeName,
+                    getterName,
+                    fxmlCollectionType,
+                    List.of(fxmlValue),
+                    List.of()
+            ));
         } catch (NoSuchMethodException _) {
             // not a collection getter, try map getter
         }
         try {
             Method getter = clazz.getMethod(getterName);
             AbstractFXMLValue fxmlValue = parseValueString(value);
-            FXMLType fxmlMapType = buildFXMLType(getter.getGenericReturnType(), List.of(), buildContext, buildContext.typeMapping());
-            return Optional.of(new FXMLMapProperty(attributeName, getterName, fxmlMapType, Map.of(attributeName, fxmlValue)));
+            FXMLType fxmlMapType = buildFXMLType(
+                    getter.getGenericReturnType(),
+                    List.of(),
+                    buildContext,
+                    buildContext.typeMapping()
+            );
+            return Optional.of(new FXMLMapProperty(
+                    attributeName,
+                    getterName,
+                    fxmlMapType,
+                    Map.of(attributeName, fxmlValue)
+            ));
         } catch (NoSuchMethodException _) {
-            log.debug("No getter, list getter, or map getter found for '%s' on '%s', skipping".formatted(attributeName, clazz.getName()));
+            log.debug("No getter, list getter, or map getter found for '%s' on '%s', skipping".formatted(
+                    attributeName,
+                    clazz.getName()
+            ));
             return Optional.empty();
         }
     }
@@ -1128,7 +1191,10 @@ public final class FXMLDocumentParser {
         if (values.size() == 1) {
             return Optional.of(new FXMLStaticObjectProperty(propName, clazz, setterName, fxmlType, values.getFirst()));
         }
-        log.warn("Multiple values for static property '%s' on '%s' are not supported, skipping".formatted(propName, clazz.getName()));
+        log.warn("Multiple values for static property '%s' on '%s' are not supported, skipping".formatted(
+                propName,
+                clazz.getName()
+        ));
         return Optional.empty();
     }
 
@@ -1163,7 +1229,10 @@ public final class FXMLDocumentParser {
             paramType = setters.getFirst().getGenericParameterTypes()[0];
         } else if (!constructorParamTypes.isEmpty()) {
             if (constructorParamTypes.size() > 1) {
-                log.warn("Multiple constructor parameters found for '%s' on '%s', skipping".formatted(propName, clazz.getName()));
+                log.warn("Multiple constructor parameters found for '%s' on '%s', skipping".formatted(
+                        propName,
+                        clazz.getName()
+                ));
                 return Optional.empty();
             }
             paramType = constructorParamTypes.getFirst();
@@ -1184,7 +1253,10 @@ public final class FXMLDocumentParser {
                 if (values.size() == 1) {
                     return Optional.of(new FXMLConstructorProperty(propName, fxmlType, values.getFirst()));
                 }
-                log.warn("Multiple values for constructor property '%s' on '%s' are not supported, skipping".formatted(propName, clazz.getName()));
+                log.warn("Multiple values for constructor property '%s' on '%s' are not supported, skipping".formatted(
+                        propName,
+                        clazz.getName()
+                ));
                 return Optional.empty();
             }
         }
@@ -1193,18 +1265,37 @@ public final class FXMLDocumentParser {
         List<AbstractFXMLValue> values = parseChildrenToValues(buildContext, child, null);
         try {
             Method getter = clazz.getMethod(getterName);
-            FXMLType fxmlCollectionType = buildFXMLType(getter.getGenericReturnType(), List.of(), buildContext, buildContext.typeMapping());
-            return Optional.of(new FXMLCollectionProperties(propName, getterName, fxmlCollectionType, values, List.of()));
+            FXMLType fxmlCollectionType = buildFXMLType(
+                    getter.getGenericReturnType(),
+                    List.of(),
+                    buildContext,
+                    buildContext.typeMapping()
+            );
+            return Optional.of(new FXMLCollectionProperties(
+                    propName,
+                    getterName,
+                    fxmlCollectionType,
+                    values,
+                    List.of()
+            ));
         } catch (NoSuchMethodException _) {
             // not a collection getter, try map getter
         }
         try {
             Method getter = clazz.getMethod(getterName);
             Map<String, AbstractFXMLValue> entries = parseChildrenToMapEntries(buildContext, child);
-            FXMLType fxmlMapType = buildFXMLType(getter.getGenericReturnType(), List.of(), buildContext, buildContext.typeMapping());
+            FXMLType fxmlMapType = buildFXMLType(
+                    getter.getGenericReturnType(),
+                    List.of(),
+                    buildContext,
+                    buildContext.typeMapping()
+            );
             return Optional.of(new FXMLMapProperty(propName, getterName, fxmlMapType, entries));
         } catch (NoSuchMethodException _) {
-            log.debug("No getter, list getter, or map getter found for property element '%s' on '%s', skipping".formatted(propName, clazz.getName()));
+            log.debug("No getter, list getter, or map getter found for property element '%s' on '%s', skipping".formatted(
+                    propName,
+                    clazz.getName()
+            ));
             return Optional.empty();
         }
     }
@@ -1373,11 +1464,19 @@ public final class FXMLDocumentParser {
         try {
             Field field = clazz.getField(constantName);
             if (!Modifier.isStatic(field.getModifiers())) {
-                throw new IllegalArgumentException("Field `%s` on `%s` is not static".formatted(constantName, clazz.getName()));
+                throw new IllegalArgumentException("Field `%s` on `%s` is not static".formatted(
+                        constantName,
+                        clazz.getName()
+                ));
             }
             return field.getGenericType();
         } catch (NoSuchFieldException e) {
-            throw new IllegalArgumentException("No such constant field `%s` on `%s`".formatted(constantName, clazz.getName()), e);
+            throw new IllegalArgumentException(
+                    "No such constant field `%s` on `%s`".formatted(
+                            constantName,
+                            clazz.getName()
+                    ), e
+            );
         }
     }
 
@@ -1439,13 +1538,21 @@ public final class FXMLDocumentParser {
             Type collectionType,
             AbstractFXMLValue value
     ) {
-        FXMLType fxmlCollectionType = buildFXMLType(collectionType, List.of(), buildContext, buildContext.typeMapping());
+        FXMLType fxmlCollectionType = buildFXMLType(
+                collectionType,
+                List.of(),
+                buildContext,
+                buildContext.typeMapping()
+        );
         for (int i = 0; i < properties.size(); i++) {
             FXMLProperty existing = properties.get(i);
             if (existing instanceof FXMLCollectionProperties mp && mp.name().equals(propName)) {
                 List<AbstractFXMLValue> newValues = new ArrayList<>(mp.value());
                 newValues.add(value);
-                properties.set(i, new FXMLCollectionProperties(propName, getterName, fxmlCollectionType, newValues, List.of()));
+                properties.set(
+                        i,
+                        new FXMLCollectionProperties(propName, getterName, fxmlCollectionType, newValues, List.of())
+                );
                 return;
             }
         }
@@ -1611,8 +1718,6 @@ public final class FXMLDocumentParser {
             Objects.requireNonNull(factoryMethod, "`factoryMethod` must not be null");
         }
     }
-
-
 
 
 }

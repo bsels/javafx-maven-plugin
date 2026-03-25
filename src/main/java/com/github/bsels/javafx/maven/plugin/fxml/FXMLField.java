@@ -10,16 +10,16 @@ import java.util.Objects;
 /// It is primarily used to store metadata about a field in the context
 /// of JavaFX FXML processing and can be associated with FXML-related constructs.
 ///
-/// @param clazz the class metadata associated with the field; must not be null
-/// @param name the name of the field; must not be null
+/// @param clazz    the class metadata associated with the field; must not be null
+/// @param name     the name of the field; must not be null
 /// @param internal a boolean indicating whether the field is internal
 /// @param generics a list of generic types associated with the field; must not be null
 public record FXMLField(Class<?> clazz, String name, boolean internal, List<String> generics) {
 
     /// Constructs an immutable [FXMLField] record object, ensuring the provided values are not null.
     ///
-    /// @param clazz the class metadata associated with the field; must not be null
-    /// @param name the name of the field; must not be null
+    /// @param clazz    the class metadata associated with the field; must not be null
+    /// @param name     the name of the field; must not be null
     /// @param internal a boolean indicating whether the field is internal
     /// @param generics a list of generic types associated with the field; must not be null
     /// @throws NullPointerException if `clazz` or `name` is null

@@ -23,8 +23,7 @@ public final class FXMLWildcardType implements FXMLType {
     /// Indicates whether some other object is "equal to" this one.
     ///
     /// @param obj The reference object with which to compare.
-    /// @return `true` if this object is the same as the obj argument or if the obj
-    /// argument is also an instance of [FXMLWildcardType].
+    /// @return `true` if this object is the same as the obj argument or if the obj argument is also an instance of [FXMLWildcardType].
     @Override
     public boolean equals(Object obj) {
         return obj instanceof FXMLWildcardType;

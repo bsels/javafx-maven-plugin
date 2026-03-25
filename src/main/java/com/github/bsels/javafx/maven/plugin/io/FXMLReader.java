@@ -146,7 +146,8 @@ public record FXMLReader(Log log) {
                 .map(length -> IntStream.range(0, length)
                         .mapToObj(attributes::item)
                         .filter(Predicate.not(
-                                attribute -> "xmlns".equals(attribute.getNodeName()) || attribute.getNodeName().startsWith("xmlns:")
+                                attribute -> "xmlns".equals(attribute.getNodeName()) || attribute.getNodeName().startsWith(
+                                        "xmlns:")
                         ))
                         .collect(Collectors.toMap(Node::getNodeName, Node::getNodeValue)))
                 .orElseGet(Map::of);
