@@ -77,8 +77,15 @@ import java.util.stream.Stream;
 /// This parser handles all standard FXML constructs including object instantiation,
 /// property attributes, static properties, `fx:root`, `fx:id`, `fx:constant`,
 /// `fx:value`, `fx:include`, `fx:copy`, `fx:reference`, `fx:script`, and inline scripts.
+///
+/// The parsing process follows these main steps:
+/// 1. Initializes a [BuildContext] with imports from the [ParsedFXML].
+/// 2. Identifies the controller class if specified via the `fx:controller` attribute.
+/// 3. Parses the root XML structure recursively into a hierarchy of [AbstractFXMLValue] objects.
+/// 4. Collects and organizes all identified definitions, scripts, and type mappings into the final [FXMLDocument].
 public final class FXMLDocumentParser {
     /// A regular expression pattern used to match and parse nested generic type definitions.
+    ///
     /// This pattern identifies sequences of generic type declarations that may be nested
     /// and separated by commas. It considers fully qualified names, optional generic type
     /// parameters enclosed in angle brackets, and allows for whitespace around elements.
@@ -88,34 +95,43 @@ public final class FXMLDocumentParser {
     /// - Fully qualified class names with optional generics, e.g., `java.util.Map<String, Integer>`.
     /// - Multiple generic type declarations separated by commas, e.g., `Map<String, Integer>, List<String>`.
     /// - Arbitrary whitespace around the types and delimiters.
+    ///
+    /// It uses named groups `first` for the preceding types, `rawType` for the current class name,
+    /// and `generics` for its type arguments.
     private static final Pattern NESTED_GENERICS = Pattern.compile(
             "^\\s*((?<first>((((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*),\\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?)$"
     );
     /// A map containing special FX elements and their respective handlers used for processing predefined FX tags in
     /// an FXML file.
-    /// The keys represent the names of FX elements (e.g., fx:reference, fx:copy, fx:include),
+    ///
+    /// The keys represent the names of FX elements (e.g., `fx:reference`, `fx:copy`, `fx:include`),
     /// and the values are [BiFunction] handlers that define the logic for resolving or creating instances of those
     /// elements during the FXML parsing and building process.
     ///
     /// This map associates each special FX element name with a [BiFunction] that takes a [ParsedXMLStructure]
-    /// representing the parsed FXML tag and a BuildContext providing the context for the current building process.
+    /// representing the parsed FXML tag and a [BuildContext] providing the context for the current building process.
     /// The [BiFunction] returns an [AbstractFXMLValue],
     /// which represents the resolved or created value for the FX element.
     ///
-    /// The map is immutable and predefined with keys for FX elements such as
-    /// - [FXMLConstants#FX_REFERENCE_ELEMENT] (fx:reference)
-    /// - [FXMLConstants#FX_COPY_ELEMENT] (fx:copy)
-    /// - [FXMLConstants#FX_INCLUDE_ELEMENT] (fx:include)
+    /// The map is immutable and predefined with keys for FX elements such as:
+    /// - [FXMLConstants#FX_REFERENCE_ELEMENT] (`fx:reference`)
+    /// - [FXMLConstants#FX_COPY_ELEMENT] (`fx:copy`)
+    /// - [FXMLConstants#FX_INCLUDE_ELEMENT] (`fx:include`)
     private final Map<String, BiFunction<ParsedXMLStructure, BuildContext, ? extends AbstractFXMLValue>> specialFxElements = Map.of(
             FXMLConstants.FX_REFERENCE_ELEMENT, this::parseFXReference,
             FXMLConstants.FX_COPY_ELEMENT, this::parseFXCopy,
             FXMLConstants.FX_INCLUDE_ELEMENT, this::parseFXInclude
     );
     /// Provides a logger instance for recording runtime information, debugging, and error messages.
-    /// This logger is immutable and initialized once, ensuring consistent logging throughout the application.
+    ///
+    /// This logger is immutable and initialized once via the constructor, ensuring consistent logging
+    /// throughout the application. It is used to report warnings for unresolvable types or properties
+    /// and to provide debug information during the parsing process.
     private final Log log;
 
     /// Compact constructor to validate the log dependency.
+    ///
+    /// It ensures that the required [Log] instance is not `null` before assignment.
     ///
     /// @param log The logging instance used for diagnostic output.
     /// @throws NullPointerException if `log` is `null`.
@@ -125,9 +141,18 @@ public final class FXMLDocumentParser {
 
     /// Parses the provided [ParsedFXML] instance and constructs an [FXMLDocument].
     ///
+    /// The logic follows these steps:
+    /// 1. Ensures `parsedFXML` is not `null`.
+    /// 2. Creates a root [BuildContext] using the imports from the FXML file.
+    /// 3. Resolves the controller class if the `fx:controller` attribute is present on the root element.
+    /// 4. Recursively parses the root element using [#parseElement(ParsedXMLStructure, BuildContext, boolean)].
+    /// 5. Verifies that the resulting root value is an instance of [AbstractFXMLObject].
+    /// 6. Returns a new [FXMLDocument] containing all gathered information.
+    ///
     /// @param parsedFXML The [ParsedFXML] object to be parsed.
     /// @return An [FXMLDocument] that represents the parsed structure of the given [ParsedFXML].
     /// @throws NullPointerException if `parsedFXML` is `null`.
+    /// @throws IllegalStateException if the root element does not parse to an [AbstractFXMLObject].
     public FXMLDocument parse(ParsedFXML parsedFXML) {
         Objects.requireNonNull(parsedFXML, "`parsedFXML` must not be null");
         ParsedXMLStructure rootStructure = parsedFXML.root();
@@ -155,13 +180,22 @@ public final class FXMLDocumentParser {
         );
     }
 
-    /// Parses an XML structure into an FXML object.
+    /// Parses an XML structure into an FXML value.
+    ///
+    /// The logic involves:
+    /// 1. Checking if the node name corresponds to a special FX element (like `fx:include`).
+    /// 2. Resolving the Java class and FXML identifier for the element.
+    /// 3. Identifying any factory method specified by `fx:factory`.
+    /// 4. Determining the actual type, considering the factory method's return type.
+    /// 5. Resolving type mappings for generics based on the class hierarchy.
+    /// 6. Extracting generic type information from XML comments.
+    /// 7. Selecting the appropriate parsing strategy based on whether the class is a [Collection], [Map], or a single object.
     ///
     /// @param structure    The parsed XML structure.
     /// @param buildContext The context used during the building process.
     /// @param isRoot       Whether the object is the root of the FXML document.
-    /// @return An [AbstractFXMLObject] representing the parsed XML structure.
-    /// @throws IllegalStateException if the parsing fails.
+    /// @return An [AbstractFXMLValue] representing the parsed XML structure.
+    /// @throws IllegalStateException if the parsing fails or if nested generics cannot be parsed.
     private AbstractFXMLValue parseElement(ParsedXMLStructure structure, BuildContext buildContext, boolean isRoot)
             throws IllegalStateException {
         String nodeName = structure.name();
@@ -203,14 +237,28 @@ public final class FXMLDocumentParser {
 
     /// Parses the given special FX element and returns its corresponding abstract FXML value.
     ///
-    /// @param structure    the parsed XML structure representing the special FX element to be processed
-    /// @param buildContext the context in which the build is occurring, providing necessary utilities and state
-    /// @return the abstract FXML value resulting from processing the special FX element
+    /// The logic looks up the handler for the element's name in the [specialFxElements] map
+    /// and applies it to the current structure and build context.
+    ///
+    /// @param structure    The parsed XML structure representing the special FX element to be processed.
+    /// @param buildContext The context in which the build is occurring, providing necessary utilities and state.
+    /// @return The abstract FXML value resulting from processing the special FX element.
     private AbstractFXMLValue parseSpecialFXElements(ParsedXMLStructure structure, BuildContext buildContext) {
         return specialFxElements.get(structure.name())
                 .apply(structure, buildContext);
     }
 
+    /// Parses an `fx:copy` element into an [FXMLCopy] value.
+    ///
+    /// The logic:
+    /// 1. Extracts the `source` attribute, ensuring it is present.
+    /// 2. Resolves an optional FXML identifier (`fx:id`); if absent, generates a new internal identifier.
+    /// 3. Returns a new [FXMLCopy] instance.
+    ///
+    /// @param structure    The parsed XML structure representing the `fx:copy` element.
+    /// @param buildContext The context used during the building process.
+    /// @return An [FXMLCopy] representing the parsed element.
+    /// @throws IllegalArgumentException if the `source` attribute is missing.
     private AbstractFXMLValue parseFXCopy(ParsedXMLStructure structure, BuildContext buildContext) {
         Map<String, String> properties = structure.properties();
         String source = properties.get(FXMLConstants.SOURCE_ATTRIBUTE);
@@ -222,6 +270,17 @@ public final class FXMLDocumentParser {
         return new FXMLCopy(copyId, source);
     }
 
+    /// Parses an `fx:include` element into an [FXMLInclude] value.
+    ///
+    /// The logic:
+    /// 1. Extracts the `source` attribute, ensuring it is present.
+    /// 2. Resolves an optional FXML identifier (`fx:id`); if absent, generates a new internal identifier.
+    /// 3. Returns a new [FXMLInclude] instance.
+    ///
+    /// @param structure    The parsed XML structure representing the `fx:include` element.
+    /// @param buildContext The context used during the building process.
+    /// @return An [FXMLInclude] representing the parsed element.
+    /// @throws IllegalArgumentException if the `source` attribute is missing.
     private AbstractFXMLValue parseFXInclude(ParsedXMLStructure structure, BuildContext buildContext) {
         Map<String, String> properties = structure.properties();
         String source = properties.get(FXMLConstants.SOURCE_ATTRIBUTE);
@@ -233,6 +292,14 @@ public final class FXMLDocumentParser {
         return new FXMLInclude(includeId, source);
     }
 
+    /// Parses an `fx:reference` element into an [FXMLReference] value.
+    ///
+    /// The logic extracts the `source` attribute and returns a new [FXMLReference] instance.
+    ///
+    /// @param structure    The parsed XML structure representing the `fx:reference` element.
+    /// @param ignored      The build context (ignored for this element).
+    /// @return An [FXMLReference] representing the parsed element.
+    /// @throws IllegalArgumentException if the `source` attribute is missing.
     private AbstractFXMLValue parseFXReference(ParsedXMLStructure structure, BuildContext ignored) {
         String source = structure.properties()
                 .get(FXMLConstants.SOURCE_ATTRIBUTE);
@@ -243,6 +310,11 @@ public final class FXMLDocumentParser {
     }
 
     /// Finds the return type of the static factory method.
+    ///
+    /// The logic searches for a static method on the given class that:
+    /// - Matches the provided `factoryMethodName`.
+    /// - Has no parameters.
+    /// - Is public and accessible.
     ///
     /// @param clazz             The class declaring the factory method.
     /// @param factoryMethodName The name of the factory method.
@@ -259,6 +331,10 @@ public final class FXMLDocumentParser {
     }
 
     /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLCollection] object.
+    ///
+    /// The logic iterates over all child elements of the current structure, parsing each one
+    /// into an [AbstractFXMLValue] using [#parseValueChild(BuildContext)]. These values are then
+    /// collected into a list and used to create an [FXMLCollection].
     ///
     /// @param context The [ParseContext] containing the parsed XML structure, build context, class and identifier, and FXML type.
     /// @return An [FXMLCollection] object constructed from the parsed XML structure, generics, factory method, and child values.
@@ -279,14 +355,17 @@ public final class FXMLDocumentParser {
 
     /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLMap] object.
     ///
-    /// Entries are collected from two sources:
-    /// - Attributes on the map element (skipping `fx:` and `xmlns` prefixes as well as `fx:factory`),
-    ///   each parsed via [#parseValueString(String)].
-    /// - Child elements, where the element name is used as the key and the children are parsed via
-    ///   [#parseValue(ParsedXMLStructure, BuildContext)].
+    /// The logic involves:
+    /// 1. Collecting map entries from attributes that don't have skippable prefixes (like `fx:`).
+    /// 2. Iterating through child elements:
+    ///    - If the child is `fx:define`, it is parsed as definitions.
+    ///    - If the child is `fx:script`, it is added to the scripts list.
+    ///    - Otherwise, if it has no skippable prefix, it's treated as a map entry where the element name is the key.
+    ///      The child must have exactly one grand-child element representing its value.
     ///
     /// @param context The parsing context containing the necessary information for map parsing.
     /// @return An [FXMLMap] object constructed from the parsed XML structure.
+    /// @throws IllegalArgumentException if a map entry element does not have exactly one child element.
     private AbstractFXMLValue parseMap(ParseContext context) {
         ParsedXMLStructure structure = context.structure();
         BuildContext buildContext = context.buildContext();
@@ -324,8 +403,11 @@ public final class FXMLDocumentParser {
 
     /// Parses the provided child element's structure and adds the definitions to the build context.
     ///
-    /// @param buildContext the context containing the definitions and related metadata
-    /// @param child        the parsed XML structure representing a parent element
+    /// The logic iterates over all children of the definition element and parses each as an element
+    /// using [#parseElement(ParsedXMLStructure, BuildContext, boolean)], then adds them to the context's definitions list.
+    ///
+    /// @param buildContext The context containing the definitions and related metadata.
+    /// @param child        The parsed XML structure representing a parent element of definitions.
     private void parseDefinitions(BuildContext buildContext, ParsedXMLStructure child) {
         child.children()
                 .stream()
@@ -333,17 +415,29 @@ public final class FXMLDocumentParser {
                 .forEach(buildContext.definitions()::add);
     }
 
-    /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLObject].
+    /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLObject] or a value.
+    ///
+    /// The logic first tries to parse the element as a constant (`fx:constant`) or a value (`fx:value`)
+    /// using [#parseConstantOrValue(ParsedXMLStructure, BuildContext, ClassAndIdentifier)].
+    /// If that fails, it proceeds to parse it as a plain FXML object.
     ///
     /// @param context The [ParseContext] containing the parsed XML structure, build context, class and identifier, and FXML type.
-    /// @return An [FXMLObject] constructed from the parsed XML structure.
+    /// @return An [AbstractFXMLValue] constructed from the parsed XML structure.
     private AbstractFXMLValue parseSingle(ParseContext context) {
         return parseConstantOrValue(context.structure(), context.buildContext(), context.classAndIdentifier())
                 .orElseGet(() -> parsePlainObject(context));
     }
 
-    /// Parses a plain FXML object from the provided parsing context, resolving its properties, child elements,
-    /// and other attributes into an `FXMLObject` representation.
+    /// Parses a plain FXML object from the provided parsing context.
+    ///
+    /// The logic involves:
+    /// 1. Parsing attribute properties that don't have skippable prefixes.
+    /// 2. Iterating through child elements:
+    ///    - Handling `fx:define` and `fx:script`.
+    ///    - Handling static properties (e.g., `GridPane.rowIndex`).
+    ///    - Handling instance properties by looking for setters or constructor parameters.
+    ///    - Handling collection and map properties.
+    ///    - Falling back to the default property if no setter or getter is found.
     ///
     /// @param context The parsing context containing necessary metadata for parsing, including the structure, build context, and class-related information.
     /// @return An `FXMLObject` instance constructed based on the parsed structure, properties, and child elements defined in the context.
@@ -427,10 +521,15 @@ public final class FXMLDocumentParser {
 
     /// Parses a constant or value attribute from the provided XML structure and returns an appropriate instance.
     ///
-    /// @param structure          the [ParsedXMLStructure] containing the XML attributes and metadata to parse.
-    /// @param buildContext       the [BuildContext] used during the parsing process to resolve types and dependencies.
-    /// @param classAndIdentifier the [ClassAndIdentifier] holding the class and identifier used for resolution.
-    /// @return an [Optional] containing an [AbstractFXMLValue] representing either an [FXMLConstant] or [FXMLValue], or an empty [Optional] if neither are found in the given structure.
+    /// The logic:
+    /// 1. Checks for the `fx:constant` attribute; if present, resolves the constant's type and returns an [FXMLConstant].
+    /// 2. Checks for the `fx:value` attribute; if present, returns an [FXMLValue].
+    /// 3. Returns an empty [Optional] if neither attribute is present.
+    ///
+    /// @param structure          The [ParsedXMLStructure] containing the XML attributes and metadata to parse.
+    /// @param buildContext       The [BuildContext] used during the parsing process to resolve types and dependencies.
+    /// @param classAndIdentifier The [ClassAndIdentifier] holding the class and identifier used for resolution.
+    /// @return An [Optional] containing an [AbstractFXMLValue] representing either an [FXMLConstant] or [FXMLValue], or an empty [Optional] if neither are found in the given structure.
     private Optional<AbstractFXMLValue> parseConstantOrValue(
             ParsedXMLStructure structure,
             BuildContext buildContext,
@@ -457,11 +556,11 @@ public final class FXMLDocumentParser {
 
     /// Resolves the default property name for a class using the [DefaultProperty] annotation.
     ///
-    /// If the class (or any of its superclasses) is annotated with [DefaultProperty],
-    /// the annotated property name is returned.
+    /// The logic traverses the class hierarchy (including superclasses) to find the first
+    /// occurrence of the [DefaultProperty] annotation and returns its value.
     ///
-    /// @param clazz the class to inspect for a [DefaultProperty] annotation.
-    /// @return the default property name if found, or an empty [Optional] if not found.
+    /// @param clazz The class to inspect for a [DefaultProperty] annotation.
+    /// @return The default property name if found, or an empty [Optional] if not found.
     private Optional<String> resolveDefaultPropertyName(Class<?> clazz) {
         Class<?> current = clazz;
         while (current != null) {
@@ -476,14 +575,13 @@ public final class FXMLDocumentParser {
 
     /// Builds an [FXMLType] from a [Type] and a list of generic type name strings.
     ///
-    /// If the generics list is empty, it attempts to resolve the type from the provided [Type]:
-    /// - [Class]: returns [FXMLClassType], or [FXMLGenericType] if the class has type parameters.
-    /// - [ParameterizedType]: returns [FXMLGenericType] with recursively resolved type arguments.
-    /// - [TypeVariable]: resolves via `typeMapping`, or returns [FXMLWildcardType] if not found.
-    /// - [WildcardType]: returns the resolved upper or lower bound type, or [FXMLWildcardType] for unbounded wildcards.
-    ///
-    /// If the generics list is not empty (e.g., from XML comments), it uses those instead,
-    /// recursively parsing each generic string into an [FXMLType] tree.
+    /// The logic:
+    /// 1. If `generics` is not empty, it parses each generic string and returns an [FXMLType] with these arguments.
+    /// 2. Otherwise, it switches on the provided [Type]:
+    ///    - For [Class]: Resolves type mapping and returns [FXMLClassType] or [FXMLGenericType].
+    ///    - For [ParameterizedType]: Recursively resolves type arguments.
+    ///    - For [TypeVariable]: Looks up the name in `typeMapping`.
+    ///    - For [WildcardType]: Resolves upper or lower bounds.
     ///
     /// @param type         The base type.
     /// @param generics     The list of generic type name strings extracted from XML comments.
@@ -539,6 +637,9 @@ public final class FXMLDocumentParser {
 
     /// Resolves the type mapping for a given class by inspecting its hierarchy.
     ///
+    /// The logic creates a copy of the current type mapping and recursively populates it
+    /// by visiting the class hierarchy (superclasses and interfaces).
+    ///
     /// @param clazz        The class to resolve the mapping for.
     /// @param buildContext The build context used for resolving type variables.
     /// @return A map of type variable names to their resolved [FXMLType]s.
@@ -550,6 +651,11 @@ public final class FXMLDocumentParser {
     }
 
     /// Recursively resolves the type mapping for a given type and updates the mapping.
+    ///
+    /// The logic handles:
+    /// - [Class]: Recursively calls for superclass and interfaces.
+    /// - [ParameterizedType]: Maps actual type arguments to the raw class's type parameters.
+    /// It avoids infinite recursion by tracking visited types.
     ///
     /// @param type    The type to resolve.
     /// @param mapping The mapping to update.
@@ -602,15 +708,16 @@ public final class FXMLDocumentParser {
 
     /// Recursively parses a single generic type string into an [FXMLType].
     ///
-    /// Uses the [#NESTED_GENERICS] pattern to extract the raw type name and any nested
-    /// type arguments. If the raw type cannot be resolved via the current classloader,
-    /// an [FXMLUncompiledClassType] is returned when there are no nested type arguments,
-    /// or an [FXMLUncompiledGenericType] is returned when nested type arguments are present.
+    /// The logic:
+    /// 1. Uses the [#NESTED_GENERICS] pattern to match the input string.
+    /// 2. Extracts the raw type name and nested generic arguments.
+    /// 3. Recursively parses nested arguments via [#parseNestedGenerics(String, BuildContext)].
+    /// 4. Attempts to resolve the raw class; if not found, creates an uncompiled FXML type.
     ///
     /// @param genericString The generic type string to parse (e.g., `Map<String, List<Integer>>`).
     /// @param buildContext  The build context used for class resolution.
     /// @return The corresponding [FXMLType], potentially nested.
-    /// @throws IllegalArgumentException if the generic string is invalid
+    /// @throws IllegalArgumentException if the generic string is invalid.
     private FXMLType parseGenericString(String genericString, BuildContext buildContext) {
         Matcher matcher = NESTED_GENERICS.matcher(genericString);
         if (!matcher.find()) {
@@ -629,8 +736,9 @@ public final class FXMLDocumentParser {
 
     /// Parses a comma-separated list of nested generic type strings into a list of [FXMLType] objects.
     ///
-    /// Iterates over the nested generics string using the [#NESTED_GENERICS] pattern, extracting
-    /// each type argument recursively. Returns an empty list if the input is null or blank.
+    /// The logic iteratively matches the [#NESTED_GENERICS] pattern against the input string,
+    /// extracting and recursively parsing each type argument until no more matches are found.
+    /// It builds the list in reverse order (due to the regex structure) and returns the correct sequence.
     ///
     /// @param nestedGenerics The string containing comma-separated nested generic type arguments.
     /// @param buildContext   The build context used for class resolution.
@@ -665,18 +773,25 @@ public final class FXMLDocumentParser {
 
     /// Parses a child XML structure into an [AbstractFXMLValue].
     ///
-    /// @param buildContext the build context for parsing
-    /// @return a function that parses a child XML structure into an [AbstractFXMLValue]
+    /// This is a convenience wrapper for the curried version of [#parseValueChild(ParsedXMLStructure, BuildContext)].
+    ///
+    /// @param buildContext The build context for parsing.
+    /// @return A function that parses a child XML structure into an [AbstractFXMLValue].
     private Function<ParsedXMLStructure, Optional<AbstractFXMLValue>> parseValueChild(BuildContext buildContext) {
         return child -> parseValueChild(child, buildContext);
     }
 
     /// Parses a value node from the XML structure and processes it based on its type.
-    /// Handles special cases such as "fx:define", "fx:script", or nodes with skippable prefixes.
     ///
-    /// @param structure    the parsed XML structure representing the value node
-    /// @param buildContext the context used during building, containing definitions, scripts, and other relevant data
-    /// @return an [Optional] containing the parsed [AbstractFXMLValue], or an empty [Optional] if the node is processed without producing a value (e.g., "fx:define" or "fx:script" nodes)
+    /// The logic handles special cases:
+    /// - `fx:define`: Calls [#parseDefinitions(BuildContext, ParsedXMLStructure)] and returns empty.
+    /// - `fx:script`: Adds the script to the build context and returns empty.
+    /// - Skippable prefixes: Returns empty.
+    /// - Others: Delegates to [#parseValue(ParsedXMLStructure, BuildContext)].
+    ///
+    /// @param structure    The parsed XML structure representing the value node.
+    /// @param buildContext The context used during building, containing definitions, scripts, and other relevant data.
+    /// @return An [Optional] containing the parsed [AbstractFXMLValue], or an empty [Optional] if the node is processed without producing a value.
     private Optional<AbstractFXMLValue> parseValueChild(ParsedXMLStructure structure, BuildContext buildContext) {
         String nodeName = structure.name();
         if (FXMLConstants.FX_DEFINE_ELEMENT.equals(nodeName)) {
@@ -695,8 +810,7 @@ public final class FXMLDocumentParser {
 
     /// Parses an XML structure into an FXML value.
     ///
-    /// Handles `fx:include`, `fx:reference`, `fx:copy`, `fx:script` (inline), `fx:constant`,
-    /// `fx:value`, and plain object nodes.
+    /// The logic delegates to [#parseValue(ParsedXMLStructure, BuildContext, Type)] with a `null` expected type.
     ///
     /// @param structure    The parsed XML structure.
     /// @param buildContext The context used during the building process.
@@ -707,13 +821,18 @@ public final class FXMLDocumentParser {
 
     /// Parses an XML structure into an FXML value, with an optional expected type.
     ///
-    /// Handles `fx:include`, `fx:reference`, `fx:copy`, `fx:script` (inline), `fx:constant`,
-    /// `fx:value`, and plain object nodes.
+    /// The logic handles:
+    /// - `fx:include`, `fx:reference`, `fx:copy`: Direct delegation to respective parsing logic.
+    /// - `fx:script`: Handles inline scripts.
+    /// - Classes: Resolves the type and handles `fx:constant` or `fx:value` attributes.
+    /// - Primitive literals: If the structure has no children and a primitive type is expected.
+    /// - Recursion: Falls back to [#parseElement(ParsedXMLStructure, BuildContext, boolean)].
     ///
     /// @param structure    The parsed XML structure.
     /// @param buildContext The context used during the building process.
     /// @param expectedType The expected [Type] of the value, used for primitive literals.
     /// @return The parsed [AbstractFXMLValue].
+    /// @throws IllegalArgumentException if `fx:include`, `fx:reference`, or `fx:copy` is missing the `source` attribute, or if `fx:script` is missing inline content.
     private AbstractFXMLValue parseValue(ParsedXMLStructure structure, BuildContext buildContext, Type expectedType) {
         String nodeName = structure.name();
         Map<String, String> attributes = structure.properties();
@@ -780,6 +899,8 @@ public final class FXMLDocumentParser {
 
     /// Determines if the given string has a skippable prefix.
     ///
+    /// The logic checks if the string starts with `fx:` or `xmlns:`.
+    ///
     /// @param key The string to check for skippable prefixes.
     /// @return `true` if the string starts with a skippable prefix; `false` otherwise.
     private boolean hasSkippablePrefix(String key) {
@@ -788,8 +909,9 @@ public final class FXMLDocumentParser {
 
     /// Parses an XML structure into an [FXMLScript].
     ///
-    /// If the structure has a `source` attribute, returns an [FXMLFileScript] with the resolved
-    /// path and charset. Otherwise, returns an [FXMLSourceScript] with the inline script content.
+    /// The logic:
+    /// 1. Checks for a `source` attribute; if present, returns an [FXMLFileScript].
+    /// 2. If no `source` is present, returns an [FXMLSourceScript] with the inline content.
     ///
     /// @param structure The parsed XML structure representing the `fx:script` element.
     /// @return The parsed [FXMLScript].
@@ -804,8 +926,15 @@ public final class FXMLDocumentParser {
         return new FXMLSourceScript(structure.getTextValue());
     }
 
-    /// Resolves and returns an [ClassAndIdentifier] object based on the given node name, attributes, and context.
-    /// This method identifies the class type and identifier for the specified node in an FXML document.
+    /// Resolves and returns a [ClassAndIdentifier] object based on the given node name, attributes, and context.
+    ///
+    /// The logic:
+    /// 1. Handles `fx:root`: ensures it's at the document root and extracts its `type`.
+    /// 2. Handles regular nodes: resolves the class via imports.
+    /// 3. Resolves the identifier:
+    ///    - Root element gets [FXMLRootIdentifier].
+    ///    - Nodes with `fx:id` get [FXMLExposedIdentifier].
+    ///    - Others get an [FXMLInternalIdentifier].
     ///
     /// @param nodeName     The name of the node being processed.
     /// @param attributes   A map of attributes associated with the node.
@@ -849,11 +978,14 @@ public final class FXMLDocumentParser {
 
     /// Converts an XML attribute into an [FXMLProperty], handling both static and instance properties.
     ///
-    /// @param buildContext  the build context for class resolution.
-    /// @param clazz         the class owning the property.
-    /// @param attributeName the attribute name (may contain a dot for static properties).
-    /// @param value         the attribute value string.
-    /// @return an [Optional] containing the property, or empty if it could not be resolved.
+    /// The logic checks if the attribute name contains a dot (indicating a static property)
+    /// and delegates to the appropriate parsing method.
+    ///
+    /// @param buildContext  The build context for class resolution.
+    /// @param clazz         The class owning the property.
+    /// @param attributeName The attribute name (may contain a dot for static properties).
+    /// @param value         The attribute value string.
+    /// @return An [Optional] containing the property, or empty if it could not be resolved.
     private Optional<FXMLProperty> parseAttributeProperty(
             BuildContext buildContext,
             Class<?> clazz,
@@ -869,10 +1001,16 @@ public final class FXMLDocumentParser {
 
     /// Converts a static attribute property (e.g., `GridPane.rowIndex="0"`) into an [FXMLStaticObjectProperty].
     ///
-    /// @param buildContext  the build context for class resolution.
-    /// @param attributeName the full attribute name including the class prefix.
-    /// @param value         the attribute value string.
-    /// @return an [Optional] containing the static property, or empty if unresolvable.
+    /// The logic:
+    /// 1. Splits the attribute name into class name and property name.
+    /// 2. Resolves the static class via imports.
+    /// 3. Searches for a corresponding static setter on that class.
+    /// 4. Parses the value string into an [FXMLValue] with the correct type.
+    ///
+    /// @param buildContext  The build context for class resolution.
+    /// @param attributeName The full attribute name including the class prefix.
+    /// @param value         The attribute value string.
+    /// @return An [Optional] containing the static property, or empty if unresolvable.
     private Optional<FXMLProperty> parseStaticAttributeProperty(
             BuildContext buildContext,
             String attributeName,
@@ -907,19 +1045,17 @@ public final class FXMLDocumentParser {
 
     /// Converts an instance attribute property (e.g., `text="Hello"`) into an [FXMLProperty].
     ///
-    /// Resolution is attempted in the following order:
-    /// 1. A setter method is looked up; if found, an [FXMLObjectProperty] is returned.
-    ///    If the setter's parameter type is `EventHandler`, the value may be an inline script (no prefix),
-    ///    an expression (`$`), or a method reference (`#`), all of which are handled accordingly.
-    /// 2. A collection getter is looked up; if found, an [FXMLCollectionProperties] is returned.
-    /// 3. A map getter is looked up; if found, an [FXMLMapProperty] is returned with the attribute name
-    ///    as the single entry key and the parsed value as the entry value.
+    /// The logic attempts resolution in order:
+    /// 1. Instance setter: Returns [FXMLObjectProperty].
+    /// 2. Constructor parameter: Returns [FXMLConstructorProperty].
+    /// 3. Collection getter: Returns [FXMLCollectionProperties].
+    /// 4. Map getter: Returns [FXMLMapProperty].
     ///
-    /// @param buildContext  the build context for class resolution.
-    /// @param clazz         the class owning the property.
-    /// @param attributeName the attribute name.
-    /// @param value         the attribute value string.
-    /// @return an [Optional] containing the property, or empty if unresolvable.
+    /// @param buildContext  The build context for class resolution.
+    /// @param clazz         The class owning the property.
+    /// @param attributeName The attribute name.
+    /// @param value         The attribute value string.
+    /// @return An [Optional] containing the property, or empty if unresolvable.
     private Optional<FXMLProperty> parseInstanceAttributeProperty(
             BuildContext buildContext,
             Class<?> clazz,
@@ -972,12 +1108,17 @@ public final class FXMLDocumentParser {
 
     /// Converts a static property child element into an [FXMLProperty].
     ///
-    /// @param buildContext the build context for class resolution.
-    /// @param clazz        the class defining the static property.
-    /// @param setterName   the name of the static setter method.
-    /// @param propName     the property name.
-    /// @param child        the child XML structure containing the property values.
-    /// @return an [Optional] containing the property, or empty if unresolvable.
+    /// The logic:
+    /// 1. Finds the unique static setter for the property on the specified class.
+    /// 2. Parses the child element's content into a list of values via [#parseChildrenToValues(BuildContext, ParsedXMLStructure, Type)].
+    /// 3. Ensures only a single value is present and returns an [FXMLStaticObjectProperty].
+    ///
+    /// @param buildContext The build context for class resolution.
+    /// @param clazz        The class defining the static property.
+    /// @param setterName   The name of the static setter method.
+    /// @param propName     The property name.
+    /// @param child        The child XML structure containing the property values.
+    /// @return An [Optional] containing the property, or empty if unresolvable.
     private Optional<FXMLProperty> parseStaticPropertyElement(
             BuildContext buildContext,
             Class<?> clazz,
@@ -1007,18 +1148,16 @@ public final class FXMLDocumentParser {
 
     /// Converts an instance property child element into an [FXMLProperty].
     ///
-    /// Resolution is attempted in the following order:
-    /// 1. A setter method is looked up; if found and a single value is present, an [FXMLObjectProperty] is returned;
-    ///    if multiple values are present, an [FXMLCollectionProperties] is returned.
-    /// 2. A collection getter is looked up; if found, an [FXMLCollectionProperties] is returned.
-    /// 3. A map getter is looked up; if found, an [FXMLMapProperty] is returned with child element names
-    ///    as keys and parsed child values as entries.
+    /// The logic attempts resolution in order:
+    /// 1. Setter or Constructor parameter: parses children or text value and returns [FXMLObjectProperty], [FXMLCollectionProperties], or [FXMLConstructorProperty].
+    /// 2. Collection getter: returns [FXMLCollectionProperties].
+    /// 3. Map getter: returns [FXMLMapProperty].
     ///
-    /// @param buildContext the build context for class resolution.
-    /// @param clazz        the class owning the property.
-    /// @param propName     the property name.
-    /// @param child        the child XML structure containing the property values.
-    /// @return an [Optional] containing the property, or empty if unresolvable.
+    /// @param buildContext The build context for class resolution.
+    /// @param clazz        The class owning the property.
+    /// @param propName     The property name.
+    /// @param child        The child XML structure containing the property values.
+    /// @return An [Optional] containing the property, or empty if unresolvable.
     private Optional<FXMLProperty> parseInstancePropertyElement(
             BuildContext buildContext,
             Class<?> clazz,
@@ -1086,10 +1225,13 @@ public final class FXMLDocumentParser {
 
     /// Converts the children of a property element into a list of [AbstractFXMLValue].
     ///
-    /// @param buildContext    the build context for class resolution.
-    /// @param propertyElement the property element whose children are to be converted.
-    /// @param paramType       the expected parameter type for the property.
-    /// @return the list of converted values.
+    /// The logic iterates over all children of the property element and parses each as a value
+    /// using [#parseValue(ParsedXMLStructure, BuildContext, Type)], applying the expected parameter type.
+    ///
+    /// @param buildContext    The build context for class resolution.
+    /// @param propertyElement The property element whose children are to be converted.
+    /// @param paramType       The expected parameter type for the property.
+    /// @return The list of converted values.
     private List<AbstractFXMLValue> parseChildrenToValues(
             BuildContext buildContext,
             ParsedXMLStructure propertyElement,
@@ -1104,12 +1246,14 @@ public final class FXMLDocumentParser {
 
     /// Converts the attributes and children of a map property element into a map of string keys to [AbstractFXMLValue] values.
     ///
-    /// Attribute names and values are parsed first using [#parseValueString(String)], followed by child element names
-    /// mapped to their parsed [AbstractFXMLValue]. Child entries override attribute entries with the same key.
+    /// The logic:
+    /// 1. Collects entries from attributes using [#parseValueString(String)].
+    /// 2. Collects entries from child elements using [#parseValue(ParsedXMLStructure, BuildContext)].
+    /// Child elements with the same name as an attribute will override the attribute's entry.
     ///
-    /// @param buildContext    the build context for class resolution.
-    /// @param propertyElement the property element whose attributes and children are to be converted.
-    /// @return the map of attribute/child names to parsed values.
+    /// @param buildContext    The build context for class resolution.
+    /// @param propertyElement The property element whose attributes and children are to be converted.
+    /// @return The map of attribute/child names to parsed values.
     private Map<String, AbstractFXMLValue> parseChildrenToMapEntries(
             BuildContext buildContext,
             ParsedXMLStructure propertyElement
@@ -1126,16 +1270,10 @@ public final class FXMLDocumentParser {
 
     /// Parses an attribute value string into an [AbstractFXMLValue].
     ///
-    /// The following prefixes are handled:
-    /// - [FXMLConstants#TRANSLATION_PREFIX] (`%`) — translation key, returns [FXMLTranslation].
-    /// - [FXMLConstants#LOCATION_PREFIX] (`@`) — resource/location reference, returns [FXMLResource].
-    /// - [FXMLConstants#METHOD_REFERENCE_PREFIX] (`#`) — method reference, returns [FXMLMethod].
-    /// - [FXMLConstants#EXPRESSION_PREFIX] (`$`) — binding expression, returns [FXMLExpression].
-    /// - [FXMLConstants#ESCAPE_PREFIX] (`\`) — escaped literal, strips the prefix and returns [FXMLValue].
-    /// - No prefix — plain string value, returns [FXMLValue].
+    /// The logic delegates to [#parseValueString(String, Class)] with a `null` parameter type.
     ///
-    /// @param value the raw attribute value string.
-    /// @return the corresponding [AbstractFXMLValue].
+    /// @param value The raw attribute value string.
+    /// @return The corresponding [AbstractFXMLValue].
     private AbstractFXMLValue parseValueString(String value) {
         return parseValueString(value, null);
     }
@@ -1143,22 +1281,17 @@ public final class FXMLDocumentParser {
     /// Parses an attribute value string into an [AbstractFXMLValue], with awareness of the expected getter
     /// parameter type and build context.
     ///
-    /// When the expected `paramType` is a functional interface (e.g., `EventHandler`), a method reference
-    /// (`#handler`) without a prefix is treated as a method reference rather than a plain string literal.
-    /// The return type of the method reference is resolved from the functional interface's method signature.
+    /// The logic handles various FXML prefixes:
+    /// - `%`: Returns [FXMLTranslation].
+    /// - `@`: Returns [FXMLResource].
+    /// - `#`: Returns [FXMLMethod] via [#resolveMethodReference(String, Class)].
+    /// - `$`: Returns [FXMLExpression].
+    /// - `\`: Returns [FXMLLiteral] (escaped).
+    /// - No prefix: Returns [FXMLInlineScript] if `paramType` is an `EventHandler`, otherwise returns [FXMLLiteral].
     ///
-    /// The following prefixes are handled:
-    /// - [FXMLConstants#TRANSLATION_PREFIX] (`%`) — translation key, returns [FXMLTranslation].
-    /// - [FXMLConstants#LOCATION_PREFIX] (`@`) — resource/location reference, returns [FXMLResource].
-    /// - [FXMLConstants#METHOD_REFERENCE_PREFIX] (`#`) — method reference, returns [FXMLMethod].
-    /// - [FXMLConstants#EXPRESSION_PREFIX] (`$`) — binding expression, returns [FXMLExpression].
-    /// - [FXMLConstants#ESCAPE_PREFIX] (`\`) — escaped literal, strips the prefix and returns [FXMLValue].
-    /// - No prefix with `paramType` assignable to [EventHandler] — treated as inline script, returns [FXMLInlineScript].
-    /// - No prefix — plain string value, returns [FXMLValue].
-    ///
-    /// @param value     the raw attribute value string.
-    /// @param paramType the expected getter parameter type, used to detect functional interfaces, may be `null`.
-    /// @return the corresponding [AbstractFXMLValue].
+    /// @param value     The raw attribute value string.
+    /// @param paramType The expected getter parameter type, used to detect functional interfaces, may be `null`.
+    /// @return The corresponding [AbstractFXMLValue].
     private AbstractFXMLValue parseValueString(String value, Class<?> paramType) {
         if (value.startsWith(FXMLConstants.TRANSLATION_PREFIX)) {
             return new FXMLTranslation(value.substring(1));
@@ -1183,12 +1316,14 @@ public final class FXMLDocumentParser {
 
     /// Resolves a method reference value string into an [FXMLMethod].
     ///
-    /// If `paramType` is a functional interface, the return type is resolved from its single abstract method.
-    /// Otherwise, `void` is used as the return type.
+    /// The logic:
+    /// 1. If `paramType` is a functional interface, it attempts to resolve the return type from its single abstract method.
+    /// 2. If it's not a functional interface, it defaults to `void`.
+    /// 3. Returns a new [FXMLMethod] instance.
     ///
-    /// @param methodName the method name (without the `#` prefix).
-    /// @param paramType  the expected getter parameter type; may be `null`.
-    /// @return the corresponding [FXMLMethod].
+    /// @param methodName The method name (without the `#` prefix).
+    /// @param paramType  The expected getter parameter type; may be `null`.
+    /// @return The corresponding [FXMLMethod].
     private FXMLMethod resolveMethodReference(String methodName, Class<?> paramType) {
         // TODO Improve handling of method references generics
         FXMLType returnType;
@@ -1207,9 +1342,9 @@ public final class FXMLDocumentParser {
 
     /// Checks whether the given class is or extends `javafx.event.EventHandler`.
     ///
-    /// Uses class name comparison to avoid a hard compile-time dependency on the JavaFX event module.
+    /// The logic uses [EventHandler#isAssignableFrom(Class)] to determine if the class is an event handler.
     ///
-    /// @param clazz the class to check.
+    /// @param clazz The class to check.
     /// @return `true` if the class is assignable to `javafx.event.EventHandler`; `false` otherwise.
     private boolean isEventHandlerType(Class<?> clazz) {
         return EventHandler.class.isAssignableFrom(clazz);
@@ -1217,11 +1352,12 @@ public final class FXMLDocumentParser {
 
     /// Checks whether the given class is a functional interface.
     ///
-    /// Used to determine the return type of method reference from the functional interface's
-    /// single abstract method. A functional interface is an interface annotated with
-    /// [@FunctionalInterface] or one that has exactly one abstract method.
+    /// The logic:
+    /// 1. Verifies the class is an interface.
+    /// 2. Checks for the [@FunctionalInterface] annotation.
+    /// 3. Alternatively, counts the number of abstract methods; if exactly one, it's considered a functional interface.
     ///
-    /// @param clazz the class to check.
+    /// @param clazz The class to check.
     /// @return `true` if the class is a functional interface; `false` otherwise.
     private boolean isFunctionalInterface(Class<?> clazz) {
         if (!clazz.isInterface()) {
@@ -1237,6 +1373,11 @@ public final class FXMLDocumentParser {
     }
 
     /// Resolves the [Type] of a constant field on the given class.
+    ///
+    /// The logic:
+    /// 1. Attempts to find a public field with the given name.
+    /// 2. Verifies that the field is static.
+    /// 3. Returns the field's generic type.
     ///
     /// @param clazz        The class defining the constant.
     /// @param constantName The name of the constant field.
@@ -1256,8 +1397,7 @@ public final class FXMLDocumentParser {
 
     /// Resolves an optional [FXMLIdentifier] from the given attributes map.
     ///
-    /// If the attributes contain an [FXMLConstants#FX_ID_ATTRIBUTE] entry, an
-    /// [FXMLExposedIdentifier] is returned. Otherwise, an empty [Optional] is returned.
+    /// The logic checks if the `fx:id` attribute is present and returns an [FXMLExposedIdentifier] if so.
     ///
     /// @param attributes The XML attributes map.
     /// @return An [Optional] containing the identifier, or empty if no `fx:id` is present.
@@ -1271,6 +1411,9 @@ public final class FXMLDocumentParser {
     }
 
     /// Extracts generic type names from XML comments (e.g., `<!-- generic 0: java.util.List<String> -->`).
+    ///
+    /// The logic iterates through comments, looking for those starting with `generic `,
+    /// then extracts the type definition following the first colon.
     ///
     /// @param comments The list of XML comments on the element.
     /// @return The list of extracted generic type strings.
@@ -1290,6 +1433,11 @@ public final class FXMLDocumentParser {
     }
 
     /// Adds a value to an existing [FXMLCollectionProperties] entry or creates a new one.
+    ///
+    /// The logic:
+    /// 1. Searches the `properties` list for an existing [FXMLCollectionProperties] with the same name.
+    /// 2. If found, appends the new value to the existing collection.
+    /// 3. If not found, creates a new [FXMLCollectionProperties] and adds it to the list.
     ///
     /// @param buildContext   The build context for class resolution.
     /// @param properties     The current list of properties to update.
@@ -1322,10 +1470,14 @@ public final class FXMLDocumentParser {
 
     /// Holds a class and its associated FXML identifier.
     ///
+    /// This record is used to associate a Java class with its identifier in the FXML document.
+    ///
     /// @param clazz      The class type.
     /// @param identifier The FXML identifier.
     private record ClassAndIdentifier(Class<?> clazz, FXMLIdentifier identifier) {
         /// Compact constructor to validate the class and identifier.
+        ///
+        /// The logic ensures that both the `clazz` and `identifier` are not `null`.
         ///
         /// @param clazz      The class type.
         /// @param identifier The FXML identifier.
@@ -1337,6 +1489,9 @@ public final class FXMLDocumentParser {
     }
 
     /// Holds the state and context during the FXML document building process.
+    ///
+    /// This record maintains the internal state such as identifiers counter, imports,
+    /// definitions, and scripts during the parsing process.
     ///
     /// @param internalCounter The counter for generating internal identifiers.
     /// @param imports         The list of imports.
@@ -1352,6 +1507,8 @@ public final class FXMLDocumentParser {
     ) {
 
         /// Compact constructor to validate the build context components.
+        ///
+        /// The logic ensures that all components of the build context are not `null`.
         ///
         /// @param internalCounter The counter for generating internal identifiers.
         /// @param imports         The list of imports.
@@ -1369,6 +1526,8 @@ public final class FXMLDocumentParser {
 
         /// Constructs a new build context with the provided imports.
         ///
+        /// The logic initializes a new build context with default empty lists and a new atomic counter.
+        ///
         /// @param imports The list of imports.
         public BuildContext(List<String> imports) {
             this(new AtomicInteger(), imports, new ArrayList<>(), new ArrayList<>(), new LinkedHashMap<>());
@@ -1377,9 +1536,11 @@ public final class FXMLDocumentParser {
         /// Constructs a new `BuildContext` by copying the properties of an existing `BuildContext`
         /// and replacing the `typeMapping` with the provided mapping.
         ///
-        /// @param original    The original `BuildContext` instance, from which properties like internal counter, imports, definitions, and scripts are copied.
-        /// @param typeMapping The new map for resolving type variables, replacing the original `typeMapping` of the provided `BuildContext`.
-        /// @throws NullPointerException If `original` or `typeMapping` is `null`.
+        /// The logic performs a shallow copy of the other fields from the `original` context.
+        ///
+        /// @param original    The original `BuildContext` instance.
+        /// @param typeMapping The new map for resolving type variables.
+        /// @throws NullPointerException if `original` or `typeMapping` is `null`.
         public BuildContext(
                 BuildContext original,
                 Map<String, FXMLType> typeMapping
@@ -1391,6 +1552,8 @@ public final class FXMLDocumentParser {
 
         /// Generates the next internal identifier for tracking purposes.
         ///
+        /// The logic increments the internal atomic counter and returns the value.
+        ///
         /// @return The next incremental identifier as an integer.
         private int nextInternalId() {
             return internalCounter.getAndIncrement();
@@ -1398,17 +1561,15 @@ public final class FXMLDocumentParser {
     }
 
     /// Represents the parsing context for an FXML document.
+    ///
     /// This record encapsulates all necessary information required for parsing and building FXML structures,
     /// ensuring proper linking between parsed elements and their associated metadata.
     ///
-    /// Instances of this record are immutable and provide a clear way to organize the parts necessary for handling FXML
-    /// processing tasks.
-    ///
-    /// @param structure          The parsed structure of the FXML document. Represents the hierarchical representation of the FXML content.
-    /// @param buildContext       The context used during the construction phase of the FXML document, providing the necessary state and resources.
-    /// @param classAndIdentifier Carries information about the involved class and its associated identifier, helping to map FXML elements to Java objects.
-    /// @param type               Specifies the type of the FXML element being processed, which could determine handling logic during parsing and building.
-    /// @param factoryMethod      Represents the factory method, if any, that may be invoked to create specific instances of the FXML elements. This parameter can be optional but cannot be null.
+    /// @param structure          The parsed structure of the FXML document.
+    /// @param buildContext       The context used during the construction phase.
+    /// @param classAndIdentifier Carries information about the involved class and its identifier.
+    /// @param type               Specifies the type of the FXML element being processed.
+    /// @param factoryMethod      Represents the factory method, if any, that may be invoked.
     private record ParseContext(
             ParsedXMLStructure structure,
             BuildContext buildContext,
@@ -1417,14 +1578,15 @@ public final class FXMLDocumentParser {
             Optional<FXMLFactoryMethod> factoryMethod
     ) {
 
-        /// Constructor for the `ParseContext` record,
-        /// used to encapsulate the context required to parse an FXML document.
+        /// Constructor for the `ParseContext` record.
         ///
-        /// @param structure          The parsed structure of the FXML document. Must not be null.
-        /// @param buildContext       The context used during the building of the FXML document. Must not be null.
-        /// @param classAndIdentifier The class and identifier details associated with this parse context. Must not be null.
-        /// @param type               The type of the FXML object being parsed. Must not be null.
-        /// @param factoryMethod      The factory method associated with the FXML object, if available. Can be empty but must not be null.
+        /// The logic ensures that all required components are not `null`.
+        ///
+        /// @param structure          The parsed structure of the FXML document.
+        /// @param buildContext       The context used during the building.
+        /// @param classAndIdentifier The class and identifier details.
+        /// @param type               The type of the FXML object being parsed.
+        /// @param factoryMethod      The factory method associated with the FXML object.
         /// @throws NullPointerException if any of the parameters (except `factoryMethod`) are null.
         private ParseContext {
             Objects.requireNonNull(structure, "`structure` must not be null");
