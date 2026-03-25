@@ -210,36 +210,7 @@ public final class FXMLDocumentParser {
             return parseSpecialFXElements(structure, buildContext, isRoot);
         }
         ClassAndIdentifier classAndIdentifier = resolveClassAndIdentifier(structure, buildContext, isRoot);
-
-        Map<String, String> properties = structure.properties();
-        Class<?> clazz = classAndIdentifier.clazz();
-        String factoryMethodName = properties.get(FXMLConstants.FX_FACTORY_ATTRIBUTE);
-        Optional<FXMLFactoryMethod> factoryMethod = Optional.ofNullable(factoryMethodName)
-                .map(method -> new FXMLFactoryMethod(clazz, method));
-
-        Type actualType = clazz;
-        if (factoryMethodName != null) {
-            actualType = findFactoryMethodReturnType(clazz, factoryMethodName);
-        }
-
-        Map<String, FXMLType> typeMapping = resolveTypeMapping(Utils.getClassType(actualType), buildContext);
-        BuildContext localContext = new BuildContext(buildContext, typeMapping);
-
-        FXMLType fxmlType = buildFXMLType(
-                actualType,
-                extractGenericsFromComments(structure.comments()),
-                localContext,
-                localContext.typeMapping()
-        );
-        Class<?> actualClass = Utils.getClassType(actualType);
-        ParseContext context = new ParseContext(structure, localContext, classAndIdentifier, fxmlType, factoryMethod);
-        if (Collection.class.isAssignableFrom(actualClass)) {
-            return Optional.of(parseCollection(context));
-        } else if (Map.class.isAssignableFrom(actualClass)) {
-            return Optional.of(parseMap(context));
-        } else {
-            return Optional.of(parseSingle(context));
-        }
+        return Optional.of(parseNormalElements(structure, buildContext, classAndIdentifier));
     }
 
     /// Parses the given special FX element and returns its corresponding abstract FXML value.
@@ -266,6 +237,50 @@ public final class FXMLDocumentParser {
                 .map(Function.identity());
     }
 
+    /// Parses the given XML structure into an `AbstractFXMLValue` based on the provided context and class information.
+    /// This method handles different types of objects, collections, and maps and resolves the appropriate type mappings
+    /// and factory methods if present.
+    ///
+    /// @param structure          The parsed XML structure containing properties, comments, and other elements.
+    /// @param buildContext       The current build context used for resolving type mappings and other configurations.
+    /// @param classAndIdentifier The class and identifier information used to determine the type of object to parse and instantiate.
+    /// @return An [AbstractFXMLValue] representing the parsed XML components, configured based on the input structure and context.
+    private AbstractFXMLValue parseNormalElements(
+            ParsedXMLStructure structure,
+            BuildContext buildContext,
+            ClassAndIdentifier classAndIdentifier
+    ) {
+        Map<String, String> properties = structure.properties();
+        Class<?> clazz = classAndIdentifier.clazz();
+        String factoryMethodName = properties.get(FXMLConstants.FX_FACTORY_ATTRIBUTE);
+        Optional<FXMLFactoryMethod> factoryMethod = Optional.ofNullable(factoryMethodName)
+                .map(method -> new FXMLFactoryMethod(clazz, method));
+
+        Type actualType = clazz;
+        if (factoryMethodName != null) {
+            actualType = findFactoryMethodReturnType(clazz, factoryMethodName);
+        }
+
+        Map<String, FXMLType> typeMapping = resolveTypeMapping(Utils.getClassType(actualType), buildContext);
+        BuildContext localContext = new BuildContext(buildContext, typeMapping);
+
+        FXMLType fxmlType = buildFXMLType(
+                actualType,
+                extractGenericsFromComments(structure.comments()),
+                localContext,
+                localContext.typeMapping()
+        );
+        Class<?> actualClass = Utils.getClassType(actualType);
+        ParseContext context = new ParseContext(structure, localContext, classAndIdentifier, fxmlType, factoryMethod);
+        if (Collection.class.isAssignableFrom(actualClass)) {
+            return parseCollection(context);
+        } else if (Map.class.isAssignableFrom(actualClass)) {
+            return parseMap(context);
+        } else {
+            return parseSingle(context);
+        }
+    }
+
     /// Parses an `fx:copy` element into an [FXMLCopy] value.
     ///
     /// The logic:
@@ -288,6 +303,12 @@ public final class FXMLDocumentParser {
         return Optional.of(new FXMLCopy(copyId, source));
     }
 
+    /// Parses an `fx:define` element from the given parsed XML structure and updates the build context
+    /// with any extracted definitions. Returns an empty optional as this method produces no specific value.
+    ///
+    /// @param structure    the parsed XML structure containing the FXDefine element and its children
+    /// @param buildContext the build context used to store extracted definitions
+    /// @return an empty [Optional] as the method does not produce a concrete result
     private Optional<AbstractFXMLValue> parseFXDefine(ParsedXMLStructure structure, BuildContext buildContext) {
         structure.children()
                 .stream()
@@ -319,7 +340,16 @@ public final class FXMLDocumentParser {
         return Optional.of(new FXMLInclude(includeId, source));
     }
 
-    private Optional<AbstractFXMLObject> parseFXRoot(ParsedXMLStructure structure, BuildContext buildContext) {
+    /// Parses an `fx:root` element from the given XML structure and creates an appropriate representation of it,
+    /// wrapped in an [Optional].
+    /// The method validates that the `fx:root` element has a type attribute
+    /// and determines the corresponding class using the provided build context.
+    ///
+    /// @param structure    the parsed XML structure containing the `fx:root` element to be processed
+    /// @param buildContext the build context providing imports and other contextual information necessary for resolving types and building objects
+    /// @return an [Optional] containing an AbstractFXMLValue representation of the `fx:root` element
+    /// @throws IllegalStateException if the `fx:root` element does not have a "type" attribute
+    private Optional<AbstractFXMLValue> parseFXRoot(ParsedXMLStructure structure, BuildContext buildContext) {
         String typeName = structure.properties()
                 .get(FXMLConstants.TYPE_ATTRIBUTE);
         if (typeName == null) {
@@ -328,8 +358,7 @@ public final class FXMLDocumentParser {
         Class<?> clazz = Utils.findType(buildContext.imports(), typeName);
         log.debug("Parsing fx:root with type: %s".formatted(clazz.getName()));
         ClassAndIdentifier classAndIdentifier = new ClassAndIdentifier(clazz, FXMLRootIdentifier.INSTANCE);
-        // TODO
-        return Optional.empty();
+        return Optional.of(parseNormalElements(structure, buildContext, classAndIdentifier));
     }
 
     /// Parses an `fx:reference` element into an [FXMLReference] value.
