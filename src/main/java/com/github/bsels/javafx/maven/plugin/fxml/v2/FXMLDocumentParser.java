@@ -62,7 +62,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -98,34 +97,39 @@ public final class FXMLDocumentParser {
     private static final Pattern NESTED_GENERICS = Pattern.compile(
             "^\\s*((?<first>((((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*),\\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?)$"
     );
+
+    /// A mapping of special JavaFX FXML element names to their corresponding handler methods.
+    /// This map is used to associate specific predefined FXML element constants with
+    /// their respective parser functions, enabling dynamic handling and processing
+    /// during FXML document parsing.
+    ///
+    /// Key-Value pairs:
+    /// - Keys: String constants representing special FXML element names, defined in `FXMLConstants`.
+    /// - Values: Method references implementing the parsing logic for each corresponding FXML element.
+    ///
+    /// This map is immutable and initialized with predefined mappings for processing the following special FXML elements:
+    /// - `fx:copy`: Maps to the `FXMLDocumentParser::parseFXCopy` handler.
+    /// - `fx:define`: Maps to the `FXMLDocumentParser::parseFXDefine` handler.
+    /// - `fx:include`: Maps to the `FXMLDocumentParser::parseFXInclude` handler.
+    /// - `fx:reference`: Maps to the `FXMLDocumentParser::parseFXReference` handler.
+    /// - `fx:root`: Maps to the `FXMLDocumentParser::parseFXRoot` handler.
+    /// - `fx:script`: Maps to the `FXMLDocumentParser::parseFXScript` handler.
+    private static final Map<String, SpecialFXElementHandler> SPECIAL_FX_ELEMENTS = Map.of(
+            FXMLConstants.FX_COPY_ELEMENT, FXMLDocumentParser::parseFXCopy,
+            FXMLConstants.FX_DEFINE_ELEMENT, FXMLDocumentParser::parseFXDefine,
+            FXMLConstants.FX_INCLUDE_ELEMENT, FXMLDocumentParser::parseFXInclude,
+            FXMLConstants.FX_REFERENCE_ELEMENT, FXMLDocumentParser::parseFXReference,
+            FXMLConstants.FX_ROOT_ELEMENT, FXMLDocumentParser::parseFXRoot,
+            FXMLConstants.FX_SCRIPT_ELEMENT, FXMLDocumentParser::parseFXScript
+    );
+
     /// Provides a logger instance for recording runtime information, debugging, and error messages.
     ///
     /// This logger is immutable and initialized once via the constructor, ensuring consistent logging
     /// throughout the application. It is used to report warnings for unresolvable types or properties
     /// and to provide debug information during the parsing process.
-    private final Log log;    /// A map containing special FX elements and their respective handlers used for processing predefined FX tags in
-    /// an FXML file.
-    ///
-    /// The keys represent the names of FX elements (e.g., `fx:reference`, `fx:copy`, `fx:include`),
-    /// and the values are [BiFunction] handlers that define the logic for resolving or creating instances of those
-    /// elements during the FXML parsing and building process.
-    ///
-    /// This map associates each special FX element name with a [BiFunction] that takes a [ParsedXMLStructure]
-    /// representing the parsed FXML tag and a [BuildContext] providing the context for the current building process.
-    /// The [BiFunction] returns an [AbstractFXMLValue],
-    /// which represents the resolved or created value for the FX element.
-    ///
-    /// The map is immutable and predefined with keys for FX elements such as:
-    /// - [FXMLConstants#FX_REFERENCE_ELEMENT] (`fx:reference`)
-    /// - [FXMLConstants#FX_COPY_ELEMENT] (`fx:copy`)
-    /// - [FXMLConstants#FX_INCLUDE_ELEMENT] (`fx:include`)
-    private final Map<String, BiFunction<ParsedXMLStructure, BuildContext, Optional<? extends AbstractFXMLValue>>> specialFxElements = Map.of(
-            FXMLConstants.FX_COPY_ELEMENT, this::parseFXCopy,
-            FXMLConstants.FX_DEFINE_ELEMENT, this::parseFXDefine,
-            FXMLConstants.FX_INCLUDE_ELEMENT, this::parseFXInclude,
-            FXMLConstants.FX_REFERENCE_ELEMENT, this::parseFXReference,
-            FXMLConstants.FX_SCRIPT_ELEMENT, this::parseFXScript
-    );
+    private final Log log;
+
     /// Compact constructor to validate the log dependency.
     ///
     /// It ensures that the required [Log] instance is not `null` before assignment.
@@ -198,12 +202,12 @@ public final class FXMLDocumentParser {
     private Optional<AbstractFXMLValue> parseElement(ParsedXMLStructure structure, BuildContext buildContext, boolean isRoot)
             throws IllegalStateException {
         String nodeName = structure.name();
-        if (specialFxElements.containsKey(nodeName)) {
-            return parseSpecialFXElements(structure, buildContext);
+        if (SPECIAL_FX_ELEMENTS.containsKey(nodeName)) {
+            return parseSpecialFXElements(structure, buildContext, isRoot);
         }
-        Map<String, String> properties = structure.properties();
-        ClassAndIdentifier classAndIdentifier = resolveClassAndIdentifier(nodeName, properties, buildContext, isRoot);
+        ClassAndIdentifier classAndIdentifier = resolveClassAndIdentifier(structure, buildContext, isRoot);
 
+        Map<String, String> properties = structure.properties();
         Class<?> clazz = classAndIdentifier.clazz();
         String factoryMethodName = properties.get(FXMLConstants.FX_FACTORY_ATTRIBUTE);
         Optional<FXMLFactoryMethod> factoryMethod = Optional.ofNullable(factoryMethodName)
@@ -236,15 +240,25 @@ public final class FXMLDocumentParser {
 
     /// Parses the given special FX element and returns its corresponding abstract FXML value.
     ///
-    /// The logic looks up the handler for the element's name in the [#specialFxElements] map
+    /// The logic looks up the handler for the element's name in the [#SPECIAL_FX_ELEMENTS] map
     /// and applies it to the current structure and build context.
     ///
     /// @param structure    The parsed XML structure representing the special FX element to be processed.
     /// @param buildContext The context in which the build is occurring, providing necessary utilities and state.
+    /// @param isRoot       Indicates whether the current element is the root of the FXML document.
     /// @return The abstract FXML value resulting from processing the special FX element.
-    private Optional<AbstractFXMLValue> parseSpecialFXElements(ParsedXMLStructure structure, BuildContext buildContext) {
-        return specialFxElements.get(structure.name())
-                .apply(structure, buildContext)
+    /// @throws IllegalStateException if the element is not the root and its name is 'fx:root'.
+    private Optional<AbstractFXMLValue> parseSpecialFXElements(
+            ParsedXMLStructure structure,
+            BuildContext buildContext,
+            boolean isRoot
+    ) {
+        String name = structure.name();
+        if (FXMLConstants.FX_ROOT_ELEMENT.equals(name) && !isRoot) {
+            throw new IllegalStateException("%s must be the root element of the FXML document".formatted(name));
+        }
+        return SPECIAL_FX_ELEMENTS.get(name)
+                .handle(this, structure, buildContext)
                 .map(Function.identity());
     }
 
@@ -299,6 +313,19 @@ public final class FXMLDocumentParser {
         FXMLIdentifier includeId = resolveOptionalIdentifier(properties)
                 .orElseGet(() -> new FXMLInternalIdentifier(buildContext.nextInternalId()));
         return Optional.of(new FXMLInclude(includeId, source));
+    }
+
+    private Optional<AbstractFXMLObject> parseFXRoot(ParsedXMLStructure structure, BuildContext buildContext) {
+        String typeName = structure.properties()
+                .get(FXMLConstants.TYPE_ATTRIBUTE);
+        if (typeName == null) {
+            throw new IllegalStateException("fx:root must have a 'type' attribute");
+        }
+        Class<?> clazz = Utils.findType(buildContext.imports(), typeName);
+        log.debug("Parsing fx:root with type: %s".formatted(clazz.getName()));
+        ClassAndIdentifier classAndIdentifier = new ClassAndIdentifier(clazz, FXMLRootIdentifier.INSTANCE);
+        // TODO
+        return Optional.empty();
     }
 
     /// Parses an `fx:reference` element into an [FXMLReference] value.
@@ -909,43 +936,29 @@ public final class FXMLDocumentParser {
     ///    - Nodes with `fx:id` get [FXMLExposedIdentifier].
     ///    - Others get an [FXMLInternalIdentifier].
     ///
-    /// @param nodeName     The name of the node being processed.
-    /// @param attributes   A map of attributes associated with the node.
+    /// @param structure    The parsed XML structure representing the node.
     /// @param buildContext The context in which the FXML document is being built.
     /// @param isRoot       Whether the node is the root of the FXML document.
     /// @return A [ClassAndIdentifier] containing the resolved class type and identifier for the node.
     /// @throws IllegalStateException    if the node is labeled as `fx:root` but is not the document root, or if `fx:root` is missing the required `type` attribute.
     /// @throws IllegalArgumentException if the class type cannot be resolved.
     private ClassAndIdentifier resolveClassAndIdentifier(
-            String nodeName,
-            Map<String, String> attributes,
+            ParsedXMLStructure structure,
             BuildContext buildContext,
             boolean isRoot
     ) throws IllegalStateException, IllegalArgumentException {
         FXMLIdentifier identifier;
         Class<?> clazz;
-        if (FXMLConstants.FX_ROOT_ELEMENT.equals(nodeName)) {
-            if (!isRoot) {
-                throw new IllegalStateException("Root object must be the document root");
-            }
-            String typeName = attributes.get(FXMLConstants.TYPE_ATTRIBUTE);
-            if (typeName == null) {
-                throw new IllegalStateException("fx:root must have a 'type' attribute");
-            }
-            clazz = Utils.findType(buildContext.imports(), typeName);
+        clazz = Utils.findType(buildContext.imports(), structure.name());
+        Map<String, String> attributes = structure.properties();
+        if (isRoot) {
             identifier = FXMLRootIdentifier.INSTANCE;
-            log.debug("Parsing fx:root with type: %s".formatted(clazz.getName()));
+        } else if (attributes.containsKey(FXMLConstants.FX_ID_ATTRIBUTE)) {
+            identifier = new FXMLExposedIdentifier(attributes.get(FXMLConstants.FX_ID_ATTRIBUTE));
         } else {
-            clazz = Utils.findType(buildContext.imports(), nodeName);
-            if (isRoot) {
-                identifier = FXMLRootIdentifier.INSTANCE;
-            } else if (attributes.containsKey(FXMLConstants.FX_ID_ATTRIBUTE)) {
-                identifier = new FXMLExposedIdentifier(attributes.get(FXMLConstants.FX_ID_ATTRIBUTE));
-            } else {
-                identifier = new FXMLInternalIdentifier(buildContext.nextInternalId());
-            }
-            log.debug("Parsing object with type: %s".formatted(clazz.getName()));
+            identifier = new FXMLInternalIdentifier(buildContext.nextInternalId());
         }
+        log.debug("Parsing object with type: %s".formatted(clazz.getName()));
         return new ClassAndIdentifier(clazz, identifier);
     }
 
@@ -1441,6 +1454,35 @@ public final class FXMLDocumentParser {
         properties.add(new FXMLCollectionProperties(propName, getterName, fxmlCollectionType, values, List.of()));
     }
 
+    /// Represents a functional interface designed to handle and process special FXML elements encountered during
+    /// the parsing and building of an FXML document.
+    /// The interface defines a single abstract method intended to handle custom processing logic for specific FXML
+    /// elements, allowing for the generation of corresponding values or actions.
+    ///
+    /// Implementations of this interface provide a mechanism to extend or customize the default behavior of
+    /// FXML document parsing.
+    ///
+    /// The handler receives relevant contextual information including the document parser instance,
+    /// the segment of the FXML document to be processed, and the build context,
+    /// enabling comprehensive and flexible handling of special FXML elements.
+    ///
+    /// This interface follows the contract of a functional interface and can be implemented using a lambda expression
+    /// or method reference.
+    @FunctionalInterface
+    private interface SpecialFXElementHandler {
+        /// Handles processing of a special FXML element based on the provided inputs.
+        ///
+        /// @param instance     The [FXMLDocumentParser] instance responsible for parsing the document.
+        /// @param structure    The [ParsedXMLStructure] representing the current segment of the FXML document.
+        /// @param buildContext The [BuildContext] providing contextual information during the building process.
+        /// @return An [Optional] containing an [AbstractFXMLValue] if the processing completes successfully, or an empty [Optional] if no value could be generated.
+        Optional<? extends AbstractFXMLValue> handle(
+                FXMLDocumentParser instance,
+                ParsedXMLStructure structure,
+                BuildContext buildContext
+        );
+    }
+
     /// Holds a class and its associated FXML identifier.
     ///
     /// This record is used to associate a Java class with its identifier in the FXML document.
@@ -1569,6 +1611,8 @@ public final class FXMLDocumentParser {
             Objects.requireNonNull(factoryMethod, "`factoryMethod` must not be null");
         }
     }
+
+
 
 
 }
