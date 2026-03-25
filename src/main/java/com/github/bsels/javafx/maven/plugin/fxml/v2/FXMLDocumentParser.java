@@ -483,9 +483,12 @@ public final class FXMLDocumentParser {
     /// Finds the value type of [Map] from the given [FXMLType].
     ///
     /// The logic:
-    /// 1. For non-generic types ([FXMLClassType], [FXMLWildcardType], [FXMLUncompiledClassType], [FXMLUncompiledGenericType]),
+    /// 1. For [FXMLWildcardType], [FXMLUncompiledClassType], and [FXMLUncompiledGenericType],
     ///    returns [Object] as the value type.
-    /// 2. For [FXMLGenericType], builds an initial type mapping from the class's own type parameters to the provided
+    /// 2. For [FXMLClassType], traverses the class hierarchy via [Utils#findMapValueTypeFromHierarchy(Class)] to find
+    ///    the [Map] interface and extract the concrete value type from its type parameters,
+    ///    defaulting to [Object] if not found.
+    /// 3. For [FXMLGenericType], builds an initial type mapping from the class's own type parameters to the provided
     ///    generic arguments, then traverses the full class hierarchy via [#resolveTypeMappingInternal(Type, Map, Set)]
     ///    to propagate type variable bindings down to the [Map] interface's type parameters.
     ///    The value type (`V`, at index 1 of [Map]'s type parameters) is then looked up in the resolved mapping
@@ -495,8 +498,8 @@ public final class FXMLDocumentParser {
     /// @return The raw [Class] of the map's value type, or [Object] if it cannot be determined.
     private Class<?> findMapValueType(FXMLType type) {
         return switch (type) {
-            case FXMLClassType _, FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ ->
-                    Object.class;
+            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> Object.class;
+            case FXMLClassType(Class<?> clazz) -> Utils.findMapValueTypeFromHierarchy(clazz);
             case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) -> {
                 // Build initial mapping from clazz's own type parameters to the provided generics
                 Map<String, FXMLType> mapping = new LinkedHashMap<>();

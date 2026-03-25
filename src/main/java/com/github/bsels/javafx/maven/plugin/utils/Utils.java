@@ -666,4 +666,50 @@ public final class Utils {
     private static Supplier<Boolean> isDownstreamAccepting(Gatherer.Downstream<? super Class<?>> downstream) {
         return () -> !downstream.isRejecting();
     }
+
+    /// Traverses the class hierarchy of the given class to find the [Map] interface and extract its value type.
+    ///
+    /// The logic:
+    /// 1. If the class itself is [Map], returns [Object] since no type arguments are available for a raw type.
+    /// 2. Searches all generic interfaces of the class; if one is a [ParameterizedType] with raw type [Map],
+    ///    extracts the second type argument (`V`) and returns its raw class.
+    /// 3. Recursively searches superclass and non-parameterized interfaces.
+    /// 4. Returns [Object] if [Map] is not found in the hierarchy.
+    ///
+    /// @param clazz The class to search.
+    /// @return The raw [Class] of the map's value type, or [Object] if it cannot be determined.
+    public static Class<?> findMapValueTypeFromHierarchy(Class<?> clazz) {
+        if (clazz == null || clazz == Object.class) {
+            return Object.class;
+        }
+        if (clazz == Map.class) {
+            return Object.class;
+        }
+        for (Type genericInterface : clazz.getGenericInterfaces()) {
+            if (genericInterface instanceof ParameterizedType pt && pt.getRawType() == Map.class) {
+                Type valueArg = pt.getActualTypeArguments()[1];
+                if (valueArg instanceof Class<?> valueClass) {
+                    return valueClass;
+                }
+                return Object.class;
+            }
+        }
+        Class<?> superclass = clazz.getSuperclass();
+        if (superclass != null) {
+            Class<?> result = findMapValueTypeFromHierarchy(superclass);
+            if (result != Object.class) {
+                return result;
+            }
+        }
+        for (Type genericInterface : clazz.getGenericInterfaces()) {
+            Class<?> ifaceClass = genericInterface instanceof ParameterizedType pt
+                    ? (Class<?>) pt.getRawType()
+                    : (Class<?>) genericInterface;
+            Class<?> result = findMapValueTypeFromHierarchy(ifaceClass);
+            if (result != Object.class) {
+                return result;
+            }
+        }
+        return Object.class;
+    }
 }
