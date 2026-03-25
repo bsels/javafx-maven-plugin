@@ -19,7 +19,7 @@ public record FXMLObject(
         FXMLIdentifier identifier,
         FXMLType type,
         Optional<FXMLFactoryMethod> factoryMethod,
-        List<FXMLProperty<?>> properties
+        List<FXMLProperty> properties
 ) implements AbstractFXMLValue, AbstractFXMLObject {
 
     /// Compact constructor to validate the FXML object components.

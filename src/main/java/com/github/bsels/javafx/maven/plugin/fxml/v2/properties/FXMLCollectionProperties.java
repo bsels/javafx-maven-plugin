@@ -18,8 +18,8 @@ public record FXMLCollectionProperties(
         String getter,
         FXMLType type,
         List<AbstractFXMLValue> value,
-        List<FXMLProperty<?>> properties
-) implements FXMLProperty<List<AbstractFXMLValue>> {
+        List<FXMLProperty> properties
+) implements FXMLProperty {
 
     /// Compact constructor to validate the property components.
     ///

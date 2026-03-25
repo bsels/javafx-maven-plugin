@@ -14,7 +14,7 @@ public record FXMLConstructorProperty(
         String name,
         FXMLType type,
         AbstractFXMLValue value
-) implements FXMLProperty<AbstractFXMLValue> {
+) implements FXMLProperty {
 
     /// Creates a new `FXMLConstructorProperty` instance.
     ///

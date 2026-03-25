@@ -16,7 +16,7 @@ public record FXMLObjectProperty(
         String setter,
         FXMLType type,
         AbstractFXMLValue value
-) implements FXMLProperty<AbstractFXMLValue> {
+) implements FXMLProperty {
 
     /// Compact constructor to validate the property components.
     ///

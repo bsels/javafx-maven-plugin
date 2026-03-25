@@ -212,7 +212,7 @@ public record FXMLDocumentParser(Log log) {
         List<AbstractFXMLValue> values = structure.children()
                 .stream()
                 .map(parseValueChild(buildContext))
-                .gather(Utils.optional(AbstractFXMLValue.class))
+                .gather(Utils.optional())
                 .toList();
         return new FXMLCollection(
                 classAndIdentifier.identifier(),
@@ -315,11 +315,11 @@ public record FXMLDocumentParser(Log log) {
             return new FXMLValue(Optional.of(classAndIdentifier.identifier()), new FXMLClassType(clazz), val);
         }
 
-        List<FXMLProperty<?>> properties = attributes.entrySet()
+        List<FXMLProperty> properties = attributes.entrySet()
                 .stream()
                 .filter(entry -> !hasSkippablePrefix(entry.getKey()))
                 .map(entry -> parseAttributeProperty(buildContext, clazz, entry.getKey(), entry.getValue()))
-                .<FXMLProperty<?>>gather(Utils.optional())
+                .gather(Utils.optional())
                 .collect(Collectors.toCollection(ArrayList::new));
 
         for (ParsedXMLStructure child : structure.children()) {
@@ -804,7 +804,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param attributeName the attribute name (may contain a dot for static properties).
     /// @param value         the attribute value string.
     /// @return an [Optional] containing the property, or empty if it could not be resolved.
-    private Optional<FXMLProperty<?>> parseAttributeProperty(
+    private Optional<FXMLProperty> parseAttributeProperty(
             BuildContext buildContext,
             Class<?> clazz,
             String attributeName,
@@ -823,7 +823,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param attributeName the full attribute name including the class prefix.
     /// @param value         the attribute value string.
     /// @return an [Optional] containing the static property, or empty if unresolvable.
-    private Optional<FXMLProperty<?>> parseStaticAttributeProperty(
+    private Optional<FXMLProperty> parseStaticAttributeProperty(
             BuildContext buildContext,
             String attributeName,
             String value
@@ -870,7 +870,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param attributeName the attribute name.
     /// @param value         the attribute value string.
     /// @return an [Optional] containing the property, or empty if unresolvable.
-    private Optional<FXMLProperty<?>> parseInstanceAttributeProperty(
+    private Optional<FXMLProperty> parseInstanceAttributeProperty(
             BuildContext buildContext,
             Class<?> clazz,
             String attributeName,
@@ -928,7 +928,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param propName     the property name.
     /// @param child        the child XML structure containing the property values.
     /// @return an [Optional] containing the property, or empty if unresolvable.
-    private Optional<FXMLProperty<?>> parseStaticPropertyElement(
+    private Optional<FXMLProperty> parseStaticPropertyElement(
             BuildContext buildContext,
             Class<?> clazz,
             String setterName,
@@ -969,7 +969,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param propName     the property name.
     /// @param child        the child XML structure containing the property values.
     /// @return an [Optional] containing the property, or empty if unresolvable.
-    private Optional<FXMLProperty<?>> parseInstancePropertyElement(
+    private Optional<FXMLProperty> parseInstancePropertyElement(
             BuildContext buildContext,
             Class<?> clazz,
             String propName,
@@ -1249,7 +1249,7 @@ public record FXMLDocumentParser(Log log) {
     /// @param value          The value to add.
     private void addValueToMultipleProperty(
             BuildContext buildContext,
-            List<FXMLProperty<?>> properties,
+            List<FXMLProperty> properties,
             String propName,
             String getterName,
             Type collectionType,
@@ -1257,7 +1257,7 @@ public record FXMLDocumentParser(Log log) {
     ) {
         FXMLType fxmlCollectionType = buildFXMLType(collectionType, List.of(), buildContext, buildContext.typeMapping());
         for (int i = 0; i < properties.size(); i++) {
-            FXMLProperty<?> existing = properties.get(i);
+            FXMLProperty existing = properties.get(i);
             if (existing instanceof FXMLCollectionProperties mp && mp.name().equals(propName)) {
                 List<AbstractFXMLValue> newValues = new ArrayList<>(mp.value());
                 newValues.add(value);

@@ -28,6 +28,7 @@ import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collector;
@@ -45,18 +46,10 @@ public final class Utils {
     /// This gatherer operates by processing type name strings and mapping them into [Class] instances.
     /// If the type name cannot be resolved, the operation is skipped without halting further processing.
     public static final Gatherer<String, Void, ? extends Class<?>> CLASS_FINDER = Gatherer.of(
-            (_, typeName, downstream) -> findTypeForName(typeName).map(downstream::push).orElse(true)
+            (_, typeName, downstream) -> findTypeForName(typeName)
+                    .map(downstream::push)
+                    .orElseGet(isDownstreamAccepting(downstream))
     );
-    /// Represents a reusable, thread-safe instance of a [Gatherer] that works with [Optional].
-    /// It processes an [Optional] value by applying a downstream operation when the optional contains a value,
-    /// or returning `true` if the optional is empty.
-    ///
-    /// This is particularly useful for collecting and managing optional values during processing
-    /// pipelines within the [FXMLProcessor].
-    private static final Gatherer<? super Optional<?>, Void, ?> OPTIONAL = Gatherer.of(
-            (_, optional, downstream) -> optional.map(downstream::push).orElse(true)
-    );
-
     /// A constant list containing sets of primitive types and their corresponding wrapper classes.
     /// Each set within the list groups a primitive type with its wrapper equivalent, facilitating lookups
     /// or type comparisons where both primitive and wrapper representations are relevant.
@@ -168,21 +161,11 @@ public final class Utils {
     ///
     /// @param <T> the type of the element contained within the [Optional]
     /// @return a [Gatherer] instance that processes Optional values
-    @SuppressWarnings("unchecked")
-    public static <T> Gatherer<? super Optional<T>, Void, T> optional() {
-        return (Gatherer<? super Optional<T>, Void, T>) OPTIONAL;
-    }
-
-    /// Returns a [Gatherer] instance that works with [Optional] values.
-    /// This method is designed to handle Optional instances by facilitating operations on their contained
-    /// values in a generic and type-safe manner.
-    ///
-    /// @param <T>   the type of the element contained within the [Optional]
-    /// @param clazz the class of the element contained within the [Optional]
-    /// @return a [Gatherer] instance that processes Optional values
-    public static <T> Gatherer<? super Optional<T>, Void, T> optional(Class<? super T> clazz) {
-        Objects.requireNonNull(clazz, "clazz cannot be null");
-        return optional();
+    public static <T> Gatherer<Optional<T>, Void, T> optional() {
+        return Gatherer.of(
+                (_, optional, downstream) -> optional.map(downstream::push)
+                        .orElseGet(() -> !downstream.isRejecting())
+        );
     }
 
     /// Creates a sequential [Gatherer] that collects elements into a list and then processes them in reverse order.
@@ -278,7 +261,7 @@ public final class Utils {
     /// @param typeName the name of the type to be resolved; may be a simple name or fully qualified name
     /// @return the resolved [Class<?>] object corresponding to the typeName
     /// @throws InternalClassNotFoundException if the type cannot be resolved or if multiple types are found
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            for a given name in wildcard imports
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   for a given name in wildcard imports
     public static Class<?> findType(List<String> imports, String typeName) {
         return findTypeOptional(imports, typeName)
                 .orElseThrow(() -> new InternalClassNotFoundException("Unable to find type for name: %s".formatted(typeName)));
@@ -507,7 +490,7 @@ public final class Utils {
     /// @return the return type of the validated getter method
     /// @throws NoSuchMethodException if the specified getter method does not exist in the class
     /// @throws IllegalStateException if the method's return type is not a collection,
-    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       or its generic type is incompatible with the given parameter type
+    ///                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     or its generic type is incompatible with the given parameter type
     public static Class<?> findCollectionGetterWithAllowedReturnType(
             Class<?> clazz,
             String identifier,
@@ -550,7 +533,7 @@ public final class Utils {
     /// @param imports   a collection of fully qualified class names representing the current imports
     /// @param parameter the fully qualified class name of the parameter to be processed
     /// @return a simplified class name if the parameter can be reduced using the import set,
-    ///                                                                                                         otherwise the original fully qualified class name of the parameter
+    ///                                                                                                                 otherwise the original fully qualified class name of the parameter
     public static String improveImportForParameter(Collection<String> imports, String parameter) {
         String simpleName = parameter.substring(parameter.lastIndexOf('.') + 1);
         if (imports.contains(parameter)) {
@@ -675,5 +658,13 @@ public final class Utils {
             }
         }
         return true;
+    }
+
+    /// Checks if the downstream is accepting items by evaluating whether it is not rejecting.
+    ///
+    /// @param downstream the downstream consumer whose acceptance status is to be checked
+    /// @return a supplier that returns true if the downstream is accepting items, false otherwise
+    private static Supplier<Boolean> isDownstreamAccepting(Gatherer.Downstream<? super Class<?>> downstream) {
+        return () -> !downstream.isRejecting();
     }
 }

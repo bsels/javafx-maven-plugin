@@ -17,7 +17,7 @@ public record FXMLMapProperty(
         String getter,
         FXMLType type,
         Map<String, AbstractFXMLValue> value
-) implements FXMLProperty<Map<String, AbstractFXMLValue>> {
+) implements FXMLProperty {
 
     /// Compact constructor to validate the property components.
     ///
