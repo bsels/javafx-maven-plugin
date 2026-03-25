@@ -17,6 +17,9 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLSourceScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLWildcardType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
@@ -387,8 +390,8 @@ public final class FXMLDocumentParser {
     /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLCollection] object.
     ///
     /// The logic iterates over all child elements of the current structure, parsing each one
-    /// into an [AbstractFXMLValue] using [#parseValueChild(BuildContext)]. These values are then
-    /// collected into a list and used to create an [FXMLCollection].
+    /// into an [AbstractFXMLValue] using [#parseElement(ParsedXMLStructure, BuildContext, boolean)].
+    /// These values are then collected into a list and used to create an [FXMLCollection].
     ///
     /// @param context The [ParseContext] containing the parsed XML structure, build context, class and identifier, and FXML type.
     /// @return An [FXMLCollection] object constructed from the parsed XML structure, generics, factory method, and child values.
@@ -396,7 +399,7 @@ public final class FXMLDocumentParser {
         List<AbstractFXMLValue> values = context.structure()
                 .children()
                 .stream()
-                .map(parseValueChild(context.buildContext()))
+                .map(child -> parseElement(child, context.buildContext(), false))
                 .gather(Utils.optional())
                 .toList();
         return new FXMLCollection(
@@ -413,7 +416,7 @@ public final class FXMLDocumentParser {
     /// 1. Collecting map entries from attributes that don't have skippable prefixes (like `fx:`).
     /// 2. Iterating through child elements:
     ///    - If the child is `fx:define`, it is parsed as definitions.
-    ///    - If the child is `fx:script`, it is added to the scripts list.
+    ///    - If the child is `fx:script`, it is added to the script list.
     ///    - Otherwise, if it has no skippable prefix, it's treated as a map entry where the element name is the key.
     ///      The child must have exactly one grand-child element representing its value.
     ///
@@ -423,34 +426,104 @@ public final class FXMLDocumentParser {
     private FXMLMap parseMap(ParseContext context) {
         ParsedXMLStructure structure = context.structure();
         BuildContext buildContext = context.buildContext();
+        FXMLType type = context.type();
+        Class<?> mapValueType = findMapValueType(type);
         Map<String, String> properties = structure.properties();
         Map<String, AbstractFXMLValue> entries = properties.entrySet()
                 .stream()
                 .filter(entry -> !hasSkippablePrefix(entry.getKey()))
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
-                        entry -> parseValueString(entry.getValue()),
+                        entry -> parseValueString(entry.getValue(), mapValueType),
                         Utils.duplicateThrowException(),
                         HashMap::new
                 ));
         for (ParsedXMLStructure child : structure.children()) {
             String childName = child.name();
             if (!hasSkippablePrefix(childName)) {
-                List<ParsedXMLStructure> grandChildren = child.children();
+                List<AbstractFXMLValue> grandChildren = child.children()
+                        .stream()
+                        .map(grandChild -> parseMapElements(grandChild, buildContext, mapValueType))
+                        .gather(Utils.optional())
+                        .toList();
                 if (grandChildren.size() != 1) {
                     throw new IllegalArgumentException(
                             "Map entry element `%s` must have exactly one child element representing the value".formatted(
                                     childName));
                 }
-                entries.put(childName, parseValue(grandChildren.getFirst(), buildContext));
+                entries.put(childName, grandChildren.getFirst());
             }
         }
         return new FXMLMap(
                 context.classAndIdentifier().identifier(),
-                context.type(),
+                type,
                 context.factoryMethod(),
                 entries
         );
+    }
+
+    /// Parses map elements from the provided XML structure and attempts to convert them into an appropriate value.
+    /// The method processes text values or XML elements to produce a result matching the expected type.
+    ///
+    /// @param structure    The parsed XML structure containing the elements to be processed.
+    /// @param buildContext The context used for building and resolving dependencies during parsing.
+    /// @param expectedType The expected type of the resulting object, used for type conversion.
+    /// @return An [Optional] containing the parsed [AbstractFXMLValue] if successful, or an empty [Optional] if no valid parsing result is found.
+    private Optional<AbstractFXMLValue> parseMapElements(
+            ParsedXMLStructure structure,
+            BuildContext buildContext,
+            Class<?> expectedType
+    ) {
+        return structure.textValue()
+                .map(value -> parseValueString(value, expectedType))
+                .or(() -> parseElement(structure, buildContext, false));
+    }
+
+    /// Finds the value type of [Map] from the given [FXMLType].
+    ///
+    /// The logic:
+    /// 1. For non-generic types ([FXMLClassType], [FXMLWildcardType], [FXMLUncompiledClassType], [FXMLUncompiledGenericType]),
+    ///    returns [Object] as the value type.
+    /// 2. For [FXMLGenericType], builds an initial type mapping from the class's own type parameters to the provided
+    ///    generic arguments, then traverses the full class hierarchy via [#resolveTypeMappingInternal(Type, Map, Set)]
+    ///    to propagate type variable bindings down to the [Map] interface's type parameters.
+    ///    The value type (`V`, at index 1 of [Map]'s type parameters) is then looked up in the resolved mapping
+    ///    and its raw class is returned.
+    ///
+    /// @param type The [FXMLType] representing the map type.
+    /// @return The raw [Class] of the map's value type, or [Object] if it cannot be determined.
+    private Class<?> findMapValueType(FXMLType type) {
+        return switch (type) {
+            case FXMLClassType _, FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ ->
+                    Object.class;
+            case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) -> {
+                // Build initial mapping from clazz's own type parameters to the provided generics
+                Map<String, FXMLType> mapping = new LinkedHashMap<>();
+                TypeVariable<?>[] typeParameters = clazz.getTypeParameters();
+                for (int i = 0; i < typeParameters.length && i < generics.size(); i++) {
+                    mapping.put(typeParameters[i].getName(), generics.get(i));
+                }
+                // Traverse the class hierarchy to propagate type variable bindings to Map's type parameters
+                Set<Type> visited = new HashSet<>();
+                resolveTypeMappingInternal(clazz, mapping, visited);
+                // Map's type parameters are K (index 0) and V (index 1)
+                String valueTypeParamName = Map.class.getTypeParameters()[1].getName();
+                FXMLType valueType = mapping.getOrDefault(valueTypeParamName, FXMLType.of(Object.class));
+                yield findRawType(valueType);
+            }
+        };
+    }
+
+    /// Determines the raw type of the given [FXMLType] instance.
+    ///
+    /// @param type the [FXMLType] instance whose raw type is to be identified
+    /// @return the raw [Class] type corresponding to the FXMLType instance; returns `Object.class` for unsupported or wildcard types
+    private Class<?> findRawType(FXMLType type) {
+        return switch (type) {
+            case FXMLClassType(Class<?> clazz) -> clazz;
+            case FXMLGenericType(Class<?> clazz, List<FXMLType> _) -> clazz;
+            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> Object.class;
+        };
     }
 
     /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLObject] or a value.
@@ -850,16 +923,6 @@ public final class FXMLDocumentParser {
             remaining = matcher.group("first");
         }
         return List.copyOf(result);
-    }
-
-    /// Parses a child XML structure into an [AbstractFXMLValue].
-    ///
-    /// This is a convenience wrapper for the curried version of [#parseValueChild(ParsedXMLStructure, BuildContext)].
-    ///
-    /// @param buildContext The build context for parsing.
-    /// @return A function that parses a child XML structure into an [AbstractFXMLValue].
-    private Function<ParsedXMLStructure, Optional<AbstractFXMLValue>> parseValueChild(BuildContext buildContext) {
-        return child -> parseElement(child, buildContext, false);
     }
 
     /// Parses an XML structure into an FXML value.
@@ -1447,8 +1510,6 @@ public final class FXMLDocumentParser {
     }
 
     /// Checks whether the given class is or extends `javafx.event.EventHandler`.
-    ///
-    /// The logic uses [EventHandler#isAssignableFrom(Class)] to determine if the class is an event handler.
     ///
     /// @param clazz The class to check.
     /// @return `true` if the class is assignable to `javafx.event.EventHandler`; `false` otherwise.
