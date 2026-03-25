@@ -427,14 +427,14 @@ public final class FXMLDocumentParser {
         ParsedXMLStructure structure = context.structure();
         BuildContext buildContext = context.buildContext();
         FXMLType type = context.type();
-        Class<?> mapValueType = findMapValueType(type);
+        Class<?> rawValueType = findMapValueType(type);
         Map<String, String> properties = structure.properties();
         Map<String, AbstractFXMLValue> entries = properties.entrySet()
                 .stream()
                 .filter(entry -> !hasSkippablePrefix(entry.getKey()))
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
-                        entry -> parseValueString(entry.getValue(), mapValueType),
+                        entry -> parseValueString(entry.getValue(), rawValueType),
                         Utils.duplicateThrowException(),
                         HashMap::new
                 ));
@@ -443,7 +443,7 @@ public final class FXMLDocumentParser {
             if (!hasSkippablePrefix(childName)) {
                 List<AbstractFXMLValue> grandChildren = child.children()
                         .stream()
-                        .map(grandChild -> parseMapElements(grandChild, buildContext, mapValueType))
+                        .map(grandChild -> parseMapElements(grandChild, buildContext, rawValueType))
                         .gather(Utils.optional())
                         .toList();
                 if (grandChildren.size() != 1) {
@@ -457,6 +457,7 @@ public final class FXMLDocumentParser {
         return new FXMLMap(
                 context.classAndIdentifier().identifier(),
                 type,
+                rawValueType,
                 context.factoryMethod(),
                 entries
         );

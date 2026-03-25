@@ -18,11 +18,13 @@ import java.util.Optional;
 ///
 /// @param identifier    The identifier of the map.
 /// @param type          The type of the map.
+/// @param rawValueClass The raw value class of the map.
 /// @param factoryMethod The optional factory method.
 /// @param entries       A collection of key-value mappings representing the entries in the map.
 public record FXMLMap(
         FXMLIdentifier identifier,
         FXMLType type,
+        Class<?> rawValueClass,
         Optional<FXMLFactoryMethod> factoryMethod,
         Map<String, AbstractFXMLValue> entries
 ) implements AbstractFXMLValue, AbstractFXMLObject {
@@ -31,12 +33,14 @@ public record FXMLMap(
     ///
     /// @param identifier    The identifier of the map.
     /// @param type          The type of the map.
+    /// @param rawValueClass The raw value class of the map.
     /// @param factoryMethod The optional factory method name.
     /// @param entries       The collection of entries.
-    /// @throws NullPointerException if `identifier`, `type`, `factoryMethod`, or `entries` is `null`.
+    /// @throws NullPointerException if `identifier`, `type`, `rawValueClass`, `factoryMethod`, or `entries` is `null`.
     public FXMLMap {
         Objects.requireNonNull(identifier, "`identifier` must not be null");
         Objects.requireNonNull(type, "`type` must not be null");
+        Objects.requireNonNull(rawValueClass, "`rawValueClass` must not be null");
         Objects.requireNonNull(factoryMethod, "`factoryMethod` must not be null");
         entries = Map.copyOf(Objects.requireNonNullElseGet(entries, Map::of));
         switch (type) {
