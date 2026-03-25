@@ -7,7 +7,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLWildCardType;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLWildcardType;
 
 import java.util.Map;
 import java.util.Objects;
@@ -50,7 +50,7 @@ public record FXMLMap(
                     throw new IllegalArgumentException("`type` must be a Map: %s".formatted(clazz));
                 }
             }
-            case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildCardType _ -> {
+            case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> {
                 // The type is not yet compiled or available in the current classloader or is a wildcard;
                 // map assignability cannot be verified at this point.
             }

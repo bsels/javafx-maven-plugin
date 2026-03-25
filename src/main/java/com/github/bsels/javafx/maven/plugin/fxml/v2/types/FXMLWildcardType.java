@@ -3,12 +3,12 @@ package com.github.bsels.javafx.maven.plugin.fxml.v2.types;
 /// Represents a wildcard type in FXML.
 ///
 /// This class represents the `?` symbol in generic type parameters.
-public final class FXMLWildCardType implements FXMLType {
-    /// The singleton instance of [FXMLWildCardType].
-    public static final FXMLWildCardType INSTANCE = new FXMLWildCardType();
+public final class FXMLWildcardType implements FXMLType {
+    /// The singleton instance of [FXMLWildcardType].
+    public static final FXMLWildcardType INSTANCE = new FXMLWildcardType();
 
     /// Private constructor to enforce a singleton pattern.
-    private FXMLWildCardType() {
+    private FXMLWildcardType() {
         // Singleton constructor
     }
 
@@ -24,10 +24,10 @@ public final class FXMLWildCardType implements FXMLType {
     ///
     /// @param obj The reference object with which to compare.
     /// @return `true` if this object is the same as the obj argument or if the obj
-    /// argument is also an instance of [FXMLWildCardType].
+    /// argument is also an instance of [FXMLWildcardType].
     @Override
     public boolean equals(Object obj) {
-        return obj instanceof FXMLWildCardType;
+        return obj instanceof FXMLWildcardType;
     }
 
     /// Returns a hash code value for the object.

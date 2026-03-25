@@ -19,7 +19,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLWildCardType;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLWildcardType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
@@ -65,6 +65,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -76,10 +77,7 @@ import java.util.stream.Stream;
 /// This parser handles all standard FXML constructs including object instantiation,
 /// property attributes, static properties, `fx:root`, `fx:id`, `fx:constant`,
 /// `fx:value`, `fx:include`, `fx:copy`, `fx:reference`, `fx:script`, and inline scripts.
-///
-/// @param log the logging instance used for diagnostic output. Must not be null.
-public record FXMLDocumentParser(Log log) {
-
+public final class FXMLDocumentParser {
     /// A regular expression pattern used to match and parse nested generic type definitions.
     /// This pattern identifies sequences of generic type declarations that may be nested
     /// and separated by commas. It considers fully qualified names, optional generic type
@@ -93,13 +91,36 @@ public record FXMLDocumentParser(Log log) {
     private static final Pattern NESTED_GENERICS = Pattern.compile(
             "^\\s*((?<first>((((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*),\\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?)$"
     );
+    /// A map containing special FX elements and their respective handlers used for processing predefined FX tags in
+    /// an FXML file.
+    /// The keys represent the names of FX elements (e.g., fx:reference, fx:copy, fx:include),
+    /// and the values are [BiFunction] handlers that define the logic for resolving or creating instances of those
+    /// elements during the FXML parsing and building process.
+    ///
+    /// This map associates each special FX element name with a [BiFunction] that takes a [ParsedXMLStructure]
+    /// representing the parsed FXML tag and a BuildContext providing the context for the current building process.
+    /// The [BiFunction] returns an [AbstractFXMLValue],
+    /// which represents the resolved or created value for the FX element.
+    ///
+    /// The map is immutable and predefined with keys for FX elements such as
+    /// - [FXMLConstants#FX_REFERENCE_ELEMENT] (fx:reference)
+    /// - [FXMLConstants#FX_COPY_ELEMENT] (fx:copy)
+    /// - [FXMLConstants#FX_INCLUDE_ELEMENT] (fx:include)
+    private final Map<String, BiFunction<ParsedXMLStructure, BuildContext, ? extends AbstractFXMLValue>> specialFxElements = Map.of(
+            FXMLConstants.FX_REFERENCE_ELEMENT, this::parseFXReference,
+            FXMLConstants.FX_COPY_ELEMENT, this::parseFXCopy,
+            FXMLConstants.FX_INCLUDE_ELEMENT, this::parseFXInclude
+    );
+    /// Provides a logger instance for recording runtime information, debugging, and error messages.
+    /// This logger is immutable and initialized once, ensuring consistent logging throughout the application.
+    private final Log log;
 
     /// Compact constructor to validate the log dependency.
     ///
     /// @param log The logging instance used for diagnostic output.
     /// @throws NullPointerException if `log` is `null`.
-    public FXMLDocumentParser {
-        Objects.requireNonNull(log, "`log` must not be null");
+    public FXMLDocumentParser(Log log) {
+        this.log = Objects.requireNonNull(log, "`log` must not be null");
     }
 
     /// Parses the provided [ParsedFXML] instance and constructs an [FXMLDocument].
@@ -116,7 +137,7 @@ public record FXMLDocumentParser(Log log) {
                 rootStructure.properties().get(FXMLConstants.FX_CONTROLLER_ATTRIBUTE)
         ).map(name -> Utils.findType(buildContext.imports(), name));
 
-        AbstractFXMLValue rootValue = parseObject(rootStructure, buildContext, true);
+        AbstractFXMLValue rootValue = parseElement(rootStructure, buildContext, true);
         if (!(rootValue instanceof AbstractFXMLObject root)) {
             throw new IllegalStateException(
                     "Root object must be an instance of AbstractFXMLObject, but was %s".formatted(rootValue.getClass().getSimpleName())
@@ -141,10 +162,13 @@ public record FXMLDocumentParser(Log log) {
     /// @param isRoot       Whether the object is the root of the FXML document.
     /// @return An [AbstractFXMLObject] representing the parsed XML structure.
     /// @throws IllegalStateException if the parsing fails.
-    private AbstractFXMLValue parseObject(ParsedXMLStructure structure, BuildContext buildContext, boolean isRoot)
+    private AbstractFXMLValue parseElement(ParsedXMLStructure structure, BuildContext buildContext, boolean isRoot)
             throws IllegalStateException {
-        Map<String, String> properties = structure.properties();
         String nodeName = structure.name();
+        if (specialFxElements.containsKey(nodeName)) {
+            return parseSpecialFXElements(structure, buildContext);
+        }
+        Map<String, String> properties = structure.properties();
         ClassAndIdentifier classAndIdentifier = resolveClassAndIdentifier(nodeName, properties, buildContext, isRoot);
 
         Class<?> clazz = classAndIdentifier.clazz();
@@ -157,28 +181,68 @@ public record FXMLDocumentParser(Log log) {
             actualType = findFactoryMethodReturnType(clazz, factoryMethodName);
         }
 
-        Map<String, FXMLType> typeMapping = resolveTypeMapping(Utils.getClassType(actualType), buildContext.typeMapping());
-        BuildContext localContext = new BuildContext(
-                buildContext.internalCounter(),
-                buildContext.imports(),
-                buildContext.definitions(),
-                buildContext.scripts(),
-                typeMapping
+        Map<String, FXMLType> typeMapping = resolveTypeMapping(Utils.getClassType(actualType), buildContext);
+        BuildContext localContext = new BuildContext(buildContext, typeMapping);
+
+        FXMLType fxmlType = buildFXMLType(
+                actualType,
+                extractGenericsFromComments(structure.comments()),
+                localContext,
+                localContext.typeMapping()
         );
-
-        FXMLType fxmlType = buildFXMLType(actualType, extractGenericsFromComments(structure.comments()), localContext, localContext.typeMapping());
         Class<?> actualClass = Utils.getClassType(actualType);
-
+        ParseContext context = new ParseContext(structure, localContext, classAndIdentifier, fxmlType, factoryMethod);
         if (Collection.class.isAssignableFrom(actualClass)) {
-            return parseCollection(structure, localContext, classAndIdentifier, fxmlType, factoryMethod);
+            return parseCollection(context);
         } else if (Map.class.isAssignableFrom(actualClass)) {
-            return parseMap(structure, localContext, classAndIdentifier, fxmlType, factoryMethod);
+            return parseMap(context);
         } else {
-            return parsePlainObject(structure, localContext, classAndIdentifier, fxmlType, factoryMethod);
+            return parseSingle(context);
         }
     }
 
-    /// Finds the return type of a static factory method.
+    /// Parses the given special FX element and returns its corresponding abstract FXML value.
+    ///
+    /// @param structure    the parsed XML structure representing the special FX element to be processed
+    /// @param buildContext the context in which the build is occurring, providing necessary utilities and state
+    /// @return the abstract FXML value resulting from processing the special FX element
+    private AbstractFXMLValue parseSpecialFXElements(ParsedXMLStructure structure, BuildContext buildContext) {
+        return specialFxElements.get(structure.name())
+                .apply(structure, buildContext);
+    }
+
+    private AbstractFXMLValue parseFXCopy(ParsedXMLStructure structure, BuildContext buildContext) {
+        Map<String, String> properties = structure.properties();
+        String source = properties.get(FXMLConstants.SOURCE_ATTRIBUTE);
+        if (source == null) {
+            throw new IllegalArgumentException("`source` attribute is required for fx:copy");
+        }
+        FXMLIdentifier copyId = resolveOptionalIdentifier(properties)
+                .orElseGet(() -> new FXMLInternalIdentifier(buildContext.nextInternalId()));
+        return new FXMLCopy(copyId, source);
+    }
+
+    private AbstractFXMLValue parseFXInclude(ParsedXMLStructure structure, BuildContext buildContext) {
+        Map<String, String> properties = structure.properties();
+        String source = properties.get(FXMLConstants.SOURCE_ATTRIBUTE);
+        if (source == null) {
+            throw new IllegalArgumentException("`source` attribute is required for fx:include");
+        }
+        FXMLIdentifier includeId = resolveOptionalIdentifier(properties)
+                .orElseGet(() -> new FXMLInternalIdentifier(buildContext.nextInternalId()));
+        return new FXMLInclude(includeId, source);
+    }
+
+    private AbstractFXMLValue parseFXReference(ParsedXMLStructure structure, BuildContext ignored) {
+        String source = structure.properties()
+                .get(FXMLConstants.SOURCE_ATTRIBUTE);
+        if (source == null) {
+            throw new IllegalArgumentException("`source` attribute is required for fx:reference");
+        }
+        return new FXMLReference(source);
+    }
+
+    /// Finds the return type of the static factory method.
     ///
     /// @param clazz             The class declaring the factory method.
     /// @param factoryMethodName The name of the factory method.
@@ -196,28 +260,19 @@ public record FXMLDocumentParser(Log log) {
 
     /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLCollection] object.
     ///
-    /// @param structure          The [ParsedXMLStructure] representing the XML to be parsed.
-    /// @param buildContext       The [BuildContext] that provides the context during the parsing process.
-    /// @param classAndIdentifier The [ClassAndIdentifier] containing the class type and identifier for the collection.
-    /// @param type               The resolved [FXMLType] of the collection.
-    /// @param factoryMethod      The optional factory method used for instantiation.
+    /// @param context The [ParseContext] containing the parsed XML structure, build context, class and identifier, and FXML type.
     /// @return An [FXMLCollection] object constructed from the parsed XML structure, generics, factory method, and child values.
-    private AbstractFXMLValue parseCollection(
-            ParsedXMLStructure structure,
-            BuildContext buildContext,
-            ClassAndIdentifier classAndIdentifier,
-            FXMLType type,
-            Optional<FXMLFactoryMethod> factoryMethod
-    ) {
-        List<AbstractFXMLValue> values = structure.children()
+    private AbstractFXMLValue parseCollection(ParseContext context) {
+        List<AbstractFXMLValue> values = context.structure()
+                .children()
                 .stream()
-                .map(parseValueChild(buildContext))
+                .map(parseValueChild(context.buildContext()))
                 .gather(Utils.optional())
                 .toList();
         return new FXMLCollection(
-                classAndIdentifier.identifier(),
-                type,
-                factoryMethod,
+                context.classAndIdentifier().identifier(),
+                context.type(),
+                context.factoryMethod(),
                 values
         );
     }
@@ -230,19 +285,11 @@ public record FXMLDocumentParser(Log log) {
     /// - Child elements, where the element name is used as the key and the children are parsed via
     ///   [#parseValue(ParsedXMLStructure, BuildContext)].
     ///
-    /// @param structure          The [ParsedXMLStructure] representing the XML to be parsed.
-    /// @param buildContext       The [BuildContext] that provides the context during the parsing process.
-    /// @param classAndIdentifier The [ClassAndIdentifier] containing the class type and identifier for the map.
-    /// @param type               The resolved [FXMLType] of the map.
-    /// @param factoryMethod      The optional factory method used for instantiation.
+    /// @param context The parsing context containing the necessary information for map parsing.
     /// @return An [FXMLMap] object constructed from the parsed XML structure.
-    private AbstractFXMLValue parseMap(
-            ParsedXMLStructure structure,
-            BuildContext buildContext,
-            ClassAndIdentifier classAndIdentifier,
-            FXMLType type,
-            Optional<FXMLFactoryMethod> factoryMethod
-    ) {
+    private AbstractFXMLValue parseMap(ParseContext context) {
+        ParsedXMLStructure structure = context.structure();
+        BuildContext buildContext = context.buildContext();
         Map<String, String> properties = structure.properties();
         Map<String, AbstractFXMLValue> entries = properties.entrySet()
                 .stream()
@@ -268,9 +315,9 @@ public record FXMLDocumentParser(Log log) {
             }
         }
         return new FXMLMap(
-                classAndIdentifier.identifier(),
-                type,
-                factoryMethod,
+                context.classAndIdentifier().identifier(),
+                context.type(),
+                context.factoryMethod(),
                 entries
         );
     }
@@ -282,39 +329,30 @@ public record FXMLDocumentParser(Log log) {
     private void parseDefinitions(BuildContext buildContext, ParsedXMLStructure child) {
         child.children()
                 .stream()
-                .map(defChild -> parseObject(defChild, buildContext, false))
+                .map(defChild -> parseElement(defChild, buildContext, false))
                 .forEach(buildContext.definitions()::add);
     }
 
     /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLObject].
     ///
-    /// @param structure          The [ParsedXMLStructure] representing the XML to be parsed.
-    /// @param buildContext       The [BuildContext] that provides the context during the parsing process.
-    /// @param classAndIdentifier The [ClassAndIdentifier] containing the class type and identifier for the object.
-    /// @param type               The resolved [FXMLType] of the object.
-    /// @param factoryMethod      The optional factory method used for instantiation.
+    /// @param context The [ParseContext] containing the parsed XML structure, build context, class and identifier, and FXML type.
     /// @return An [FXMLObject] constructed from the parsed XML structure.
-    private AbstractFXMLValue parsePlainObject(
-            ParsedXMLStructure structure,
-            BuildContext buildContext,
-            ClassAndIdentifier classAndIdentifier,
-            FXMLType type,
-            Optional<FXMLFactoryMethod> factoryMethod
-    ) {
+    private AbstractFXMLValue parseSingle(ParseContext context) {
+        return parseConstantOrValue(context.structure(), context.buildContext(), context.classAndIdentifier())
+                .orElseGet(() -> parsePlainObject(context));
+    }
+
+    /// Parses a plain FXML object from the provided parsing context, resolving its properties, child elements,
+    /// and other attributes into an `FXMLObject` representation.
+    ///
+    /// @param context The parsing context containing necessary metadata for parsing, including the structure, build context, and class-related information.
+    /// @return An `FXMLObject` instance constructed based on the parsed structure, properties, and child elements defined in the context.
+    private FXMLObject parsePlainObject(ParseContext context) {
+        ParsedXMLStructure structure = context.structure();
+        BuildContext buildContext = context.buildContext();
+        ClassAndIdentifier classAndIdentifier = context.classAndIdentifier();
         Class<?> clazz = classAndIdentifier.clazz();
         Map<String, String> attributes = structure.properties();
-
-        if (attributes.containsKey(FXMLConstants.FX_CONSTANT_ATTRIBUTE)) {
-            String constantName = attributes.get(FXMLConstants.FX_CONSTANT_ATTRIBUTE);
-            FXMLType constantType = new FXMLClassType(Utils.getClassType(resolveConstantType(clazz, constantName)));
-            return new FXMLConstant(clazz, constantName, constantType);
-        }
-
-        if (attributes.containsKey(FXMLConstants.FX_VALUE_ATTRIBUTE)) {
-            String val = attributes.get(FXMLConstants.FX_VALUE_ATTRIBUTE);
-            return new FXMLValue(Optional.of(classAndIdentifier.identifier()), new FXMLClassType(clazz), val);
-        }
-
         List<FXMLProperty> properties = attributes.entrySet()
                 .stream()
                 .filter(entry -> !hasSkippablePrefix(entry.getKey()))
@@ -328,18 +366,6 @@ public record FXMLDocumentParser(Log log) {
                 parseDefinitions(buildContext, child);
             } else if (FXMLConstants.FX_SCRIPT_ELEMENT.equals(childName)) {
                 buildContext.scripts().add(parseScript(child));
-            } else if (FXMLConstants.FX_INCLUDE_ELEMENT.equals(childName)
-                    || FXMLConstants.FX_REFERENCE_ELEMENT.equals(childName)
-                    || FXMLConstants.FX_COPY_ELEMENT.equals(childName)) {
-                AbstractFXMLValue fxValue = parseValue(child, buildContext);
-                Optional<String> defaultPropName = resolveDefaultPropertyName(clazz);
-                String getterName = Utils.getGetterName(defaultPropName.orElseThrow());
-                try {
-                    Method getter = clazz.getMethod(getterName);
-                    addValueToMultipleProperty(buildContext, properties, defaultPropName.orElseThrow(), getterName, getter.getGenericReturnType(), fxValue);
-                } catch (NoSuchMethodException _) {
-                    log.debug("No default list property found on %s for %s, skipping".formatted(clazz.getSimpleName(), childName));
-                }
             } else if (childName.contains(".")) {
                 int dotIndex = childName.lastIndexOf('.');
                 String ownerPart = childName.substring(0, dotIndex);
@@ -377,7 +403,7 @@ public record FXMLDocumentParser(Log log) {
                         }
                     }
                     if (!handled) {
-                        AbstractFXMLValue childValue = parseObject(child, buildContext, false);
+                        AbstractFXMLValue childValue = parseElement(child, buildContext, false);
                         Optional<String> defaultPropName = resolveDefaultPropertyName(clazz);
                         if (defaultPropName.isPresent()) {
                             String defaultGetterName = Utils.getGetterName(defaultPropName.get());
@@ -396,7 +422,37 @@ public record FXMLDocumentParser(Log log) {
             }
         }
 
-        return new FXMLObject(classAndIdentifier.identifier(), type, factoryMethod, properties);
+        return new FXMLObject(classAndIdentifier.identifier(), context.type(), context.factoryMethod(), properties);
+    }
+
+    /// Parses a constant or value attribute from the provided XML structure and returns an appropriate instance.
+    ///
+    /// @param structure          the [ParsedXMLStructure] containing the XML attributes and metadata to parse.
+    /// @param buildContext       the [BuildContext] used during the parsing process to resolve types and dependencies.
+    /// @param classAndIdentifier the [ClassAndIdentifier] holding the class and identifier used for resolution.
+    /// @return an [Optional] containing an [AbstractFXMLValue] representing either an [FXMLConstant] or [FXMLValue], or an empty [Optional] if neither are found in the given structure.
+    private Optional<AbstractFXMLValue> parseConstantOrValue(
+            ParsedXMLStructure structure,
+            BuildContext buildContext,
+            ClassAndIdentifier classAndIdentifier
+    ) {
+        Class<?> clazz = classAndIdentifier.clazz();
+        Map<String, String> properties = structure.properties();
+        if (properties.containsKey(FXMLConstants.FX_CONSTANT_ATTRIBUTE)) {
+            String constantName = properties.get(FXMLConstants.FX_CONSTANT_ATTRIBUTE);
+            FXMLType constantType = buildFXMLType(
+                    resolveConstantType(clazz, constantName),
+                    List.of(),
+                    buildContext,
+                    Map.of()
+            );
+            return Optional.of(new FXMLConstant(clazz, constantName, constantType));
+        }
+        if (properties.containsKey(FXMLConstants.FX_VALUE_ATTRIBUTE)) {
+            String val = properties.get(FXMLConstants.FX_VALUE_ATTRIBUTE);
+            return Optional.of(new FXMLValue(Optional.of(classAndIdentifier.identifier()), FXMLType.of(clazz), val));
+        }
+        return Optional.empty();
     }
 
     /// Resolves the default property name for a class using the [DefaultProperty] annotation.
@@ -423,8 +479,8 @@ public record FXMLDocumentParser(Log log) {
     /// If the generics list is empty, it attempts to resolve the type from the provided [Type]:
     /// - [Class]: returns [FXMLClassType], or [FXMLGenericType] if the class has type parameters.
     /// - [ParameterizedType]: returns [FXMLGenericType] with recursively resolved type arguments.
-    /// - [TypeVariable]: resolves via `typeMapping`, or returns [FXMLWildCardType] if not found.
-    /// - [WildcardType]: returns the resolved upper or lower bound type, or [FXMLWildCardType] for unbounded wildcards.
+    /// - [TypeVariable]: resolves via `typeMapping`, or returns [FXMLWildcardType] if not found.
+    /// - [WildcardType]: returns the resolved upper or lower bound type, or [FXMLWildcardType] for unbounded wildcards.
     ///
     /// If the generics list is not empty (e.g., from XML comments), it uses those instead,
     /// recursively parsing each generic string into an [FXMLType] tree.
@@ -440,32 +496,32 @@ public record FXMLDocumentParser(Log log) {
             List<FXMLType> typeArgs = generics.stream()
                     .map(generic -> parseGenericString(generic.strip(), buildContext))
                     .toList();
-            return new FXMLGenericType(clazz, typeArgs);
+            return FXMLType.of(clazz, typeArgs);
         }
 
         return switch (type) {
             case Class<?> clazz -> {
-                Map<String, FXMLType> resolvedMapping = resolveTypeMapping(clazz, typeMapping);
+                Map<String, FXMLType> resolvedMapping = resolveTypeMapping(clazz, buildContext);
                 if (clazz.getTypeParameters().length > 0) {
                     List<FXMLType> typeArgs = Stream.of(clazz.getTypeParameters())
-                            .map(tp -> resolvedMapping.getOrDefault(tp.getName(), new FXMLClassType(Object.class)))
+                            .map(tp -> resolvedMapping.getOrDefault(tp.getName(), FXMLType.of(Object.class)))
                             .toList();
-                    yield new FXMLGenericType(clazz, typeArgs);
+                    yield FXMLType.of(clazz, typeArgs);
                 }
                 // Check if any superclass/interface resolved type parameters for this class
                 // But wait, if this class has no type parameters itself, it should be FXMLClassType
                 // UNLESS we want to represent it as a generic type of its superclass?
                 // No, the FXMLType should represent the class itself.
-                yield new FXMLClassType(clazz);
+                yield FXMLType.of(clazz);
             }
             case ParameterizedType pt -> {
                 Class<?> rawClass = (Class<?>) pt.getRawType();
                 List<FXMLType> typeArgs = Stream.of(pt.getActualTypeArguments())
                         .map(arg -> buildFXMLType(arg, List.of(), buildContext, typeMapping))
                         .toList();
-                yield new FXMLGenericType(rawClass, typeArgs);
+                yield FXMLType.of(rawClass, typeArgs);
             }
-            case TypeVariable<?> tv -> typeMapping.getOrDefault(tv.getName(), FXMLWildCardType.INSTANCE);
+            case TypeVariable<?> tv -> typeMapping.getOrDefault(tv.getName(), FXMLType.wildcard());
             case WildcardType wt -> {
                 Type[] upperBounds = wt.getUpperBounds();
                 Type[] lowerBounds = wt.getLowerBounds();
@@ -474,20 +530,20 @@ public record FXMLDocumentParser(Log log) {
                 } else if (lowerBounds.length > 0) {
                     yield buildFXMLType(lowerBounds[0], List.of(), buildContext, typeMapping);
                 } else {
-                    yield FXMLWildCardType.INSTANCE;
+                    yield FXMLType.wildcard();
                 }
             }
-            default -> new FXMLClassType(Utils.getClassType(type));
+            default -> FXMLType.of(Utils.getClassType(type));
         };
     }
 
     /// Resolves the type mapping for a given class by inspecting its hierarchy.
     ///
-    /// @param clazz       The class to resolve the mapping for.
-    /// @param baseMapping The base mapping to start from.
+    /// @param clazz        The class to resolve the mapping for.
+    /// @param buildContext The build context used for resolving type variables.
     /// @return A map of type variable names to their resolved [FXMLType]s.
-    private Map<String, FXMLType> resolveTypeMapping(Class<?> clazz, Map<String, FXMLType> baseMapping) {
-        Map<String, FXMLType> mapping = new LinkedHashMap<>(baseMapping);
+    private Map<String, FXMLType> resolveTypeMapping(Class<?> clazz, BuildContext buildContext) {
+        Map<String, FXMLType> mapping = new LinkedHashMap<>(buildContext.typeMapping());
         Set<Type> visited = new HashSet<>();
         resolveTypeMappingInternal(clazz, mapping, visited);
         return mapping;
@@ -524,20 +580,20 @@ public record FXMLDocumentParser(Log log) {
                             mapping.put(typeParameters[i].getName(), resolved);
                         }
                     }
-                    case Class<?> argClass -> mapping.put(typeParameters[i].getName(), new FXMLClassType(argClass));
+                    case Class<?> argClass -> mapping.put(typeParameters[i].getName(), FXMLType.of(argClass));
                     case ParameterizedType argPt -> {
                         Class<?> argRawClass = (Class<?>) argPt.getRawType();
                         List<FXMLType> argTypeArgs = Stream.of(argPt.getActualTypeArguments())
                                 .map(innerArg -> {
                                     if (innerArg instanceof Class<?> innerClass) {
-                                        return new FXMLClassType(innerClass);
+                                        return FXMLType.of(innerClass);
                                     }
-                                    return FXMLWildCardType.INSTANCE;
+                                    return FXMLType.wildcard();
                                 })
                                 .toList();
-                        mapping.put(typeParameters[i].getName(), new FXMLGenericType(argRawClass, argTypeArgs));
+                        mapping.put(typeParameters[i].getName(), FXMLType.of(argRawClass, argTypeArgs));
                     }
-                    case null, default -> mapping.put(typeParameters[i].getName(), FXMLWildCardType.INSTANCE);
+                    case null, default -> mapping.put(typeParameters[i].getName(), FXMLType.wildcard());
                 }
             }
             resolveTypeMappingInternal(rawClass, mapping, visited);
@@ -554,26 +610,20 @@ public record FXMLDocumentParser(Log log) {
     /// @param genericString The generic type string to parse (e.g., `Map<String, List<Integer>>`).
     /// @param buildContext  The build context used for class resolution.
     /// @return The corresponding [FXMLType], potentially nested.
+    /// @throws IllegalArgumentException if the generic string is invalid
     private FXMLType parseGenericString(String genericString, BuildContext buildContext) {
         Matcher matcher = NESTED_GENERICS.matcher(genericString);
         if (!matcher.find()) {
-            log().warn("Could not parse generic type string: %s".formatted(genericString));
-            return new FXMLUncompiledClassType(genericString);
+            throw new IllegalArgumentException("Invalid generic type string: %s".formatted(genericString));
         }
         String rawType = matcher.group("rawType").strip();
         String nestedGenerics = matcher.group("generics");
         List<FXMLType> nestedTypeArgs = parseNestedGenerics(nestedGenerics, buildContext);
         try {
             Class<?> resolvedClass = Utils.findType(buildContext.imports(), rawType);
-            if (nestedTypeArgs.isEmpty()) {
-                return new FXMLClassType(resolvedClass);
-            }
-            return new FXMLGenericType(resolvedClass, nestedTypeArgs);
+            return FXMLType.of(resolvedClass, nestedTypeArgs);
         } catch (InternalClassNotFoundException _) {
-            if (nestedTypeArgs.isEmpty()) {
-                return new FXMLUncompiledClassType(rawType);
-            }
-            return new FXMLUncompiledGenericType(rawType, nestedTypeArgs);
+            return FXMLType.of(rawType, nestedTypeArgs);
         }
     }
 
@@ -594,7 +644,7 @@ public record FXMLDocumentParser(Log log) {
         while (remaining != null) {
             Matcher matcher = NESTED_GENERICS.matcher(remaining);
             if (!matcher.find()) {
-                log().warn("Could not parse nested generic type string: %s".formatted(remaining));
+                log.warn("Could not parse nested generic type string: %s".formatted(remaining));
                 break;
             }
             String rawType = matcher.group("rawType").strip();
@@ -603,9 +653,9 @@ public record FXMLDocumentParser(Log log) {
             FXMLType type;
             try {
                 Class<?> resolvedClass = Utils.findType(buildContext.imports(), rawType);
-                type = deeperArgs.isEmpty() ? new FXMLClassType(resolvedClass) : new FXMLGenericType(resolvedClass, deeperArgs);
+                type = FXMLType.of(resolvedClass, deeperArgs);
             } catch (InternalClassNotFoundException _) {
-                type = deeperArgs.isEmpty() ? new FXMLUncompiledClassType(rawType) : new FXMLUncompiledGenericType(rawType, deeperArgs);
+                type = FXMLType.of(rawType, deeperArgs);
             }
             result.addFirst(type);
             remaining = matcher.group("first");
@@ -674,7 +724,7 @@ public record FXMLDocumentParser(Log log) {
                 throw new IllegalArgumentException("`source` attribute is required for fx:include");
             }
             FXMLIdentifier includeId = resolveOptionalIdentifier(attributes)
-                    .orElseGet(() -> new FXMLInternalIdentifier(buildContext.internalCounter().getAndIncrement()));
+                    .orElseGet(() -> new FXMLInternalIdentifier(buildContext.nextInternalId()));
             return new FXMLInclude(includeId, src);
         }
 
@@ -692,7 +742,7 @@ public record FXMLDocumentParser(Log log) {
                 throw new IllegalArgumentException("`source` attribute is required for fx:copy");
             }
             FXMLIdentifier copyId = resolveOptionalIdentifier(attributes)
-                    .orElseGet(() -> new FXMLInternalIdentifier(buildContext.internalCounter().getAndIncrement()));
+                    .orElseGet(() -> new FXMLInternalIdentifier(buildContext.nextInternalId()));
             return new FXMLCopy(copyId, source);
         }
 
@@ -710,14 +760,14 @@ public record FXMLDocumentParser(Log log) {
             Class<?> clazz = clazzOpt.get();
             if (attributes.containsKey(FXMLConstants.FX_CONSTANT_ATTRIBUTE)) {
                 String constantName = attributes.get(FXMLConstants.FX_CONSTANT_ATTRIBUTE);
-                FXMLType constantType = new FXMLClassType(Utils.getClassType(resolveConstantType(clazz, constantName)));
+                FXMLType constantType = FXMLType.of(Utils.getClassType(resolveConstantType(clazz, constantName)));
                 return new FXMLConstant(clazz, constantName, constantType);
             }
 
             if (attributes.containsKey(FXMLConstants.FX_VALUE_ATTRIBUTE)) {
                 String val = attributes.get(FXMLConstants.FX_VALUE_ATTRIBUTE);
                 Optional<FXMLIdentifier> id = resolveOptionalIdentifier(attributes);
-                return new FXMLValue(id, new FXMLClassType(clazz), val);
+                return new FXMLValue(id, FXMLType.of(clazz), val);
             }
         }
 
@@ -725,7 +775,7 @@ public record FXMLDocumentParser(Log log) {
             return new FXMLLiteral(structure.getTextValue());
         }
 
-        return parseObject(structure, buildContext, false);
+        return parseElement(structure, buildContext, false);
     }
 
     /// Determines if the given string has a skippable prefix.
@@ -790,7 +840,7 @@ public record FXMLDocumentParser(Log log) {
             } else if (attributes.containsKey(FXMLConstants.FX_ID_ATTRIBUTE)) {
                 identifier = new FXMLExposedIdentifier(attributes.get(FXMLConstants.FX_ID_ATTRIBUTE));
             } else {
-                identifier = new FXMLInternalIdentifier(buildContext.internalCounter().getAndIncrement());
+                identifier = new FXMLInternalIdentifier(buildContext.nextInternalId());
             }
             log.debug("Parsing object with type: %s".formatted(clazz.getName()));
         }
@@ -1145,12 +1195,12 @@ public record FXMLDocumentParser(Log log) {
         if (paramType != null && isFunctionalInterface(paramType)) {
             try {
                 Method functionalMethod = Utils.getFunctionalMethod(paramType);
-                returnType = new FXMLClassType(functionalMethod.getReturnType());
+                returnType = FXMLType.of(functionalMethod.getReturnType());
             } catch (IllegalStateException _) {
-                returnType = new FXMLClassType(void.class);
+                returnType = FXMLType.of(void.class);
             }
         } else {
-            returnType = new FXMLClassType(void.class);
+            returnType = FXMLType.of(void.class);
         }
         return new FXMLMethod(methodName, List.of(), returnType);
     }
@@ -1322,6 +1372,66 @@ public record FXMLDocumentParser(Log log) {
         /// @param imports The list of imports.
         public BuildContext(List<String> imports) {
             this(new AtomicInteger(), imports, new ArrayList<>(), new ArrayList<>(), new LinkedHashMap<>());
+        }
+
+        /// Constructs a new `BuildContext` by copying the properties of an existing `BuildContext`
+        /// and replacing the `typeMapping` with the provided mapping.
+        ///
+        /// @param original    The original `BuildContext` instance, from which properties like internal counter, imports, definitions, and scripts are copied.
+        /// @param typeMapping The new map for resolving type variables, replacing the original `typeMapping` of the provided `BuildContext`.
+        /// @throws NullPointerException If `original` or `typeMapping` is `null`.
+        public BuildContext(
+                BuildContext original,
+                Map<String, FXMLType> typeMapping
+        ) {
+            Objects.requireNonNull(original, "`original` must not be null");
+            Objects.requireNonNull(typeMapping, "`typeMapping` must not be null");
+            this(original.internalCounter, original.imports, original.definitions, original.scripts, typeMapping);
+        }
+
+        /// Generates the next internal identifier for tracking purposes.
+        ///
+        /// @return The next incremental identifier as an integer.
+        private int nextInternalId() {
+            return internalCounter.getAndIncrement();
+        }
+    }
+
+    /// Represents the parsing context for an FXML document.
+    /// This record encapsulates all necessary information required for parsing and building FXML structures,
+    /// ensuring proper linking between parsed elements and their associated metadata.
+    ///
+    /// Instances of this record are immutable and provide a clear way to organize the parts necessary for handling FXML
+    /// processing tasks.
+    ///
+    /// @param structure          The parsed structure of the FXML document. Represents the hierarchical representation of the FXML content.
+    /// @param buildContext       The context used during the construction phase of the FXML document, providing the necessary state and resources.
+    /// @param classAndIdentifier Carries information about the involved class and its associated identifier, helping to map FXML elements to Java objects.
+    /// @param type               Specifies the type of the FXML element being processed, which could determine handling logic during parsing and building.
+    /// @param factoryMethod      Represents the factory method, if any, that may be invoked to create specific instances of the FXML elements. This parameter can be optional but cannot be null.
+    private record ParseContext(
+            ParsedXMLStructure structure,
+            BuildContext buildContext,
+            ClassAndIdentifier classAndIdentifier,
+            FXMLType type,
+            Optional<FXMLFactoryMethod> factoryMethod
+    ) {
+
+        /// Constructor for the `ParseContext` record,
+        /// used to encapsulate the context required to parse an FXML document.
+        ///
+        /// @param structure          The parsed structure of the FXML document. Must not be null.
+        /// @param buildContext       The context used during the building of the FXML document. Must not be null.
+        /// @param classAndIdentifier The class and identifier details associated with this parse context. Must not be null.
+        /// @param type               The type of the FXML object being parsed. Must not be null.
+        /// @param factoryMethod      The factory method associated with the FXML object, if available. Can be empty but must not be null.
+        /// @throws NullPointerException if any of the parameters (except `factoryMethod`) are null.
+        private ParseContext {
+            Objects.requireNonNull(structure, "`structure` must not be null");
+            Objects.requireNonNull(buildContext, "`buildContext` must not be null");
+            Objects.requireNonNull(classAndIdentifier, "`classAndIdentifier` must not be null");
+            Objects.requireNonNull(type, "`type` must not be null");
+            Objects.requireNonNull(factoryMethod, "`factoryMethod` must not be null");
         }
     }
 }
