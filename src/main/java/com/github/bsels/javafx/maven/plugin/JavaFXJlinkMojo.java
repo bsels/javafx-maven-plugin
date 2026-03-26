@@ -113,7 +113,7 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
     /// File name of the logging configuration properties file used by the JavaFXJlinkMojo class.
     /// This file contains logging-related settings that configure the logging behavior during
     /// the execution of the plugin.
-    /// It serves as a reference to locate and utilize the specific logging configuration file
+    /// It serves as a reference to locate and use the specific logging configuration file
     /// required for proper logging output when running associated processes.
     private static final String LOGGING_PROPERTIES_FILE = "logging.properties";
     /// Represents the file extension for a ZIP archive.
@@ -152,9 +152,9 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
     @Parameter(readonly = true, required = true, defaultValue = "${project.build.directory}")
     Path buildDirectory;
     /// Specifies the launcher name for the JavaFX application.
-    /// This parameter is used to define the application's entry point or launcher that is utilized
-    /// during the build process. It corresponds to the "javafx.launcher" property and can be configured
-    /// in the Maven plugin configuration if needed.
+    /// This parameter is used to define the application's entry point or launcher used during the build process.
+    /// It corresponds to the "javafx.launcher" property and can be configured in the Maven plugin configuration
+    /// if needed.
     @Parameter(property = "javafx.launcher")
     String launcher;
     /// Specifies the path to the `jlink` executable to be used during the build process.
@@ -175,7 +175,7 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
     /// The name of the directory to be created as the output of the jlink tool.
     /// This is the name of the image containing the runtime and application modules.
     /// Configured via the Maven property `javafx.jlinkImageName`.
-    /// Default value is "image".
+    /// The default value is "image".
     @Parameter(property = "javafx.jlinkImageName", defaultValue = "image")
     String jlinkImageName;
     /// Specifies the path to the directory containing the JavaFX modular runtime platform (jmods).
@@ -327,7 +327,7 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
     /// such as stripping debug information, compression, or module binding based on the class-level configurations.
     ///
     /// @return a list of strings representing the `jlink` command and its arguments
-    /// @throws MojoExecutionException if a required configuration (e.g., module descriptor) is missing or if there are issues with cleanup or invalid options
+    /// @throws MojoExecutionException if a required configuration (e.g., module descriptor) is missing, or if there are issues with cleanup or invalid options
     private List<String> getJLinkCommand() throws MojoExecutionException {
         List<String> command = new ArrayList<>(getExecutable(jlinkExecutable));
         if (!isEmpty(modulePathElements)) {
@@ -425,10 +425,10 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
     /// to be Windows, it also processes the corresponding `.bat` launcher script. The scripts are
     /// modified based on the configurations provided within the class, such as JVM options and
     /// command-line arguments.
-    /// The method utilizes [#patchLauncherScript(String)] to apply the modifications to the
+    /// The method uses [#patchLauncherScript(String)] to apply the modifications to the
     /// individual launcher scripts. If the script does not exist, a warning is logged, and no changes are made.
     ///
-    /// @throws MojoExecutionException if an error occurs during the modification of the launcher scripts,                                                                                                                                          such as an I/O issue or invalid script content.
+    /// @throws MojoExecutionException if an error occurs during the modification of the launcher scripts, such as an I/O issue or invalid script content.
     private void patchLauncherScripts() throws MojoExecutionException {
         if (isEmpty(launcher)) {
             return;

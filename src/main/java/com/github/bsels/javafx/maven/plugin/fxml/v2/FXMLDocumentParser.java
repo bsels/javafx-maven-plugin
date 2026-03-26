@@ -785,7 +785,7 @@ public final class FXMLDocumentParser {
     /// @param type         The [FXMLType] of the static property.
     /// @param value        The [ParsedXMLStructure] representing the property's value.
     /// @return An [AbstractFXMLValue] representing the parsed value.
-    /// @throws IllegalArgumentException If the structure contains multiple child elements when a single value is expected.
+    /// @throws IllegalArgumentException If the structure contains multiple child elements, when a single value is expected.
     private AbstractFXMLValue parseStaticPropertyOfElement(
             BuildContext buildContext,
             FXMLType type,
@@ -931,7 +931,7 @@ public final class FXMLDocumentParser {
     }
 
     /// Parses a property and processes it based on its type and context.
-    /// his method handles both static setter properties and object properties,
+    /// This method handles both static setter properties and object properties
     /// and delegates additional processing to provided functional handlers.
     ///
     /// @param defaultPropertyValues a list to which default property values can be added during processing
@@ -1089,64 +1089,8 @@ public final class FXMLDocumentParser {
     private Map<String, FXMLType> resolveTypeMapping(Class<?> clazz, BuildContext buildContext) {
         Map<String, FXMLType> mapping = new LinkedHashMap<>(buildContext.typeMapping());
         Set<Type> visited = new HashSet<>();
-        resolveTypeMappingInternal(clazz, mapping, visited);
+        FXMLUtils.resolveTypeMapping(clazz, mapping, visited);
         return mapping;
-    }
-
-    /// Recursively resolves the type mapping for a given type and updates the mapping.
-    ///
-    /// The logic handles:
-    /// - [Class]: Recursively calls for superclass and interfaces.
-    /// - [ParameterizedType]: Maps actual type arguments to the raw class's type parameters.
-    /// It avoids infinite recursion by tracking visited types.
-    ///
-    /// @param type    The type to resolve.
-    /// @param mapping The mapping to update.
-    /// @param visited The set of visited types to avoid infinite recursion.
-    private void resolveTypeMappingInternal(Type type, Map<String, FXMLType> mapping, Set<Type> visited) {
-        if (type == null || type == Object.class || !visited.add(type)) {
-            return;
-        }
-
-        if (type instanceof Class<?> clazz) {
-            Type superclass = clazz.getGenericSuperclass();
-            if (superclass != null) {
-                resolveTypeMappingInternal(superclass, mapping, visited);
-            }
-            for (Type genericInterface : clazz.getGenericInterfaces()) {
-                resolveTypeMappingInternal(genericInterface, mapping, visited);
-            }
-        } else if (type instanceof ParameterizedType pt) {
-            Class<?> rawClass = (Class<?>) pt.getRawType();
-            TypeVariable<?>[] typeParameters = rawClass.getTypeParameters();
-            Type[] actualTypeArguments = pt.getActualTypeArguments();
-            for (int i = 0; i < typeParameters.length && i < actualTypeArguments.length; i++) {
-                Type arg = actualTypeArguments[i];
-                switch (arg) {
-                    case TypeVariable<?> tv -> {
-                        FXMLType resolved = mapping.get(tv.getName());
-                        if (resolved != null) {
-                            mapping.put(typeParameters[i].getName(), resolved);
-                        }
-                    }
-                    case Class<?> argClass -> mapping.put(typeParameters[i].getName(), FXMLType.of(argClass));
-                    case ParameterizedType argPt -> {
-                        Class<?> argRawClass = (Class<?>) argPt.getRawType();
-                        List<FXMLType> argTypeArgs = Stream.of(argPt.getActualTypeArguments())
-                                .map(innerArg -> {
-                                    if (innerArg instanceof Class<?> innerClass) {
-                                        return FXMLType.of(innerClass);
-                                    }
-                                    return FXMLType.wildcard();
-                                })
-                                .toList();
-                        mapping.put(typeParameters[i].getName(), FXMLType.of(argRawClass, argTypeArgs));
-                    }
-                    case null, default -> mapping.put(typeParameters[i].getName(), FXMLType.wildcard());
-                }
-            }
-            resolveTypeMappingInternal(rawClass, mapping, visited);
-        }
     }
 
     /// Recursively parses a single generic type string into an [FXMLType].

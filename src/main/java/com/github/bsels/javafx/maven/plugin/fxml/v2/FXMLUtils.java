@@ -91,7 +91,7 @@ public final class FXMLUtils {
     ///
     /// @param type The [FXMLType] representing the map type.
     /// @return A [Map.Entry] where the key is the [FXMLType] of the map's key type and the value is the [FXMLType]
-    ///                 of the map's value type, both defaulting to `FXMLType.of(Object.class)` if they cannot be determined.
+    ///                         of the map's value type, both defaulting to `FXMLType.of(Object.class)` if they cannot be determined.
     public static Map.Entry<FXMLType, FXMLType> findMapKeyAndValueTypes(FXMLType type) {
         return switch (type) {
             case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ ->
@@ -114,20 +114,6 @@ public final class FXMLUtils {
         };
     }
 
-    /// Builds an initial type variable mapping from a class's own type parameters to the provided generic arguments.
-    ///
-    /// @param clazz    The class whose type parameters are to be mapped.
-    /// @param generics The list of [FXMLType] arguments corresponding to the class's type parameters.
-    /// @return A [Map] from a type parameter name to its resolved [FXMLType].
-    private static Map<String, FXMLType> buildInitialTypeMapping(Class<?> clazz, List<FXMLType> generics) {
-        Map<String, FXMLType> mapping = new LinkedHashMap<>();
-        TypeVariable<?>[] typeParameters = clazz.getTypeParameters();
-        for (int i = 0; i < typeParameters.length && i < generics.size(); i++) {
-            mapping.put(typeParameters[i].getName(), generics.get(i));
-        }
-        return mapping;
-    }
-
     /// Recursively resolves the type mapping for a given type and updates the mapping,
     /// traversing the class hierarchy to propagate type variable bindings.
     ///
@@ -139,7 +125,7 @@ public final class FXMLUtils {
     /// @param type    The type to resolve.
     /// @param mapping The mapping to update.
     /// @param visited The set of visited types to avoid infinite recursion.
-    private static void resolveTypeMapping(Type type, Map<String, FXMLType> mapping, Set<Type> visited) {
+    public static void resolveTypeMapping(Type type, Map<String, FXMLType> mapping, Set<Type> visited) {
         if (type == null || type == Object.class || !visited.add(type)) {
             return;
         }
@@ -193,4 +179,19 @@ public final class FXMLUtils {
         Objects.requireNonNull(name, "`name` must not be null");
         return !VALID_NAME_PATTERN.test(name);
     }
+
+    /// Builds an initial type variable mapping from a class's own type parameters to the provided generic arguments.
+    ///
+    /// @param clazz    The class whose type parameters are to be mapped.
+    /// @param generics The list of [FXMLType] arguments corresponding to the class's type parameters.
+    /// @return A [Map] from a type parameter name to its resolved [FXMLType].
+    private static Map<String, FXMLType> buildInitialTypeMapping(Class<?> clazz, List<FXMLType> generics) {
+        Map<String, FXMLType> mapping = new LinkedHashMap<>();
+        TypeVariable<?>[] typeParameters = clazz.getTypeParameters();
+        for (int i = 0; i < typeParameters.length && i < generics.size(); i++) {
+            mapping.put(typeParameters[i].getName(), generics.get(i));
+        }
+        return mapping;
+    }
+
 }

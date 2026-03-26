@@ -70,7 +70,7 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     ///
     /// The MavenProject instance contains details such as the project's artifacts, dependencies, build configuration,
     /// and other metadata.
-    /// It is used throughout the plugin's execution to reference or update project-related settings, such  as adding
+    /// It is used throughout the plugin's execution to reference or update project-related settings, such as adding
     /// generated source directories to the project's compiled source roots.
     ///
     /// The value of this field is resolved by Maven using the `${project}` expression and is typically not manually
@@ -231,10 +231,10 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
             if (resourceBundleObject == null || resourceBundleObject.isBlank()) {
                 resourceBundleObject = null;
             }
-            List<Path> fxmls = findFXMLFiles();
+            List<Path> fxmlList = findFXMLFiles();
             Path generatedPackageDirectory = createGeneratedPackageDirectory();
             Map<String, FXMLParameterized> mappedFXMLParametrization = getClassNameToFXMLParameterizedMap();
-            for (Path fxmlFile : fxmls) {
+            for (Path fxmlFile : fxmlList) {
                 ParsedFXML parsedFXML = fxmlReader.readFXML(fxmlFile);
                 if (debugInternalModel) {
                     try {
@@ -278,7 +278,7 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     /// Generates a mapping of class names to their corresponding [FXMLParameterized] instances
     /// based on the configured FXML parameterization.
     ///
-    /// This method processes the field `fxmlParameterizations`, which is expected to be a list of  [FXMLParameterized]
+    /// This method processes the field `fxmlParameterizations`, which is expected to be a list of [FXMLParameterized]
     /// objects, and creates a map where the key is the class name of each [FXMLParameterized] and the value is the
     /// corresponding object instance.
     ///
@@ -324,12 +324,12 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     /// @throws MojoExecutionException if an error occurs while accessing the directory or reading its contents
     private List<Path> findFXMLFiles() throws MojoExecutionException {
         try (Stream<Path> files = Files.walk(fxmlDirectory)) {
-            List<Path> fxmls = files.filter(Files::isRegularFile)
+            List<Path> fxmlList = files.filter(Files::isRegularFile)
                     .filter(f -> f.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".fxml"))
                     .toList();
-            getLog().info("Found %d FXML files".formatted(fxmls.size()));
-            getLog().debug("FXML files: %s".formatted(fxmls));
-            return fxmls;
+            getLog().info("Found %d FXML files".formatted(fxmlList.size()));
+            getLog().debug("FXML files: %s".formatted(fxmlList));
+            return fxmlList;
         } catch (IOException e) {
             throw new MojoExecutionException("Unable to read FXML directory", e);
         }
@@ -340,7 +340,7 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     ///
     /// This method constructs a classpath based on the runtime and compile dependencies of the Maven project.
     /// It creates a new [URLClassLoader] with the combined classpath and sets it as the thread's context class loader.
-    /// The process ensures that dependencies required at runtime or during compilation  are accessible within the
+    /// The process ensures that dependencies required at runtime or during compilation are accessible within the
     /// thread's execution context.
     ///
     /// @return return the current class loader of the thread

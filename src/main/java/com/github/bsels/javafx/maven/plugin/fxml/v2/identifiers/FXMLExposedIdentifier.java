@@ -4,7 +4,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
 
 import java.util.Objects;
 
-/// Represents an identifier that is explicitly named in FXML (e.g., using fx:id).
+/// Represents an identifier explicitly named in FXML (e.g., using fx:id).
 ///
 /// @param name The name of the identifier.
 public record FXMLExposedIdentifier(String name) implements FXMLIdentifier {

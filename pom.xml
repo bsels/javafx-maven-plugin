@@ -70,7 +70,7 @@
         <!-- https://central.sonatype.com/artifact/org.assertj/assertj-core -->
         <assertj.version>3.27.7</assertj.version>
         <!-- https://central.sonatype.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
-        <jackson.version>2.21.0</jackson.version>
+        <jackson.version>2.21.2</jackson.version>
         <!-- https://central.sonatype.com/artifact/org.junit.jupiter/junit-jupiter-api -->
         <junit.version>6.0.3</junit.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugin-tools/maven-plugin-annotations -->
@@ -217,7 +217,7 @@
                             <goal>sign</goal>
                         </goals>
                         <configuration>
-                            <!-- This is necessary for gpg to not try to use the pinentry programs -->
+                            <!-- This is necessary for gpg to not try to use the pin entry programs -->
                             <gpgArguments>
                                 <arg>--pinentry-mode</arg>
                                 <arg>loopback</arg>

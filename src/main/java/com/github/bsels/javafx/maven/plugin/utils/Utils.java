@@ -168,7 +168,7 @@ public final class Utils {
         );
     }
 
-    /// Creates a sequential [Gatherer] that collects elements into a list and then processes them in reverse order.
+    /// Creates sequential [Gatherer] that collects elements into a list and then processes them in reverse order.
     ///
     /// @param <T> the type of elements to be processed
     /// @return a [Gatherer] that accumulates elements into a list and outputs them in reverse order during downstream processing
@@ -474,7 +474,7 @@ public final class Utils {
 
     /// Checks if a class or interface represented by the `variable` parameter is either the same as or is a superclass
     /// or superinterface of the class or interface represented by the `expression` parameter.
-    /// Additionally, handles primitive and wrapper class compatibility.
+    /// Additionally, it handles primitive and wrapper class compatibility.
     ///
     /// @param variable   the class or interface to be checked as the potential assignable target
     /// @param expression the class or interface to be checked for assignability to `variable`
@@ -483,15 +483,6 @@ public final class Utils {
         return PRIMITIVE_TYPE_AND_WRAPPER.stream()
                 .anyMatch(classes -> classes.contains(variable) && classes.contains(expression))
                 || variable.isAssignableFrom(expression);
-    }
-
-    /// Checks if a given class is a primitive type or its wrapper equivalent.
-    ///
-    /// @param clazz the class to be checked
-    /// @return `true` if the class is a primitive type or a wrapper; otherwise `false`
-    public static boolean isPrimitiveOrWrapper(Class<?> clazz) {
-        return PRIMITIVE_TYPE_AND_WRAPPER.stream()
-                .anyMatch(classes -> classes.contains(clazz));
     }
 
     /// Searches and validates a getter method in the specified class that matches the provided identifier,

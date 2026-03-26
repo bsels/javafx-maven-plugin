@@ -202,7 +202,7 @@ public record FXMLProcessor(Log log) {
                 ));
     }
 
-    /// Determines the visibility type of member based on its modifier flags.
+    /// Determines the visibility type of the member based on its modifier flags.
     ///
     /// @param modifiers the integer value representing the modifier flags of a member
     /// @return the Visibility enumeration value corresponding to the member's visibility
@@ -278,7 +278,7 @@ public record FXMLProcessor(Log log) {
         return deduplicateNodes(fxmlNode, FXMLConstantNode.class, deduplicatedNodes);
     }
 
-    /// Creates a deduplicate map from the provided list of nodes, where duplicate elements are identified
+    /// Creates a deduplicated map from the provided list of nodes, where duplicate elements are identified
     /// based on the specified equality predicate.
     /// Each node will map to either itself or an already existing equivalent node in the map,
     /// as determined by the equality predicate.
@@ -587,7 +587,7 @@ public record FXMLProcessor(Log log) {
     }
 
     /// Extracts FXML properties from the given map of properties, filtering and processing entries
-    /// that do not contain a ":" character in their keys. The method resolves these properties into
+    /// that do not contain an ":" character in their keys. The method resolves these properties into
     /// a list of [FXMLProperty] objects, leveraging the helper function to process each entry.
     ///
     /// @param imports    the list of import statements used to resolve type references during property extraction.
@@ -724,7 +724,7 @@ public record FXMLProcessor(Log log) {
     /// @param clazz         The class to inspect for constructors with the desired named property.
     /// @param propertyName  The name of the property to locate among constructor parameters.
     /// @param propertyValue The value for the located property to associate with the resulting FXMLProperty.
-    /// @return An [Optional<FXMLProperty>] representing the found named property. Returns an empty Optional if no matching property is found or if ambiguities exist.
+    /// @return An [Optional<FXMLProperty>] representing the found-named property. Returns an empty Optional if no matching property is found or if ambiguities exist.
     private Optional<FXMLProperty> getNamedConstructorProperty(
             Class<?> clazz,
             String propertyName,
