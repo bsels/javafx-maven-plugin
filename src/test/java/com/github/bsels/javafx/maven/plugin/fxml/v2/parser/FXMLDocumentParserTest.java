@@ -767,7 +767,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/%s.fxml".formatted(className));
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples/");
 
             // Assert
             assertThat(document)

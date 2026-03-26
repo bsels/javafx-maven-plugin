@@ -141,7 +141,8 @@ public final class FXMLUtils {
             Class<?> rawClass = (Class<?>) pt.getRawType();
             TypeVariable<?>[] rawTypeParameters = rawClass.getTypeParameters();
             Type[] actualTypeArguments = pt.getActualTypeArguments();
-            for (int i = 0; i < rawTypeParameters.length && i < actualTypeArguments.length; i++) {
+            int size = Math.min(rawTypeParameters.length, actualTypeArguments.length);
+            for (int i = 0; i < size; i++) {
                 Type arg = actualTypeArguments[i];
                 switch (arg) {
                     case TypeVariable<?> tv -> {
@@ -188,7 +189,8 @@ public final class FXMLUtils {
     private static Map<String, FXMLType> buildInitialTypeMapping(Class<?> clazz, List<FXMLType> generics) {
         Map<String, FXMLType> mapping = new LinkedHashMap<>();
         TypeVariable<?>[] typeParameters = clazz.getTypeParameters();
-        for (int i = 0; i < typeParameters.length && i < generics.size(); i++) {
+        int size = Math.min(typeParameters.length, generics.size());
+        for (int i = 0; i < size; i++) {
             mapping.put(typeParameters[i].getName(), generics.get(i));
         }
         return mapping;
