@@ -124,6 +124,13 @@ class FXMLUtilsTest {
             // Then
             assertThat(result).isEqualTo(Object.class);
         }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullType() {
+            // When & Then
+            assertThatThrownBy(() -> FXMLUtils.findRawType(null))
+                    .isInstanceOf(NullPointerException.class);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -227,6 +234,13 @@ class FXMLUtilsTest {
 
             // Then
             assertThat(result).isEqualTo(FXMLType.of(Integer.class));
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullType() {
+            // When & Then
+            assertThatThrownBy(() -> FXMLUtils.findCollectionValueType(null))
+                    .isInstanceOf(NullPointerException.class);
         }
     }
 
@@ -339,6 +353,13 @@ class FXMLUtilsTest {
             // Then
             assertThat(result.getKey()).isEqualTo(FXMLType.of(String.class));
             assertThat(result.getValue()).isEqualTo(FXMLType.of(Integer.class));
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullType() {
+            // When & Then
+            assertThatThrownBy(() -> FXMLUtils.findMapKeyAndValueTypes(null))
+                    .isInstanceOf(NullPointerException.class);
         }
     }
 
