@@ -162,20 +162,23 @@ public final class FXMLDocumentParser {
     ///
     /// The logic follows these steps:
     /// 1. Ensures `parsedFXML` is not `null`.
-    /// 2. Creates a root [BuildContext] using the imports from the FXML file.
-    /// 3. Resolves the controller class if the `fx:controller` attribute is present on the root element.
-    /// 4. Recursively parses the root element using [#parseElement(ParsedXMLStructure, BuildContext, boolean)].
-    /// 5. Verifies that the resulting root value is an instance of [AbstractFXMLObject].
-    /// 6. Returns a new [FXMLDocument] containing all gathered information.
+    /// 2. Ensures `resourcePath` is not `null`.
+    /// 3. Creates a root [BuildContext] using the imports from the FXML file and the given resource path.
+    /// 4. Resolves the controller class if the `fx:controller` attribute is present on the root element.
+    /// 5. Recursively parses the root element using [#parseElement(ParsedXMLStructure, BuildContext, boolean)].
+    /// 6. Verifies that the resulting root value is an instance of [AbstractFXMLObject].
+    /// 7. Returns a new [FXMLDocument] containing all gathered information.
     ///
-    /// @param parsedFXML The [ParsedFXML] object to be parsed.
+    /// @param parsedFXML   The [ParsedFXML] object to be parsed.
+    /// @param resourcePath The path of the FXML file relative to the resources folder root. A single `/` denotes the root of the resource directory.
     /// @return An [FXMLDocument] that represents the parsed structure of the given [ParsedFXML].
-    /// @throws NullPointerException  if `parsedFXML` is `null`.
+    /// @throws NullPointerException  if `parsedFXML` or `resourcePath` is `null`.
     /// @throws IllegalStateException if the root element does not parse to an [AbstractFXMLObject].
-    public FXMLDocument parse(ParsedFXML parsedFXML) {
+    public FXMLDocument parse(ParsedFXML parsedFXML, String resourcePath) {
         Objects.requireNonNull(parsedFXML, "`parsedFXML` must not be null");
+        Objects.requireNonNull(resourcePath, "`resourcePath` must not be null");
         ParsedXMLStructure rootStructure = parsedFXML.root();
-        BuildContext buildContext = new BuildContext(parsedFXML.imports());
+        BuildContext buildContext = new BuildContext(parsedFXML.imports(), resourcePath);
 
         Optional<Class<?>> controller = Optional.ofNullable(
                 rootStructure.properties().get(FXMLConstants.FX_CONTROLLER_ATTRIBUTE)
@@ -351,7 +354,8 @@ public final class FXMLDocumentParser {
     /// The logic:
     /// 1. Extracts the `source` attribute, ensuring it is present.
     /// 2. Resolves an optional FXML identifier (`fx:id`); if absent, generates a new internal identifier.
-    /// 3. Returns a new [FXMLInclude] instance.
+    /// 3. Resolves the `source` and optional `resources` paths relative to the resource directory.
+    /// 4. Returns a new [FXMLInclude] instance.
     ///
     /// @param structure    The parsed XML structure representing the `fx:include` element.
     /// @param buildContext The context used during the building process.
@@ -366,7 +370,9 @@ public final class FXMLDocumentParser {
         FXMLIdentifier includeId = resolveOptionalIdentifier(properties)
                 .orElseGet(() -> new FXMLInternalIdentifier(buildContext.nextInternalId()));
         Charset charset = getCharsetOfElement(structure);
-        Optional<String> resources = Optional.ofNullable(properties.get(FXMLConstants.RESOURCES_ATTRIBUTE));
+        Optional<String> resources = Optional.ofNullable(properties.get(FXMLConstants.RESOURCES_ATTRIBUTE))
+                .map(r -> resolveResourcePath(r, buildContext.resourcePath()));
+        source = resolveResourcePath(source, buildContext.resourcePath());
         return Optional.of(new FXMLInclude(includeId, source, charset, resources));
     }
 
@@ -426,7 +432,7 @@ public final class FXMLDocumentParser {
     /// @return An empty [Optional] as the method does not produce a concrete result.
     private Optional<AbstractFXMLValue> parseFXScript(ParsedXMLStructure structure, BuildContext buildContext) {
         buildContext.scripts()
-                .add(parseScript(structure));
+                .add(parseScript(structure, buildContext));
         return Optional.empty();
     }
 
@@ -684,9 +690,9 @@ public final class FXMLDocumentParser {
     /// - Collections: Supported if the property is a getter (read-only collection).
     /// - Basic properties: Supported through setters or constructors.
     ///
-    /// @param ignored      The [BuildContext] (not used in this implementation).
-    /// @param property     The [ObjectProperty] definition being parsed.
-    /// @param value        The string value to be assigned to the property.
+    /// @param ignored  The [BuildContext] (not used in this implementation).
+    /// @param property The [ObjectProperty] definition being parsed.
+    /// @param value    The string value to be assigned to the property.
     /// @return An [Optional] containing the parsed [FXMLProperty], or empty if the property type or method type is not supported.
     private Optional<FXMLProperty> parseObjectProperty(BuildContext ignored, ObjectProperty property, String value) {
         Class<?> rawType = FXMLUtils.findRawType(property.type());
@@ -1213,20 +1219,45 @@ public final class FXMLDocumentParser {
         return !key.startsWith(FXMLConstants.FX_PREFIX) && !key.startsWith(FXMLConstants.XML_NAMESPACE_PREFIX);
     }
 
+    /// Resolves a resource-related path value against the given resource root path.
+    ///
+    /// If `value` starts with `/`, it is returned unchanged (absolute resource path).
+    /// Otherwise, the relative directory derived from `resourcePath` is prepended to `value`.
+    /// The relative directory is computed by stripping the leading `/` from `resourcePath`
+    /// and appending a `/` separator if the result is non-empty.
+    ///
+    /// Examples:
+    /// - `resourcePath = "/"`, `value = "foo.fxml"` → `"/foo.fxml"`
+    /// - `resourcePath = "/examples"`, `value = "foo.fxml"` → `"/examples/foo.fxml"`
+    /// - `resourcePath = "/examples"`, `value = "/foo.fxml"` → `"/foo.fxml"`
+    ///
+    /// @param value        The raw path value to resolve.
+    /// @param resourcePath The resource root path stored in [BuildContext], where `/` means the root.
+    /// @return The resolved path string.
+    private String resolveResourcePath(String value, String resourcePath) {
+        if (value.startsWith("/")) {
+            return value;
+        }
+        String normalizedResourcePath = resourcePath.endsWith("/") ? resourcePath : resourcePath + "/";
+        return normalizedResourcePath + value;
+    }
+
     /// Parses an XML structure into an [FXMLScript].
     ///
     /// The logic:
-    /// 1. Checks for a `source` attribute; if present, returns an [FXMLFileScript].
+    /// 1. Checks for a `source` attribute; if present, resolves the path relative to the resource directory
+    ///    and returns an [FXMLFileScript].
     /// 2. If no `source` is present, returns an [FXMLSourceScript] with the inline content.
     ///
-    /// @param structure The parsed XML structure representing the `fx:script` element.
+    /// @param structure    The parsed XML structure representing the `fx:script` element.
+    /// @param buildContext The [BuildContext] used to resolve the script file path.
     /// @return The parsed [FXMLScript].
-    private FXMLScript parseScript(ParsedXMLStructure structure) {
+    private FXMLScript parseScript(ParsedXMLStructure structure, BuildContext buildContext) {
         Map<String, String> attributes = structure.properties();
         if (attributes.containsKey(FXMLConstants.SOURCE_ATTRIBUTE)) {
             String source = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
             Charset charset = getCharsetOfElement(structure);
-            return new FXMLFileScript(source, charset);
+            return new FXMLFileScript(resolveResourcePath(source, buildContext.resourcePath()), charset);
         }
         return new FXMLSourceScript(structure.getTextValue());
     }
@@ -1612,20 +1643,22 @@ public final class FXMLDocumentParser {
 
     /// Holds the state and context during the FXML document building process.
     ///
-    /// This record maintains the internal state such as identifiers counter, imports,
-    /// definitions, and scripts during the parsing process.
+    /// This record maintains the internal state such as identifier counter, imports,
+    /// definitions, scripts, and the resource path during the parsing process.
     ///
     /// @param internalCounter The counter for generating internal identifiers.
     /// @param imports         The list of imports.
     /// @param definitions     The list of definitions.
     /// @param scripts         The list of scripts.
     /// @param typeMapping     The map for resolving type variables.
+    /// @param resourcePath    The path of the FXML file relative to the resources folder root. A single `/` denotes the root of the resource directory.
     private record BuildContext(
             AtomicInteger internalCounter,
             List<String> imports,
             List<AbstractFXMLValue> definitions,
             List<FXMLScript> scripts,
-            Map<String, FXMLType> typeMapping
+            Map<String, FXMLType> typeMapping,
+            String resourcePath
     ) {
 
         /// Compact constructor to validate the build context components.
@@ -1637,6 +1670,7 @@ public final class FXMLDocumentParser {
         /// @param definitions     The list of definitions.
         /// @param scripts         The list of scripts.
         /// @param typeMapping     The map for resolving type variables.
+        /// @param resourcePath    The path of the FXML file relative to the resources folder root.
         /// @throws NullPointerException if any parameter is `null`.
         public BuildContext {
             Objects.requireNonNull(internalCounter, "`internalCounter` must not be null");
@@ -1644,15 +1678,24 @@ public final class FXMLDocumentParser {
             Objects.requireNonNull(definitions, "`definitions` must not be null");
             Objects.requireNonNull(scripts, "`scripts` must not be null");
             Objects.requireNonNull(typeMapping, "`typeMapping` must not be null");
+            Objects.requireNonNull(resourcePath, "`resourcePath` must not be null");
         }
 
-        /// Constructs a new build context with the provided imports.
+        /// Constructs a new build context with the provided imports and resource path.
         ///
         /// The logic initializes a new build context with default empty lists and a new atomic counter.
         ///
-        /// @param imports The list of imports.
-        public BuildContext(List<String> imports) {
-            this(new AtomicInteger(), imports, new ArrayList<>(), new ArrayList<>(), new LinkedHashMap<>());
+        /// @param imports      The list of imports.
+        /// @param resourcePath The path of the FXML file relative to the resources folder root. A single `/` denotes the root of the resource directory.
+        public BuildContext(List<String> imports, String resourcePath) {
+            this(
+                    new AtomicInteger(),
+                    imports,
+                    new ArrayList<>(),
+                    new ArrayList<>(),
+                    new LinkedHashMap<>(),
+                    resourcePath
+            );
         }
 
         /// Constructs a new `BuildContext` by copying the properties of an existing `BuildContext`
@@ -1669,7 +1712,14 @@ public final class FXMLDocumentParser {
         ) {
             Objects.requireNonNull(original, "`original` must not be null");
             Objects.requireNonNull(typeMapping, "`typeMapping` must not be null");
-            this(original.internalCounter, original.imports, original.definitions, original.scripts, typeMapping);
+            this(
+                    original.internalCounter,
+                    original.imports,
+                    original.definitions,
+                    original.scripts,
+                    typeMapping,
+                    original.resourcePath
+            );
         }
 
         /// Generates the next internal identifier for tracking purposes.

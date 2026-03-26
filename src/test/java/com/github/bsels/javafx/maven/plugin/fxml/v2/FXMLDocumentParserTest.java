@@ -71,6 +71,7 @@ public class FXMLDocumentParserTest {
     @SuppressWarnings("rawtypes") // The factory is generic, we can't use the type parameter here
     public static final InstanceOfAssertFactory<List, ListAssert<AbstractFXMLValue>> LIST_VALUE_ASSERT_FACTORY = InstanceOfAssertFactories.list(
             AbstractFXMLValue.class);
+    @SuppressWarnings("rawtypes") // The factory is generic, we can't use the type parameter here
     public static final InstanceOfAssertFactory<Optional, OptionalAssert<FXMLIdentifier>> OPTIONAL_IDENTIFIER_ASSERT_FACTORY = InstanceOfAssertFactories.optional(
             FXMLIdentifier.class);
 
@@ -118,7 +119,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/InMemoryScript.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML);
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
 
             // Assert
             assertThat(document)
@@ -213,7 +214,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/ExternalScript.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML);
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
 
             // Assert
             assertThat(document)
@@ -229,7 +230,7 @@ public class FXMLDocumentParserTest {
                                     .satisfiesExactly(
                                             script -> assertThat(script)
                                                     .isInstanceOf(FXMLFileScript.class)
-                                                    .hasFieldOrPropertyWithValue("path", "example.js")
+                                                    .hasFieldOrPropertyWithValue("path", "/examples/example.js")
                                                     .hasFieldOrPropertyWithValue("charset", StandardCharsets.UTF_8)
                                     ),
                             doc -> assertThat(doc.imports())
@@ -304,7 +305,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/%s.fxml".formatted(className));
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML);
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
 
             // Assert
             assertThat(document)
@@ -401,7 +402,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/MyHashMap.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML);
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
 
             // Assert
             assertThat(document)
@@ -453,7 +454,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/MapWithReferences.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML);
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
 
             // Assert
             assertThat(document)
@@ -490,7 +491,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/ObservableListDefinition.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML);
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
 
             // Assert
             assertThat(document)
@@ -580,7 +581,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/ColorDefinitions.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML);
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
 
             // Assert
             assertThat(document)
@@ -712,7 +713,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/FXInclude.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML);
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
 
             // Assert
             assertThat(document)
@@ -749,7 +750,7 @@ public class FXMLDocumentParserTest {
                     .hasSize(1)
                     .hasOnlyElementsOfType(FXMLInclude.class)
                     .first(InstanceOfAssertFactories.type(FXMLInclude.class))
-                    .hasFieldOrPropertyWithValue("sourceFile", "ExplicitDefault.fxml")
+                    .hasFieldOrPropertyWithValue("sourceFile", "/examples/ExplicitDefault.fxml")
                     .hasFieldOrPropertyWithValue("resources", Optional.empty())
                     .hasFieldOrPropertyWithValue("charset", StandardCharsets.UTF_8)
                     .extracting(FXMLInclude::identifier)
