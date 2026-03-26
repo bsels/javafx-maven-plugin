@@ -11,4 +11,5 @@
     <copyEntry>
         <fx:copy source="myButton"/>
     </copyEntry>
+    <fx:reference source="ignored" />
 </HashMap>

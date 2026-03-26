@@ -1,0 +1,7 @@
+<?import javafx.scene.control.Button?>
+<?import java.lang.Double?>
+<Button xmlns:fx="http://javafx.com/fxml">
+    <minHeight>
+        <Double fx:constant="NEGATIVE_INFINITY"/>
+    </minHeight>
+</Button>

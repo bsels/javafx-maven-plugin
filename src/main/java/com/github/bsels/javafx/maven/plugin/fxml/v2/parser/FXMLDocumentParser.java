@@ -108,7 +108,7 @@ public final class FXMLDocumentParser {
     ///
     /// Key-Value pairs:
     /// - Keys: String constants representing special FXML element names, defined in `FXMLConstants`.
-    /// - Values: Method references implementing the parsing logic for each corresponding FXML element.
+    /// - Values: Method references implement the parsing logic for each corresponding FXML element.
     ///
     /// This map is immutable and initialized with predefined mappings for processing the following special FXML elements:
     /// - `fx:copy`: Maps to the `FXMLDocumentParser::parseFXCopy` handler.
@@ -190,9 +190,9 @@ public final class FXMLDocumentParser {
         Optional<AbstractFXMLValue> rootValue = parseElement(rootStructure, buildContext, true);
         if (rootValue.isEmpty() || !(rootValue.get() instanceof AbstractFXMLObject root)) {
             throw new IllegalStateException(
-                    "Root object must be an instance of AbstractFXMLObject, but was %s".formatted(rootValue.map(
-                            value -> value.getClass().getName()
-                    ).orElse("null"))
+                    "Root object must be an instance of object, collection, or map, but was %s".formatted(
+                            rootStructure.name()
+                    )
             );
         }
 
@@ -397,12 +397,12 @@ public final class FXMLDocumentParser {
     /// @param structure    the parsed XML structure containing the `fx:root` element to be processed
     /// @param buildContext the build context providing imports and other contextual information necessary for resolving types and building objects
     /// @return an [Optional] containing an AbstractFXMLValue representation of the `fx:root` element
-    /// @throws IllegalStateException if the `fx:root` element does not have a "type" attribute
+    /// @throws IllegalArgumentException if the `fx:root` element does not have a "type" attribute
     private Optional<AbstractFXMLValue> parseFXRoot(ParsedXMLStructure structure, BuildContext buildContext) {
         Map<String, String> properties = structure.properties();
         String typeName = properties.get(FXMLConstants.TYPE_ATTRIBUTE);
         if (typeName == null) {
-            throw new IllegalStateException("fx:root must have a 'type' attribute");
+            throw new IllegalArgumentException("fx:root must have a 'type' attribute");
         }
         Class<?> clazz = Utils.findType(buildContext.imports(), typeName);
         log.debug("Parsing fx:root with type: %s".formatted(clazz.getName()));
@@ -1213,7 +1213,7 @@ public final class FXMLDocumentParser {
         return new FXMLSourceScript(structure.getTextValue());
     }
 
-    /// Resolves and returns a [ClassAndIdentifier] object based on the given node name, attributes, and context.
+    /// Resolves and returns an [ClassAndIdentifier] object based on the given node name, attributes, and context.
     ///
     /// The logic:
     /// 1. Handles `fx:root`: ensures it's at the document root and extracts its `type`.
@@ -1385,7 +1385,7 @@ public final class FXMLDocumentParser {
     /// - No prefix: Returns [FXMLInlineScript] if `paramType` is an `EventHandler`, otherwise returns [FXMLLiteral].
     ///
     /// @param value     The raw attribute value string.
-    /// @param paramType The expected getter parameter type, used to detect functional interfaces, may be `null`.
+    /// @param paramType The expected getter parameter type, used to detect functional interfaces.
     /// @return The corresponding [AbstractFXMLValue].
     private AbstractFXMLValue parseValueString(String value, Class<?> paramType) {
         if (value.startsWith(FXMLConstants.TRANSLATION_PREFIX)) {
@@ -1403,7 +1403,7 @@ public final class FXMLDocumentParser {
         if (value.startsWith(FXMLConstants.ESCAPE_PREFIX)) {
             return new FXMLLiteral(value.substring(1));
         }
-        if (paramType != null && isEventHandlerType(paramType)) {
+        if (isEventHandlerType(paramType)) {
             return new FXMLInlineScript(value);
         }
         return new FXMLLiteral(value);

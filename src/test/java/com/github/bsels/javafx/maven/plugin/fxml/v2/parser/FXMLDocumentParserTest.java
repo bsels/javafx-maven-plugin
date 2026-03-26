@@ -18,6 +18,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLConstant;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCopy;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInclude;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInlineScript;
@@ -65,6 +66,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(MockitoExtension.class)
 public class FXMLDocumentParserTest {
@@ -794,6 +796,143 @@ public class FXMLDocumentParserTest {
                                 default -> throw new IllegalArgumentException("Invalid test case: " + className);
                             }
                     );
+        }
+
+        @Test
+        void myButtonWithConstants() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/MyButtonWithConstants.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+
+            // Assert
+            assertThat(document)
+                    // Validate document
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "MyButtonWithConstants")
+                    .hasFieldOrPropertyWithValue("controller", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scripts", List.of())
+                    .hasFieldOrPropertyWithValue("definitions", List.of())
+                    .satisfies(
+                            doc -> assertThat(doc.imports())
+                                    .hasSize(2)
+                                    .containsExactlyInAnyOrder("javafx.scene.control.Button", "java.lang.Double")
+                    )
+                    // Validate root
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Button.class))
+                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .first()
+                    .hasFieldOrPropertyWithValue("name", "minHeight")
+                    .hasFieldOrPropertyWithValue("setter", "setMinHeight")
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(double.class))
+                    .extracting("value")
+                    .isInstanceOf(FXMLConstant.class)
+                    .extracting(FXMLConstant.class::cast)
+                    .hasFieldOrPropertyWithValue("clazz", Double.class)
+                    .hasFieldOrPropertyWithValue("identifier", "NEGATIVE_INFINITY")
+                    .hasFieldOrPropertyWithValue("constantType", new FXMLClassType(double.class));
+        }
+    }
+
+    @Nested
+    class InvalidExampleTest {
+
+        @Test
+        void doubleFxRoot() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/invalid/DoubleFxRoot.fxml");
+
+            // Act and Assert
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("fx:root must be the root element of the FXML document");
+        }
+
+        @Test
+        void notAnObjectRoot() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/invalid/NotAnObjectRoot.fxml");
+
+            // Act and Assert
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Root object must be an instance of object, collection, or map, but was Double");
+        }
+
+        @Test
+        void fxDefineRoot() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/invalid/FXDefineRoot.fxml");
+
+            // Act and Assert
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Root object must be an instance of object, collection, or map, but was fx:define");
+        }
+
+        @Test
+        void incompleteFXCopy() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/invalid/IncompleteFXCopy.fxml");
+
+            // Act and Assert
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("`source` attribute is required for fx:copy");
+        }
+
+        @Test
+        void incompleteFXInclude() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/invalid/IncompleteFXInclude.fxml");
+
+            // Act and Assert
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("`source` attribute is required for fx:include");
+        }
+
+        @Test
+        void incompleteFXRoot() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/invalid/IncompleteFXRoot.fxml");
+
+            // Act and Assert
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("fx:root must have a 'type' attribute");
+        }
+
+        @Test
+        void incompleteFXReference() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/invalid/IncompleteFXReference.fxml");
+
+            // Act and Assert
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("`source` attribute is required for fx:reference");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"HashMapKeyButNoValue", "HashMapKeyButMultipleValue"})
+        void invalidMap(String file) throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/invalid/%s.fxml".formatted(file));
+
+            // Act and Assert
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Map entry element `test` must have exactly one child element representing the value");
         }
     }
 }

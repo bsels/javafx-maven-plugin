@@ -1,0 +1,6 @@
+<?import java.util.HashMap?>
+<HashMap xmlns:fx="http://javafx.com/fxml">
+    <!-- generic 0: String -->
+    <!-- generic 1: String -->
+    <test/>
+</HashMap>
