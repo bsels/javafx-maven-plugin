@@ -4,6 +4,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdent
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
@@ -396,14 +397,18 @@ public final class FXMLDocumentParser {
     /// @return an [Optional] containing an AbstractFXMLValue representation of the `fx:root` element
     /// @throws IllegalStateException if the `fx:root` element does not have a "type" attribute
     private Optional<AbstractFXMLValue> parseFXRoot(ParsedXMLStructure structure, BuildContext buildContext) {
-        String typeName = structure.properties()
-                .get(FXMLConstants.TYPE_ATTRIBUTE);
+        Map<String, String> properties = structure.properties();
+        String typeName = properties.get(FXMLConstants.TYPE_ATTRIBUTE);
         if (typeName == null) {
             throw new IllegalStateException("fx:root must have a 'type' attribute");
         }
         Class<?> clazz = Utils.findType(buildContext.imports(), typeName);
         log.debug("Parsing fx:root with type: %s".formatted(clazz.getName()));
-        ClassAndIdentifier classAndIdentifier = new ClassAndIdentifier(clazz, FXMLRootIdentifier.INSTANCE);
+        FXMLIdentifier identifier = Optional.ofNullable(properties.get(FXMLConstants.FX_ID_ATTRIBUTE))
+                .map(FXMLNamedRootIdentifier::new)
+                .map(Function.<FXMLIdentifier>identity())
+                .orElse(FXMLRootIdentifier.INSTANCE);
+        ClassAndIdentifier classAndIdentifier = new ClassAndIdentifier(clazz, identifier);
         return Optional.of(parseNormalElements(structure, buildContext, classAndIdentifier));
     }
 
@@ -1288,7 +1293,10 @@ public final class FXMLDocumentParser {
         clazz = Utils.findType(buildContext.imports(), structure.name());
         Map<String, String> attributes = structure.properties();
         if (isRoot) {
-            identifier = FXMLRootIdentifier.INSTANCE;
+            identifier = Optional.ofNullable(attributes.get(FXMLConstants.FX_ID_ATTRIBUTE))
+                    .map(FXMLNamedRootIdentifier::new)
+                    .map(Function.<FXMLIdentifier>identity())
+                    .orElse(FXMLRootIdentifier.INSTANCE);
         } else if (attributes.containsKey(FXMLConstants.FX_ID_ATTRIBUTE)) {
             identifier = new FXMLExposedIdentifier(attributes.get(FXMLConstants.FX_ID_ATTRIBUTE));
         } else {
