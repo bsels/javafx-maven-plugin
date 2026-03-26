@@ -1,0 +1,2 @@
+<?import javafx.scene.layout.BorderPane?>
+<fx:root type="BorderPane" fx:id="myRoot" xmlns:fx="http://javafx.com/fxml"/>

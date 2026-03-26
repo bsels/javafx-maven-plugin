@@ -1,12 +1,13 @@
-package com.github.bsels.javafx.maven.plugin.fxml.v2;
+package com.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
 import com.github.bsels.javafx.maven.plugin.TestHelpers;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLDocumentParser;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
@@ -35,6 +36,7 @@ import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Separator;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import org.apache.maven.monitor.logging.DefaultLog;
@@ -756,6 +758,42 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("charset", StandardCharsets.UTF_8)
                     .extracting(FXMLInclude::identifier)
                     .isInstanceOf(FXMLInternalIdentifier.class);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"FXRootNoId", "FXRootWithId", "NoFXRootNoId", "NoFXRootWithId"})
+        void root(String className) throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/%s.fxml".formatted(className));
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+
+            // Assert
+            assertThat(document)
+                    // Validate document
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", className)
+                    .hasFieldOrPropertyWithValue("controller", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
+                    .hasFieldOrPropertyWithValue("definitions", List.of())
+                    .hasFieldOrPropertyWithValue("scripts", List.of())
+                    .hasFieldOrPropertyWithValue("imports", List.of("javafx.scene.layout.BorderPane"))
+                    // Validate root
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(BorderPane.class))
+                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                    .hasFieldOrPropertyWithValue("properties", List.of())
+                    .hasFieldOrPropertyWithValue(
+                            "identifier", switch (className) {
+                                case "FXRootNoId", "NoFXRootNoId" -> FXMLRootIdentifier.INSTANCE;
+                                case "FXRootWithId", "NoFXRootWithId" -> new FXMLNamedRootIdentifier("myRoot");
+                                default -> throw new IllegalArgumentException("Invalid test case: " + className);
+                            }
+                    );
         }
     }
 }
