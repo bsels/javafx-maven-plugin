@@ -850,6 +850,7 @@ public final class FXMLDocumentParser {
                     ));
                 }
                 case SETTER, CONSTRUCTOR -> {
+                    // TODO: Check for manual map construction
                     log.debug(
                             "Parsing child elements property using setter or constructor as map: %s is not supported.".formatted(
                                     property.name()));

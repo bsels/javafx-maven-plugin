@@ -12,6 +12,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionPro
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticObjectProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLFileScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLSourceScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
@@ -36,8 +37,10 @@ import javafx.event.EventHandler;
 import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import org.apache.maven.monitor.logging.DefaultLog;
@@ -840,6 +843,200 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("clazz", Double.class)
                     .hasFieldOrPropertyWithValue("identifier", "NEGATIVE_INFINITY")
                     .hasFieldOrPropertyWithValue("constantType", new FXMLClassType(double.class));
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"GridPaneStaticPropertyAttribute", "GridPaneStaticPropertyElement"})
+        void gridPaneStaticProperties(String className) throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/%s.fxml".formatted(className));
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+
+            // Assert
+            assertThat(document)
+                    // Validate document
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", className)
+                    .hasFieldOrPropertyWithValue("controller", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
+                    .hasFieldOrPropertyWithValue("definitions", List.of())
+                    .hasFieldOrPropertyWithValue("scripts", List.of())
+                    .satisfies(
+                            doc -> assertThat(doc.imports())
+                                    .hasSize(2)
+                                    .containsExactly(
+                                            "javafx.scene.control.Label",
+                                            "javafx.scene.layout.GridPane"
+                                    )
+                    )
+                    // Validate root
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(GridPane.class))
+                    // Validate root properties
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLCollectionProperties.class)
+                    .extracting(FXMLCollectionProperties.class::cast)
+                    .hasFieldOrPropertyWithValue("name", "children")
+                    .hasFieldOrPropertyWithValue("getter", "getChildren")
+                    .hasFieldOrPropertyWithValue(
+                            "type",
+                            new FXMLGenericType(ObservableList.class, new FXMLClassType(Node.class))
+                    )
+                    .hasFieldOrPropertyWithValue("properties", List.of())
+                    // Validate children's values
+                    .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .hasOnlyElementsOfType(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .allSatisfy(
+                            object -> assertThat(object.identifier())
+                                    .isInstanceOf(FXMLInternalIdentifier.class)
+                    )
+                    .allSatisfy(
+                            object -> assertThat(object.factoryMethod())
+                                    .isNotPresent()
+                    )
+                    .first()
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Label.class))
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(3)
+                    .satisfiesExactlyInAnyOrder(
+                            first -> assertThat(first)
+                                    .isInstanceOf(FXMLObjectProperty.class)
+                                    .hasFieldOrPropertyWithValue("name", "text")
+                                    .hasFieldOrPropertyWithValue("setter", "setText")
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
+                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("My Label")),
+                            second -> assertThat(second)
+                                    .isInstanceOf(FXMLStaticObjectProperty.class)
+                                    .hasFieldOrPropertyWithValue("name", "rowIndex")
+                                    .hasFieldOrPropertyWithValue("clazz", GridPane.class)
+                                    .hasFieldOrPropertyWithValue("setter", "setRowIndex")
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Integer.class))
+                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("0")),
+                            third -> assertThat(third)
+                                    .isInstanceOf(FXMLStaticObjectProperty.class)
+                                    .hasFieldOrPropertyWithValue("name", "columnIndex")
+                                    .hasFieldOrPropertyWithValue("clazz", GridPane.class)
+                                    .hasFieldOrPropertyWithValue("setter", "setColumnIndex")
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Integer.class))
+                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("0"))
+                    );
+        }
+
+        @Test
+        void gridPaneStaticPropertiesExplicitValue() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/GridPaneStaticPropertyElementExplicitValue.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+
+            // Assert
+            assertThat(document)
+                    // Validate document
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "GridPaneStaticPropertyElementExplicitValue")
+                    .hasFieldOrPropertyWithValue("controller", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
+                    .hasFieldOrPropertyWithValue("definitions", List.of())
+                    .hasFieldOrPropertyWithValue("scripts", List.of())
+                    .satisfies(
+                            doc -> assertThat(doc.imports())
+                                    .hasSize(3)
+                                    .containsExactly(
+                                            "javafx.scene.control.Label",
+                                            "javafx.scene.layout.GridPane",
+                                            "java.lang.Integer"
+                                    )
+                    )
+                    // Validate root
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(GridPane.class))
+                    // Validate root properties
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLCollectionProperties.class)
+                    .extracting(FXMLCollectionProperties.class::cast)
+                    .hasFieldOrPropertyWithValue("name", "children")
+                    .hasFieldOrPropertyWithValue("getter", "getChildren")
+                    .hasFieldOrPropertyWithValue(
+                            "type",
+                            new FXMLGenericType(ObservableList.class, new FXMLClassType(Node.class))
+                    )
+                    .hasFieldOrPropertyWithValue("properties", List.of())
+                    // Validate children's values
+                    .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .hasOnlyElementsOfType(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .allSatisfy(
+                            object -> assertThat(object.identifier())
+                                    .isInstanceOf(FXMLInternalIdentifier.class)
+                    )
+                    .allSatisfy(
+                            object -> assertThat(object.factoryMethod())
+                                    .isNotPresent()
+                    )
+                    .first()
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Label.class))
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(3)
+                    .satisfiesExactlyInAnyOrder(
+                            first -> assertThat(first)
+                                    .isInstanceOf(FXMLObjectProperty.class)
+                                    .hasFieldOrPropertyWithValue("name", "text")
+                                    .hasFieldOrPropertyWithValue("setter", "setText")
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
+                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("My Label")),
+                            second -> assertThat(second)
+                                    .isInstanceOf(FXMLStaticObjectProperty.class)
+                                    .extracting(FXMLStaticObjectProperty.class::cast)
+                                    .hasFieldOrPropertyWithValue("name", "rowIndex")
+                                    .hasFieldOrPropertyWithValue("clazz", GridPane.class)
+                                    .hasFieldOrPropertyWithValue("setter", "setRowIndex")
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Integer.class))
+                                    .extracting(FXMLStaticObjectProperty::value)
+                                    .isInstanceOf(FXMLValue.class)
+                                    .extracting(FXMLValue.class::cast)
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Integer.class))
+                                    .hasFieldOrPropertyWithValue("value", "0")
+                                    .satisfies(
+                                            staticProperty -> assertThat(staticProperty.identifier())
+                                                    .containsInstanceOf(FXMLInternalIdentifier.class)
+                                    ),
+                            third -> assertThat(third)
+                                    .isInstanceOf(FXMLStaticObjectProperty.class)
+                                    .extracting(FXMLStaticObjectProperty.class::cast)
+                                    .hasFieldOrPropertyWithValue("name", "columnIndex")
+                                    .hasFieldOrPropertyWithValue("clazz", GridPane.class)
+                                    .hasFieldOrPropertyWithValue("setter", "setColumnIndex")
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Integer.class))
+                                    .extracting(FXMLStaticObjectProperty::value)
+                                    .isInstanceOf(FXMLValue.class)
+                                    .extracting(FXMLValue.class::cast)
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Integer.class))
+                                    .hasFieldOrPropertyWithValue("value", "0")
+                                    .satisfies(
+                                            staticProperty -> assertThat(staticProperty.identifier())
+                                                    .containsInstanceOf(FXMLInternalIdentifier.class)
+                                    )
+                    );
         }
     }
 
