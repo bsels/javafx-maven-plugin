@@ -1,5 +1,7 @@
-package com.github.bsels.javafx.maven.plugin.fxml.v2;
+package com.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
+import com.github.bsels.javafx.maven.plugin.fxml.v2.FXMLConstants;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;

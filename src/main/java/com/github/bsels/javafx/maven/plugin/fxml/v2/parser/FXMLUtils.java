@@ -1,4 +1,4 @@
-package com.github.bsels.javafx.maven.plugin.fxml.v2;
+package com.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;

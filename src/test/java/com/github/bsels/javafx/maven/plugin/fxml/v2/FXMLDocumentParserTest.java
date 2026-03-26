@@ -6,6 +6,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMetho
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLDocumentParser;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
