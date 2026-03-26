@@ -1,6 +1,6 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
-import com.github.bsels.javafx.maven.plugin.fxml.v2.Utils;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 
 import java.util.List;
@@ -23,7 +23,7 @@ public record FXMLMethod(String name, List<FXMLType> parameters, FXMLType return
     /// @throws IllegalArgumentException if `name` is not a valid Java identifier.
     public FXMLMethod {
         Objects.requireNonNull(name, "`name` must not be null");
-        if (Utils.isInvalidIdentifierName(name)) {
+        if (FXMLUtils.isInvalidIdentifierName(name)) {
             throw new IllegalArgumentException("`name` must be a valid Java identifier: %s".formatted(name));
         }
         Objects.requireNonNull(returnType, "`returnType` must not be null");

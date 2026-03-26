@@ -1,6 +1,6 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
-import com.github.bsels.javafx.maven.plugin.fxml.v2.Utils;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 
 import java.util.Objects;
@@ -22,7 +22,7 @@ public record FXMLConstant(Class<?> clazz, String identifier, FXMLType constantT
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         Objects.requireNonNull(identifier, "`identifier` must not be null");
         Objects.requireNonNull(constantType, "`constantType` must not be null");
-        if (Utils.isInvalidIdentifierName(identifier)) {
+        if (FXMLUtils.isInvalidIdentifierName(identifier)) {
             throw new IllegalArgumentException("`identifier` must be a valid Java identifier: %s".formatted(identifier));
         }
     }

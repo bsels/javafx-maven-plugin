@@ -1,6 +1,6 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
-import com.github.bsels.javafx.maven.plugin.fxml.v2.Utils;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
 
 import java.util.Objects;
 
@@ -16,7 +16,7 @@ public record FXMLReference(String name) implements AbstractFXMLValue {
     /// @throws IllegalArgumentException if `name` is not a valid Java identifier.
     public FXMLReference {
         Objects.requireNonNull(name, "`name` must not be null");
-        if (Utils.isInvalidIdentifierName(name)) {
+        if (FXMLUtils.isInvalidIdentifierName(name)) {
             throw new IllegalArgumentException("`name` must be a valid Java identifier: %s".formatted(name));
         }
     }

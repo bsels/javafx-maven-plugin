@@ -513,20 +513,8 @@ public final class FXMLDocumentParser {
                 // Map's type parameters are K (index 0) and V (index 1)
                 String valueTypeParamName = Map.class.getTypeParameters()[1].getName();
                 FXMLType valueType = mapping.getOrDefault(valueTypeParamName, FXMLType.of(Object.class));
-                yield findRawType(valueType);
+                yield FXMLUtils.findRawType(valueType);
             }
-        };
-    }
-
-    /// Determines the raw type of the given [FXMLType] instance.
-    ///
-    /// @param type the [FXMLType] instance whose raw type is to be identified
-    /// @return the raw [Class] type corresponding to the FXMLType instance; returns `Object.class` for unsupported or wildcard types
-    private Class<?> findRawType(FXMLType type) {
-        return switch (type) {
-            case FXMLClassType(Class<?> clazz) -> clazz;
-            case FXMLGenericType(Class<?> clazz, List<FXMLType> _) -> clazz;
-            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> Object.class;
         };
     }
 

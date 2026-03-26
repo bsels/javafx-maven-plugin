@@ -1,6 +1,6 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers;
 
-import com.github.bsels.javafx.maven.plugin.fxml.v2.Utils;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
 
 import java.util.Objects;
 
@@ -24,7 +24,7 @@ public record FXMLFactoryMethod(Class<?> clazz, String method) {
     public FXMLFactoryMethod {
         Objects.requireNonNull(clazz, "`clazz` cannot be null");
         Objects.requireNonNull(method, "`method` cannot be null");
-        if (Utils.isInvalidIdentifierName(method)) {
+        if (FXMLUtils.isInvalidIdentifierName(method)) {
             throw new IllegalArgumentException(
                     "`factoryMethod` must be a valid Java identifier: %s".formatted(method)
             );

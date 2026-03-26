@@ -1,6 +1,6 @@
 package com.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
-import com.github.bsels.javafx.maven.plugin.fxml.v2.Utils;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
 
 import java.util.Objects;
 
@@ -18,7 +18,7 @@ public sealed interface AbstractFXMLValue
     static void validateIdentifier(String identifier)
             throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(identifier, "`identifier` must not be null");
-        if (Utils.isInvalidIdentifierName(identifier)) {
+        if (FXMLUtils.isInvalidIdentifierName(identifier)) {
             throw new IllegalArgumentException(
                     "`identifier` must be a valid Java identifier: %s".formatted(identifier)
             );
