@@ -230,9 +230,11 @@ public final class FXMLDocumentParser {
 
     /// Parses an XML element and converts it into an AbstractFXMLValue, if possible.
     ///
+    /// The logic delegates to [#parseElement(ParsedXMLStructure, BuildContext, boolean)] with `isRoot` set to `false`.
+    ///
     /// @param structure    the parsed XML structure to analyze and process
     /// @param buildContext the context used for building and maintaining state during parsing
-    /// @return an [Optional] containing the parsed [AbstractFXMLValue] if successful, or an empty [Optional] if parsing failed
+    /// @return an [Optional] containing the parsed [AbstractFXMLValue], or an empty [Optional] for certain special elements (e.g., `fx:define`, `fx:script`)
     /// @throws IllegalStateException if the parsing process encounters an unexpected or illegal state
     private Optional<AbstractFXMLValue> parseElement(ParsedXMLStructure structure, BuildContext buildContext)
             throws IllegalStateException {
@@ -405,6 +407,12 @@ public final class FXMLDocumentParser {
         return Optional.of(new FXMLReference(source));
     }
 
+    /// Parses an `fx:script` element from the given XML structure and updates the build context
+    /// by adding the extracted script. Returns an empty optional as this method produces no specific value.
+    ///
+    /// @param structure    The parsed XML structure containing the `fx:script` element.
+    /// @param buildContext The context used to store the extracted script.
+    /// @return An empty [Optional] as the method does not produce a concrete result.
     private Optional<AbstractFXMLValue> parseFXScript(ParsedXMLStructure structure, BuildContext buildContext) {
         buildContext.scripts()
                 .add(parseScript(structure));
@@ -1210,6 +1218,17 @@ public final class FXMLDocumentParser {
 
     }
 
+    /// Finds an object property for the given class and property name.
+    ///
+    /// The logic searches for:
+    /// 1. A setter method matching the property name.
+    /// 2. A constructor parameter matching the property name.
+    /// 3. A getter method matching the property name.
+    ///
+    /// @param buildContext The build context used for type resolution.
+    /// @param clazz        The class to search for the property.
+    /// @param name         The name of the property.
+    /// @return An [Optional] containing the [ObjectProperty] if found, or empty otherwise.
     private Optional<ObjectProperty> findObjectProperty(BuildContext buildContext, Class<?> clazz, String name) {
         // region: setter
         String setterName = Utils.getSetterName(name);
@@ -1461,7 +1480,16 @@ public final class FXMLDocumentParser {
         );
     }
 
+    /// Functional interface for handling property parsing logic.
+    ///
+    /// @param <T> The type of the value to handle.
     private interface PropertyHandler<T> {
+        /// Applies the property handling logic.
+        ///
+        /// @param buildContext The build context.
+        /// @param property     The object property.
+        /// @param value        The value to apply.
+        /// @return An [Optional] containing the [FXMLProperty] if successful, or empty otherwise.
         Optional<FXMLProperty> apply(BuildContext buildContext, ObjectProperty property, T value);
     }
 
@@ -1557,8 +1585,23 @@ public final class FXMLDocumentParser {
         }
     }
 
+    /// Represents an internal static setter property.
+    ///
+    /// @param name        The name of the property.
+    /// @param staticClass The static class containing the setter.
+    /// @param setter      The name of the setter method.
+    /// @param fxmlType    The FXML type of the property.
     private record InternalStaticSetterProperty(String name, Class<?> staticClass, String setter, FXMLType fxmlType) {
 
+        /// Compact constructor for [InternalStaticSetterProperty].
+        ///
+        /// The logic ensures that all components are not `null`.
+        ///
+        /// @param name        The name of the property.
+        /// @param staticClass The static class containing the setter.
+        /// @param setter      The name of the setter method.
+        /// @param fxmlType    The FXML type of the property.
+        /// @throws NullPointerException if any parameter is `null`.
         private InternalStaticSetterProperty {
             Objects.requireNonNull(name, "`name` must not be null");
             Objects.requireNonNull(staticClass, "`staticClass` must not be null");
@@ -1567,7 +1610,22 @@ public final class FXMLDocumentParser {
         }
     }
 
+    /// Represents a property of an FXML object.
+    ///
+    /// @param type       The FXML type of the property.
+    /// @param name       The name of the property.
+    /// @param methodName The optional method name associated with the property.
+    /// @param methodType The type of method (getter, setter, or constructor).
     private record ObjectProperty(FXMLType type, String name, Optional<String> methodName, MethodType methodType) {
+        /// Compact constructor for [ObjectProperty].
+        ///
+        /// The logic ensures that all components are not `null`.
+        ///
+        /// @param type       The FXML type of the property.
+        /// @param name       The name of the property.
+        /// @param methodName The optional method name.
+        /// @param methodType The type of method.
+        /// @throws NullPointerException if any parameter is `null`.
         private ObjectProperty {
             Objects.requireNonNull(type, "`type` must not be null");
             Objects.requireNonNull(name, "`name` must not be null");
@@ -1575,9 +1633,13 @@ public final class FXMLDocumentParser {
             Objects.requireNonNull(methodType, "`methodType` must not be null");
         }
 
+        /// Enumerates the types of methods associated with an object property.
         enum MethodType {
+            /// A getter method.
             GETTER,
+            /// A setter method.
             SETTER,
+            /// A constructor parameter.
             CONSTRUCTOR
         }
     }
@@ -1609,7 +1671,7 @@ public final class FXMLDocumentParser {
         /// @param classAndIdentifier The class and identifier details.
         /// @param type               The type of the FXML object being parsed.
         /// @param factoryMethod      The factory method associated with the FXML object.
-        /// @throws NullPointerException if any of the parameters (except `factoryMethod`) are null.
+        /// @throws NullPointerException if any of the parameters are null.
         private ParseContext {
             Objects.requireNonNull(structure, "`structure` must not be null");
             Objects.requireNonNull(buildContext, "`buildContext` must not be null");
