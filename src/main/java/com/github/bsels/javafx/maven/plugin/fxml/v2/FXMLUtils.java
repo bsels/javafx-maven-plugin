@@ -27,10 +27,6 @@ public final class FXMLUtils {
     /// Pattern to validate standard Java identifier names.
     private static final Predicate<String> VALID_NAME_PATTERN = Pattern.compile("^[a-zA-Z$][a-zA-Z0-9_$]*$")
             .asPredicate();
-    /// Pattern to validate chained Java identifier names (e.g., package names).
-    private static final Predicate<String> VALID_CHAINED_IDENTIFIER_PATTERN = Pattern.compile(
-            "^([a-zA-Z$][a-zA-Z0-9_$]*)(\\.[a-zA-Z$][a-zA-Z0-9_$]*)*$"
-    ).asPredicate();
 
     /// Private constructor to prevent instantiation.
     private FXMLUtils() {
@@ -66,7 +62,8 @@ public final class FXMLUtils {
     /// @return The [FXMLType] of the collection's element type, or `FXMLType.of(Object.class)` if it cannot be determined.
     public static FXMLType findCollectionValueType(FXMLType type) {
         return switch (type) {
-            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> FXMLType.of(Object.class);
+            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ ->
+                    FXMLType.of(Object.class);
             case FXMLClassType(Class<?> clazz) -> FXMLType.of(Utils.findCollectionValueTypeFromHierarchy(clazz));
             case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) -> {
                 Map<String, FXMLType> mapping = buildInitialTypeMapping(clazz, generics);
@@ -94,7 +91,7 @@ public final class FXMLUtils {
     ///
     /// @param type The [FXMLType] representing the map type.
     /// @return A [Map.Entry] where the key is the [FXMLType] of the map's key type and the value is the [FXMLType]
-    ///         of the map's value type, both defaulting to `FXMLType.of(Object.class)` if they cannot be determined.
+    ///                 of the map's value type, both defaulting to `FXMLType.of(Object.class)` if they cannot be determined.
     public static Map.Entry<FXMLType, FXMLType> findMapKeyAndValueTypes(FXMLType type) {
         return switch (type) {
             case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ ->
@@ -121,7 +118,7 @@ public final class FXMLUtils {
     ///
     /// @param clazz    The class whose type parameters are to be mapped.
     /// @param generics The list of [FXMLType] arguments corresponding to the class's type parameters.
-    /// @return A [Map] from type parameter name to its resolved [FXMLType].
+    /// @return A [Map] from a type parameter name to its resolved [FXMLType].
     private static Map<String, FXMLType> buildInitialTypeMapping(Class<?> clazz, List<FXMLType> generics) {
         Map<String, FXMLType> mapping = new LinkedHashMap<>();
         TypeVariable<?>[] typeParameters = clazz.getTypeParameters();
@@ -195,15 +192,5 @@ public final class FXMLUtils {
     public static boolean isInvalidIdentifierName(String name) {
         Objects.requireNonNull(name, "`name` must not be null");
         return !VALID_NAME_PATTERN.test(name);
-    }
-
-    /// Checks if the provided name is an invalid chained Java identifier (e.g., "com.example.Class").
-    ///
-    /// @param name The name to check.
-    /// @return `true` if the name is invalid, `false` otherwise.
-    /// @throws NullPointerException if `name` is `null`.
-    public static boolean isInvalidChainedIdentifierName(String name) {
-        Objects.requireNonNull(name, "`name` must not be null");
-        return !VALID_CHAINED_IDENTIFIER_PATTERN.test(name);
     }
 }

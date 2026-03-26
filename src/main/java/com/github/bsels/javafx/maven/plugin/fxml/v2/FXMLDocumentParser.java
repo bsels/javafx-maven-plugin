@@ -49,7 +49,6 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -366,7 +365,19 @@ public final class FXMLDocumentParser {
         }
         FXMLIdentifier includeId = resolveOptionalIdentifier(properties)
                 .orElseGet(() -> new FXMLInternalIdentifier(buildContext.nextInternalId()));
-        return Optional.of(new FXMLInclude(includeId, source));
+        Charset charset = getCharsetOfElement(structure);
+        Optional<String> resources = Optional.ofNullable(properties.get(FXMLConstants.RESOURCES_ATTRIBUTE));
+        return Optional.of(new FXMLInclude(includeId, source, charset, resources));
+    }
+
+    /// Retrieves the charset of the specified XML element from the provided parsed structure.
+    ///
+    /// @param structure the parsed XML structure containing the element's properties
+    /// @return the charset specified for the XML element, or the default charset if none is specified
+    private Charset getCharsetOfElement(ParsedXMLStructure structure) {
+        return Optional.ofNullable(structure.properties().get(FXMLConstants.CHARSET_ATTRIBUTE))
+                .map(Charset::forName)
+                .orElseGet(Charset::defaultCharset);
     }
 
     /// Parses an `fx:root` element from the given XML structure and creates an appropriate representation of it,
@@ -470,6 +481,17 @@ public final class FXMLDocumentParser {
         );
     }
 
+    /// Parses map entries from the provided XML structure.
+    ///
+    /// The method extracts entries from both XML attributes and child elements of the structure.
+    /// Attribute properties with non-skippable prefixes are treated as simple map entries.
+    /// Child elements with non-skippable prefixes are expected to have exactly one child representing the value.
+    ///
+    /// @param structure    The [ParsedXMLStructure] containing the map entries to parse.
+    /// @param rawValueType The expected raw class type for the map values.
+    /// @param buildContext The [BuildContext] used for parsing and resolving values.
+    /// @return A [Map] of entry keys to their corresponding [AbstractFXMLValue] objects.
+    /// @throws IllegalArgumentException If a child element for a map entry does not have exactly one child representing the value.
     private Map<String, AbstractFXMLValue> parseMapEntries(ParsedXMLStructure structure, Class<?> rawValueType, BuildContext buildContext) {
         Map<String, String> properties = structure.properties();
         Map<String, AbstractFXMLValue> entries = properties.entrySet()
@@ -610,6 +632,15 @@ public final class FXMLDocumentParser {
         return new FXMLObject(classAndIdentifier.identifier(), context.type(), context.factoryMethod(), properties);
     }
 
+    /// Parses all attribute properties for a given class from a map of attributes.
+    ///
+    /// Only attributes with non-skippable prefixes are processed. Each such attribute is converted
+    /// into an [FXMLProperty] using the attribute parsing logic.
+    ///
+    /// @param clazz        The [Class] for which the attributes are being parsed.
+    /// @param buildContext The [BuildContext] used for property resolution and parsing.
+    /// @param attributes   A [Map] of attribute names to their string values.
+    /// @return A [List] of [FXMLProperty] objects representing the parsed attributes.
     private List<FXMLProperty> parseAttributesProperties(
             Class<?> clazz,
             BuildContext buildContext,
@@ -623,6 +654,14 @@ public final class FXMLDocumentParser {
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 
+    /// Returns a function that parses a single attribute entry into an [Optional] [FXMLProperty].
+    ///
+    /// The returned function uses [parseProperty] to handle the attribute, delegating value parsing
+    /// to [parseValueString] and object property parsing to [parseObjectProperty].
+    ///
+    /// @param buildContext The [BuildContext] used for property resolution and parsing.
+    /// @param clazz        The [Class] to which the attribute property belongs.
+    /// @return A [Function] that maps an attribute entry to an [Optional] [FXMLProperty].
     private Function<Map.Entry<String, String>, Optional<FXMLProperty>> parseAttributeProperty(
             BuildContext buildContext,
             Class<?> clazz
@@ -638,6 +677,17 @@ public final class FXMLDocumentParser {
         );
     }
 
+    /// Parses an object property from a string value.
+    ///
+    /// This method handles different types of properties:
+    /// - Maps: Currently not supported for string values.
+    /// - Collections: Supported if the property is a getter (read-only collection).
+    /// - Basic properties: Supported through setters or constructors.
+    ///
+    /// @param ignored      The [BuildContext] (not used in this implementation).
+    /// @param property     The [ObjectProperty] definition being parsed.
+    /// @param value        The string value to be assigned to the property.
+    /// @return An [Optional] containing the parsed [FXMLProperty], or empty if the property type or method type is not supported.
     private Optional<FXMLProperty> parseObjectProperty(BuildContext ignored, ObjectProperty property, String value) {
         Class<?> rawType = FXMLUtils.findRawType(property.type());
         // region: map
@@ -688,6 +738,16 @@ public final class FXMLDocumentParser {
         // endregion
     }
 
+    /// Returns a function that parses a [ParsedXMLStructure] into an [Optional] [FXMLProperty].
+    ///
+    /// This is typically used for parsing FXML elements that represent properties of an object.
+    /// It delegates to [parseProperty] using various handlers for static properties, object properties,
+    /// and nested elements.
+    ///
+    /// @param defaultPropertyValues A list to collect values for the default property if the element does not match a specific property.
+    /// @param buildContext          The [BuildContext] used for property resolution and parsing.
+    /// @param clazz                 The [Class] to which the element property belongs.
+    /// @return A [Function] that maps a [ParsedXMLStructure] to an [Optional] [FXMLProperty].
     private Function<ParsedXMLStructure, Optional<FXMLProperty>> parseElementProperty(
             List<AbstractFXMLValue> defaultPropertyValues,
             BuildContext buildContext,
@@ -704,6 +764,17 @@ public final class FXMLDocumentParser {
         );
     }
 
+    /// Parses a static property of an element from a [ParsedXMLStructure].
+    ///
+    /// This method handles both simple text values and complex child elements. If the structure
+    /// contains a text value, it is parsed according to the expected type. If it contains
+    /// child elements, it expects exactly one child representing the value.
+    ///
+    /// @param buildContext The [BuildContext] used for parsing.
+    /// @param type         The [FXMLType] of the static property.
+    /// @param value        The [ParsedXMLStructure] representing the property's value.
+    /// @return An [AbstractFXMLValue] representing the parsed value.
+    /// @throws IllegalArgumentException If the structure contains multiple child elements when a single value is expected.
     private AbstractFXMLValue parseStaticPropertyOfElement(
             BuildContext buildContext,
             FXMLType type,
@@ -728,6 +799,17 @@ public final class FXMLDocumentParser {
         // endregion
     }
 
+    /// Parses an object property from a [ParsedXMLStructure].
+    ///
+    /// This method handles properties defined as XML elements. It supports:
+    /// - Text values within the element.
+    /// - Map properties (via getters).
+    /// - Collection properties or single object properties defined by child elements.
+    ///
+    /// @param buildContext The [BuildContext] used for parsing and resolution.
+    /// @param property     The [ObjectProperty] definition being parsed.
+    /// @param value        The [ParsedXMLStructure] representing the property element.
+    /// @return An [Optional] containing the parsed [FXMLProperty], or empty if not supported or no values found.
     private Optional<FXMLProperty> parseObjectProperty(
             BuildContext buildContext,
             ObjectProperty property,
@@ -771,6 +853,17 @@ public final class FXMLDocumentParser {
         return handleObjectPropertyOrCollectionProperties(buildContext, property, value.properties(), values);
     }
 
+    /// Handles the resolution of an object property or collection properties from a list of values.
+    ///
+    /// Depending on the raw type of the property and its method type (GETTER, SETTER, or CONSTRUCTOR),
+    /// this method constructs an [FXMLCollectionProperties], [FXMLObjectProperty], or [FXMLConstructorProperty].
+    ///
+    /// @param buildContext The [BuildContext] used for property resolution.
+    /// @param property     The [ObjectProperty] definition being handled.
+    /// @param attributes   A [Map] of attributes associated with the property element.
+    /// @param values       A [List] of [AbstractFXMLValue] objects representing the property's content.
+    /// @return An [Optional] containing the resolved [FXMLProperty], or empty if no values are provided or the configuration is unsupported.
+    /// @throws IllegalArgumentException If multiple values are provided for a non-collection property.
     private Optional<FXMLProperty> handleObjectPropertyOrCollectionProperties(
             BuildContext buildContext,
             ObjectProperty property,
@@ -1132,11 +1225,7 @@ public final class FXMLDocumentParser {
         Map<String, String> attributes = structure.properties();
         if (attributes.containsKey(FXMLConstants.SOURCE_ATTRIBUTE)) {
             String source = attributes.get(FXMLConstants.SOURCE_ATTRIBUTE);
-            String charsetName = attributes.getOrDefault(
-                    FXMLConstants.CHARSET_ATTRIBUTE,
-                    StandardCharsets.UTF_8.name()
-            );
-            Charset charset = Charset.forName(charsetName);
+            Charset charset = getCharsetOfElement(structure);
             return new FXMLFileScript(source, charset);
         }
         return new FXMLSourceScript(structure.getTextValue());
@@ -1178,6 +1267,14 @@ public final class FXMLDocumentParser {
         return new ClassAndIdentifier(clazz, identifier);
     }
 
+    /// Attempts to find a static setter method for a given property name.
+    ///
+    /// The property name is expected to be in the format `ClassName.propertyName`.
+    /// The method resolves the class and looks for a static setter following JavaFX conventions.
+    ///
+    /// @param buildContext The [BuildContext] used to resolve the class name.
+    /// @param name         The qualified name of the static property.
+    /// @return An [Optional] containing an [InternalStaticSetterProperty] if found, or empty otherwise.
     private Optional<InternalStaticSetterProperty> findStaticSetter(BuildContext buildContext, String name) {
         int dotIndex = name.lastIndexOf('.');
         String className = name.substring(0, dotIndex);
