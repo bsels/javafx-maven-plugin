@@ -7,6 +7,7 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIden
 import com.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticObjectProperty;
@@ -16,9 +17,6 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLSourceScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
-import com.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLWildcardType;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
@@ -453,7 +451,18 @@ public final class FXMLDocumentParser {
         ParsedXMLStructure structure = context.structure();
         BuildContext buildContext = context.buildContext();
         FXMLType type = context.type();
-        Class<?> rawValueType = findMapValueType(type);
+        Class<?> rawValueType = FXMLUtils.findRawType(FXMLUtils.findMapKeyAndValueTypes(type).getValue());
+        Map<String, AbstractFXMLValue> entries = parseMapEntries(structure, rawValueType, buildContext);
+        return new FXMLMap(
+                context.classAndIdentifier().identifier(),
+                type,
+                rawValueType,
+                context.factoryMethod(),
+                entries
+        );
+    }
+
+    private Map<String, AbstractFXMLValue> parseMapEntries(ParsedXMLStructure structure, Class<?> rawValueType, BuildContext buildContext) {
         Map<String, String> properties = structure.properties();
         Map<String, AbstractFXMLValue> entries = properties.entrySet()
                 .stream()
@@ -483,13 +492,7 @@ public final class FXMLDocumentParser {
                 entries.put(childName, grandChildren.getFirst());
             }
         }
-        return new FXMLMap(
-                context.classAndIdentifier().identifier(),
-                type,
-                rawValueType,
-                context.factoryMethod(),
-                entries
-        );
+        return entries;
     }
 
     /// Parses map elements from the provided XML structure and attempts to convert them into an appropriate value.
@@ -507,44 +510,6 @@ public final class FXMLDocumentParser {
         return structure.textValue()
                 .map(value -> parseValueString(value, expectedType))
                 .or(() -> parseElement(structure, buildContext));
-    }
-
-    /// Finds the value type of [Map] from the given [FXMLType].
-    ///
-    /// The logic:
-    /// 1. For [FXMLWildcardType], [FXMLUncompiledClassType], and [FXMLUncompiledGenericType],
-    ///    returns [Object] as the value type.
-    /// 2. For [FXMLClassType], traverses the class hierarchy via [Utils#findMapValueTypeFromHierarchy(Class)] to find
-    ///    the [Map] interface and extract the concrete value type from its type parameters,
-    ///    defaulting to [Object] if not found.
-    /// 3. For [FXMLGenericType], builds an initial type mapping from the class's own type parameters to the provided
-    ///    generic arguments, then traverses the full class hierarchy via [#resolveTypeMappingInternal(Type, Map, Set)]
-    ///    to propagate type variable bindings down to the [Map] interface's type parameters.
-    ///    The value type (`V`, at index 1 of [Map]'s type parameters) is then looked up in the resolved mapping
-    ///    and its raw class is returned.
-    ///
-    /// @param type The [FXMLType] representing the map type.
-    /// @return The raw [Class] of the map's value type, or [Object] if it cannot be determined.
-    private Class<?> findMapValueType(FXMLType type) {
-        return switch (type) {
-            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> Object.class;
-            case FXMLClassType(Class<?> clazz) -> Utils.findMapValueTypeFromHierarchy(clazz);
-            case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) -> {
-                // Build initial mapping from clazz's own type parameters to the provided generics
-                Map<String, FXMLType> mapping = new LinkedHashMap<>();
-                TypeVariable<?>[] typeParameters = clazz.getTypeParameters();
-                for (int i = 0; i < typeParameters.length && i < generics.size(); i++) {
-                    mapping.put(typeParameters[i].getName(), generics.get(i));
-                }
-                // Traverse the class hierarchy to propagate type variable bindings to Map's type parameters
-                Set<Type> visited = new HashSet<>();
-                resolveTypeMappingInternal(clazz, mapping, visited);
-                // Map's type parameters are K (index 0) and V (index 1)
-                String valueTypeParamName = Map.class.getTypeParameters()[1].getName();
-                FXMLType valueType = mapping.getOrDefault(valueTypeParamName, FXMLType.of(Object.class));
-                yield FXMLUtils.findRawType(valueType);
-            }
-        };
     }
 
     /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLObject] or a value.
@@ -769,8 +734,25 @@ public final class FXMLDocumentParser {
         Class<?> rawType = FXMLUtils.findRawType(property.type());
         // region: map
         if (Map.class.isAssignableFrom(rawType)) {
-            // TODO: special parsing for map attributes
-            return Optional.empty();
+            return switch (property.methodType()) {
+                case GETTER -> {
+                    Class<?> rawValueType = FXMLUtils.findRawType(FXMLUtils.findMapKeyAndValueTypes(property.type()).getValue());
+                    Map<String, AbstractFXMLValue> entries = parseMapEntries(value, rawValueType, buildContext);
+                    yield Optional.of(new FXMLMapProperty(
+                            property.name(),
+                            property.methodName().orElseThrow(),
+                            property.type(),
+                            rawValueType,
+                            entries
+                    ));
+                }
+                case SETTER, CONSTRUCTOR -> {
+                    log.debug(
+                            "Parsing child elements property using setter or constructor as map: %s is not supported.".formatted(
+                                    property.name()));
+                    yield Optional.empty();
+                }
+            };
         }
         // endregion
         List<AbstractFXMLValue> values = value.children()
