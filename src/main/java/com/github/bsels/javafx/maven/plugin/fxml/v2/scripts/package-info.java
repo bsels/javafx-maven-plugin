@@ -1,2 +1,0 @@
-/// Support for FXML scripts.
-package com.github.bsels.javafx.maven.plugin.fxml.v2.scripts;
