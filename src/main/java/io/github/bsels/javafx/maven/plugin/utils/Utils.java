@@ -18,6 +18,7 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -182,6 +183,22 @@ public final class Utils {
                         i--;
                     }
                 }
+        );
+    }
+
+    /// Creates a Gatherer that collects unique items from a stream of input.
+    /// <t> represents the type of items being processed.
+    /// The method uses a [HashSet] to ensure that each item is included only once pushed to the downstream.
+    /// Duplicate items are discarded and downstream processing continues.
+    ///
+    /// @return a [Gatherer] instance that pushes unique items from the input stream to the downstream.
+    public static <T> Gatherer<T, Set<T>, T> unique() {
+        return Gatherer.ofSequential(
+                HashSet::new,
+                (state, line, downstream) -> Optional.ofNullable(line)
+                        .filter(state::add)
+                        .map(downstream::push)
+                        .orElseGet(isDownstreamAccepting(downstream))
         );
     }
 
@@ -667,7 +684,7 @@ public final class Utils {
     ///
     /// @param downstream the downstream consumer whose acceptance status is to be checked
     /// @return a supplier that returns true if the downstream is accepting items, false otherwise
-    private static Supplier<Boolean> isDownstreamAccepting(Gatherer.Downstream<? super Class<?>> downstream) {
+    private static Supplier<Boolean> isDownstreamAccepting(Gatherer.Downstream<?> downstream) {
         return () -> !downstream.isRejecting();
     }
 

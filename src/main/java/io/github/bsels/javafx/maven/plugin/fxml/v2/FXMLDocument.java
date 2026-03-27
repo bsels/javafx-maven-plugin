@@ -1,5 +1,6 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLScript;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
@@ -20,7 +21,7 @@ import java.util.Optional;
 public record FXMLDocument(
         String className,
         AbstractFXMLObject root,
-        Optional<Class<?>> controller,
+        Optional<FXMLController> controller,
         Optional<String> scriptEngine,
         List<String> imports,
         List<AbstractFXMLValue> definitions,

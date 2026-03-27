@@ -1,4 +1,4 @@
-package io.github.bsels.javafx.maven.plugin.fxml.introspect;
+package io.github.bsels.javafx.maven.plugin.fxml.v2.controller;
 
 /// Represents various levels of visibility within a given context.
 ///

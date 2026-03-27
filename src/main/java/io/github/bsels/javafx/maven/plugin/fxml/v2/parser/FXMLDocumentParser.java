@@ -2,6 +2,7 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLConstants;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
@@ -152,9 +153,10 @@ public final class FXMLDocumentParser {
         ParsedXMLStructure rootStructure = parsedFXML.root();
         BuildContext buildContext = new BuildContext(parsedFXML.imports(), resourcePath);
 
-        Optional<Class<?>> controller = Optional.ofNullable(
-                rootStructure.properties().get(FXMLConstants.FX_CONTROLLER_ATTRIBUTE)
-        ).map(name -> Utils.findType(buildContext.imports(), name));
+        Map<String, String> properties = rootStructure.properties();
+        Optional<FXMLController> controller = Optional.ofNullable(properties.get(FXMLConstants.FX_CONTROLLER_ATTRIBUTE))
+                .map(name -> Utils.findType(buildContext.imports(), name))
+                .map(controllerClass -> helper.introspectControllerClass(controllerClass, buildContext));
 
         Optional<AbstractFXMLValue> rootValue = parseElement(rootStructure, buildContext, true);
         if (rootValue.isEmpty() || !(rootValue.get() instanceof AbstractFXMLObject root)) {

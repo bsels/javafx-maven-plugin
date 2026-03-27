@@ -1,6 +1,10 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLConstants;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.Visibility;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
@@ -15,7 +19,10 @@ import io.github.bsels.javafx.maven.plugin.utils.InternalClassNotFoundException;
 import io.github.bsels.javafx.maven.plugin.utils.Utils;
 import org.apache.maven.plugin.logging.Log;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -378,4 +385,84 @@ final class FXMLDocumentParserHelper {
                 .orElse(defaultCharset);
     }
 
+    /// Analyzes the provided controller class to inspect its fields, methods, and other relevant details,
+    /// and returns a corresponding [FXMLController] object.
+    ///
+    /// @param clazz        the class object representing the controller to be introspected; must not be null, must be public, and must not be abstract.
+    /// @param buildContext the context that provides necessary build-time information for processing the class; must not be null.
+    /// @return an `FXMLController` instance that encapsulates the introspected fields and methods of the class.
+    /// @throws NullPointerException     if either `clazz` or `buildContext` is null.
+    /// @throws IllegalArgumentException if the provided class is not public, is abstract, or does not have a public no-arg constructor.
+    public FXMLController introspectControllerClass(Class<?> clazz, BuildContext buildContext)
+            throws NullPointerException, IllegalArgumentException {
+        Objects.requireNonNull(clazz, "`clazz` must not be null");
+        Objects.requireNonNull(buildContext, "`buildContext` must not be null");
+        if (!Modifier.isPublic(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers())) {
+            throw new IllegalArgumentException("Class '%s' must be public and not abstract".formatted(clazz.getName()));
+        }
+        Optional<Constructor<?>> defaultConstructor = Arrays.stream(clazz.getDeclaredConstructors())
+                .filter(constructor -> constructor.getParameterCount() == 0)
+                .filter(constructor -> Modifier.isPublic(constructor.getModifiers()))
+                .findFirst();
+        if (defaultConstructor.isEmpty()) {
+            throw new IllegalArgumentException("Controller class must have a public no-arg constructor");
+        }
+        List<FXMLControllerField> fields = Stream.concat(
+                        Arrays.stream(clazz.getDeclaredFields()),
+                        Arrays.stream(clazz.getFields())
+                )
+                .gather(Utils.unique())
+                .map(field -> createFXMLControllerField(buildContext, field))
+                .toList();
+        List<FXMLControllerMethod> methods = Stream.concat(
+                        Arrays.stream(clazz.getDeclaredMethods()),
+                        Arrays.stream(clazz.getMethods())
+                )
+                .gather(Utils.unique())
+                .map(method -> createFXMLControllerMethod(buildContext, method))
+                .toList();
+        return new FXMLController(clazz, fields, methods);
+    }
+
+    /// Creates an instance of [FXMLControllerMethod] based on the provided build context and method.
+    ///
+    /// @param buildContext the context used to build FXML-related types and configurations
+    /// @param method       the method being analyzed and converted into an [FXMLControllerMethod]
+    /// @return a newly constructed [FXMLControllerMethod] instance representing the given method
+    private FXMLControllerMethod createFXMLControllerMethod(BuildContext buildContext, Method method) {
+        return new FXMLControllerMethod(
+                visibilityOfModifier(method.getModifiers()),
+                method.getName(),
+                buildFXMLType(method.getGenericReturnType(), buildContext),
+                Arrays.stream(method.getGenericParameterTypes())
+                        .map(parameterType -> buildFXMLType(parameterType, buildContext))
+                        .toList()
+        );
+    }
+
+    /// Creates an instance of [FXMLControllerField] using the provided field metadata and build context.
+    ///
+    /// @param buildContext the context used to build the FXML type and other field properties
+    /// @param field        the field from which the [FXMLControllerField] is constructed
+    /// @return a new [FXMLControllerField] instance representing the specified field with appropriate properties
+    private FXMLControllerField createFXMLControllerField(BuildContext buildContext, Field field) {
+        return new FXMLControllerField(
+                visibilityOfModifier(field.getModifiers()),
+                field.getName(),
+                buildFXMLType(field.getGenericType(), buildContext)
+        );
+    }
+
+    /// Determines the visibility of a given modifier.
+    ///
+    /// @param modifier the integer value representing a modifier, typically from the [Modifier] class
+    /// @return the corresponding [Visibility] enum value, such as `PUBLIC`, `PROTECTED`, `PRIVATE`, or `PACKAGE_PRIVATE`
+    private Visibility visibilityOfModifier(int modifier) {
+        return switch (modifier) {
+            case Modifier.PUBLIC -> Visibility.PUBLIC;
+            case Modifier.PROTECTED -> Visibility.PROTECTED;
+            case Modifier.PRIVATE -> Visibility.PRIVATE;
+            default -> Visibility.PACKAGE_PRIVATE;
+        };
+    }
 }
