@@ -286,22 +286,22 @@ class FXMLValueTest {
     class FXMLResourceTest {
         @Test
         void shouldCreateWithValidParams() {
-            FXMLResource res = new FXMLResource("name");
-            assertThat(res.name()).isEqualTo("name");
+            FXMLResource res = new FXMLResource("path");
+            assertThat(res.path()).isEqualTo("path");
         }
 
         @Test
         void shouldThrowNpeWithMessage() {
             assertThatThrownBy(() -> new FXMLResource(null))
                     .isInstanceOf(NullPointerException.class)
-                    .hasMessage("`name` must not be null");
+                    .hasMessage("`path` must not be null");
         }
 
         @Test
-        void shouldThrowIaeForBlankName() {
+        void shouldThrowIaeForBlankPath() {
             assertThatThrownBy(() -> new FXMLResource("   "))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("`name` must not be blank");
+                    .hasMessage("`path` must not be blank");
         }
     }
 

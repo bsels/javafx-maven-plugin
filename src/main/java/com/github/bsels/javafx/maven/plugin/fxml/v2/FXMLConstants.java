@@ -39,8 +39,12 @@ public final class FXMLConstants {
     // region: Prefixes
     /// The `\` escape prefix.
     public static final String ESCAPE_PREFIX = "\\";
-    /// The `$` expression prefix.
+    /// The `$` expression and reference prefix.
     public static final String EXPRESSION_PREFIX = "$";
+    /// The `${` expression start delimiter.
+    public static final String EXPRESSION_START = "${";
+    /// The `}` expression end delimiter.
+    public static final String EXPRESSION_END = "}";
     /// The `fx:` namespace prefix.
     public static final String FX_PREFIX = "fx:";
     /// The `@` location prefix.

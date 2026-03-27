@@ -1,0 +1,7 @@
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<ImageView>
+    <image>
+        <Image url="@my_image.png"/>
+    </image>
+</ImageView>

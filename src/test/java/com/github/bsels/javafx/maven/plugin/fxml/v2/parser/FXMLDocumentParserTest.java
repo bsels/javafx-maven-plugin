@@ -21,12 +21,14 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLConstant;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCopy;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLExpression;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInclude;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInlineScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLLiteral;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMap;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLObject;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLReference;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLResource;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
 import com.github.bsels.javafx.maven.plugin.io.FXMLReader;
 import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
@@ -39,6 +41,8 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
@@ -61,6 +65,8 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -116,6 +122,72 @@ public class FXMLDocumentParserTest {
     private ParsedFXML readFXML(String fxml) throws MojoExecutionException {
         Path fxmlFile = TestHelpers.getTestResourcePath(fxml);
         return fxmlReader.readFXML(fxmlFile);
+    }
+
+    @Nested
+    class ParseValueStringTest {
+        @Test
+        void shouldParseReference() throws Exception {
+            Method parseValueString = FXMLDocumentParser.class.getDeclaredMethod(
+                    "parseValueString",
+                    String.class,
+                    Class.class,
+                    FXMLDocumentParser.class.getDeclaredClasses()[0]
+            );
+            parseValueString.setAccessible(true);
+
+            Constructor<?> buildContextConstructor = FXMLDocumentParser.class.getDeclaredClasses()[0].getDeclaredConstructor(
+                    List.class,
+                    String.class
+            );
+            buildContextConstructor.setAccessible(true);
+            Object context = buildContextConstructor.newInstance(List.of(), "");
+            Object result = parseValueString.invoke(classUnderTest, "$myId", String.class, context);
+
+            assertThat(result).isEqualTo(new FXMLReference("myId"));
+        }
+
+        @Test
+        void shouldParseExpression() throws Exception {
+            Method parseValueString = FXMLDocumentParser.class.getDeclaredMethod(
+                    "parseValueString",
+                    String.class,
+                    Class.class,
+                    FXMLDocumentParser.class.getDeclaredClasses()[0]
+            );
+            parseValueString.setAccessible(true);
+
+            Constructor<?> buildContextConstructor = FXMLDocumentParser.class.getDeclaredClasses()[0].getDeclaredConstructor(
+                    List.class,
+                    String.class
+            );
+            buildContextConstructor.setAccessible(true);
+            Object context = buildContextConstructor.newInstance(List.of(), "");
+            Object result = parseValueString.invoke(classUnderTest, "${myExpr}", String.class, context);
+
+            assertThat(result).isEqualTo(new FXMLExpression("myExpr"));
+        }
+
+        @Test
+        void shouldParseEscaped() throws Exception {
+            Method parseValueString = FXMLDocumentParser.class.getDeclaredMethod(
+                    "parseValueString",
+                    String.class,
+                    Class.class,
+                    FXMLDocumentParser.class.getDeclaredClasses()[0]
+            );
+            parseValueString.setAccessible(true);
+
+            Constructor<?> buildContextConstructor = FXMLDocumentParser.class.getDeclaredClasses()[0].getDeclaredConstructor(
+                    List.class,
+                    String.class
+            );
+            buildContextConstructor.setAccessible(true);
+            Object context = buildContextConstructor.newInstance(List.of(), "");
+            Object result = parseValueString.invoke(classUnderTest, "\\$notRef", String.class, context);
+
+            assertThat(result).isEqualTo(new FXMLLiteral("$notRef"));
+        }
     }
 
     @Nested
@@ -1037,6 +1109,67 @@ public class FXMLDocumentParserTest {
                                                     .containsInstanceOf(FXMLInternalIdentifier.class)
                                     )
                     );
+        }
+
+        @Test
+        void locationResolution() throws MojoExecutionException {
+
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/LocationResolution.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+
+            // Assert
+            assertThat(document)
+                    // Validate document
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "LocationResolution")
+                    .hasFieldOrPropertyWithValue("controller", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
+                    .hasFieldOrPropertyWithValue("definitions", List.of())
+                    .hasFieldOrPropertyWithValue("scripts", List.of())
+                    .satisfies(
+                            doc -> assertThat(doc.imports())
+                                    .hasSize(2)
+                                    .containsExactly(
+                                            "javafx.scene.image.Image",
+                                            "javafx.scene.image.ImageView"
+                                    )
+                    )
+                    // Validate root
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(ImageView.class))
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLObjectProperty.class)
+                    .extracting(FXMLObjectProperty.class::cast)
+                    .hasFieldOrPropertyWithValue("name", "image")
+                    .hasFieldOrPropertyWithValue("setter", "setImage")
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Image.class))
+                    .extracting(FXMLObjectProperty::value)
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Image.class))
+                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                    .satisfies(
+                            image -> assertThat(image.identifier())
+                                    .isInstanceOf(FXMLInternalIdentifier.class)
+                    )
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLConstructorProperty.class)
+                    .extracting(FXMLConstructorProperty.class::cast)
+                    .hasFieldOrPropertyWithValue("name", "url")
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
+                    .hasFieldOrPropertyWithValue("value", new FXMLResource("/examples/my_image.png"));
         }
     }
 
