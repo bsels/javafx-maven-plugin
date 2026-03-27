@@ -63,6 +63,6 @@ class ObjectMapperProviderTest {
     void testTypeSerialization() throws Exception {
         ObjectMapper objectMapper = ObjectMapperProvider.getObjectMapper();
         assertThat(objectMapper.writeValueAsString(TypeEncoderTest.class))
-                .isEqualTo("\"class com.github.bsels.javafx.maven.plugin.utils.TypeEncoderTest\"");
+                .isEqualTo("\"class io.github.bsels.javafx.maven.plugin.utils.TypeEncoderTest\"");
     }
 }

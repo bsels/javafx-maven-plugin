@@ -6,12 +6,10 @@
 /// ## Key Parts
 /// - [io.github.bsels.javafx.maven.plugin.io.FXMLReader]: Handles parsing of FXML files, extracting import statements
 ///   and XML structure
-/// - [io.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder]: Generates Java source code from parsed FXML
-///   structures
 /// - [io.github.bsels.javafx.maven.plugin.io.ParsedFXML]: Represents the result of parsing an FXML file,
 ///   including imports and XML structure
 /// - [io.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure]: Encapsulates the hierarchical structure of
-///   an XML node with its attributes and children</dd>
+///   an XML node with its attributes and children
 ///
 /// ## Package Responsibilities
 /// - Reading FXML files from various sources

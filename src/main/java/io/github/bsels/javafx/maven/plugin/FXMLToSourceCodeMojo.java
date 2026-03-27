@@ -169,7 +169,6 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     ///
     /// The execution process involves several steps:
     /// - Reading the FXML files using the [FXMLReader] component.
-    /// - Processing the FXML models using the [FXMLProcessor] component.
     /// - Generating source code for each processed FXML model.
     /// - Writing the generated source code to files in the appropriate package directory.
     ///

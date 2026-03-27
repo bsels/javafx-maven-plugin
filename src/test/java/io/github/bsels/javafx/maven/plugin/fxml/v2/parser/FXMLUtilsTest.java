@@ -58,6 +58,32 @@ class FXMLUtilsTest {
         }
     }
 
+    /** A custom ParameterizedType implementation for testing null actual type arguments. */
+    static class CustomParameterizedType implements ParameterizedType {
+        private final Class<?> rawType;
+        private final Type[] actualTypeArguments;
+
+        CustomParameterizedType(Class<?> rawType, Type[] actualTypeArguments) {
+            this.rawType = rawType;
+            this.actualTypeArguments = actualTypeArguments;
+        }
+
+        @Override
+        public Type[] getActualTypeArguments() {
+            return actualTypeArguments;
+        }
+
+        @Override
+        public Type getRawType() {
+            return rawType;
+        }
+
+        @Override
+        public Type getOwnerType() {
+            return null;
+        }
+    }
+
     // -------------------------------------------------------------------------
     // findRawType
     // -------------------------------------------------------------------------
@@ -530,6 +556,19 @@ class FXMLUtilsTest {
 
             // Then – it's not a Class, and it's not a ParameterizedType, so nothing should happen
             assertThat(mapping).isEmpty();
+        }
+
+        @Test
+        void shouldMapWildcardForNullActualTypeArgument() {
+            // Given – a ParameterizedType for List whose actual type argument is null
+            ParameterizedType pt = new CustomParameterizedType(List.class, new Type[] {null});
+            Map<String, FXMLType> mapping = new LinkedHashMap<>();
+
+            // When
+            FXMLUtils.resolveTypeMapping(pt, mapping, new HashSet<>());
+
+            // Then – null arg should produce a wildcard FXMLType for "E"
+            assertThat(mapping).containsEntry("E", FXMLType.wildcard());
         }
     }
 

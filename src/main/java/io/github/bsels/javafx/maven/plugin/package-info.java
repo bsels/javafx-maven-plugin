@@ -14,11 +14,11 @@
 /// - [io.github.bsels.javafx.maven.plugin.CheckAndCast]: Utility for type checking and casting
 ///
 /// ## Subpackages
-/// - [com.github.bsels.javafx.maven.plugin.fxml]: FXML processing and node manipulation utilities
-/// - [com.github.bsels.javafx.maven.plugin.in.memory.compiler]: In-memory compilation support
-/// - [com.github.bsels.javafx.maven.plugin.io]: Input/output utilities for FXML and source code processing
-/// - [com.github.bsels.javafx.maven.plugin.parameters]: Parameter handling and configuration management
-/// - [com.github.bsels.javafx.maven.plugin.utils]: General utility classes and helper methods
+/// - [io.github.bsels.javafx.maven.plugin.fxml]: FXML processing and node manipulation utilities
+/// - [io.github.bsels.javafx.maven.plugin.in.memory.compiler]: In-memory compilation support
+/// - [io.github.bsels.javafx.maven.plugin.io]: Input/output utilities for FXML and source code processing
+/// - [io.github.bsels.javafx.maven.plugin.parameters]: Parameter handling and configuration management
+/// - [io.github.bsels.javafx.maven.plugin.utils]: General utility classes and helper methods
 ///
 /// ## Key Responsibilities
 /// - Providing Maven goals for JavaFX application development

@@ -1423,8 +1423,9 @@ public final class FXMLDocumentParser {
     /// 2. If it's not a functional interface, it defaults to `void`.
     /// 3. Returns a new [FXMLMethod] instance.
     ///
-    /// @param methodName The method name (without the `#` prefix).
-    /// @param paramType  The expected getter parameter type; may be `null`.
+    /// @param methodName   The method name (without the `#` prefix).
+    /// @param paramType    The expected getter parameter type.
+    /// @param buildContext The current build context.
     /// @return The corresponding [FXMLMethod].
     private FXMLMethod resolveMethodReference(String methodName, Class<?> paramType, BuildContext buildContext) {
         if (isFunctionalInterface(paramType)) {

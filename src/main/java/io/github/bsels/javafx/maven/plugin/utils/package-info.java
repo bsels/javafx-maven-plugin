@@ -4,8 +4,6 @@
 /// functionalities across the JavaFX Maven Plugin, offering essential
 /// tools for processing, encoding, and managing plugin operations.
 /// ## Key Parts
-/// - [io.github.bsels.javafx.maven.plugin.utils.FXMLProcessor]: Handles processing and transformation of
-///   FXML-related operations
 /// - [io.github.bsels.javafx.maven.plugin.utils.InternalClassNotFoundException]: Custom exception for handling class
 ///   resolution issues within the plugin
 /// - [io.github.bsels.javafx.maven.plugin.utils.ObjectMapperProvider]: Provides mapping and conversion utilities
