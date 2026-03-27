@@ -187,7 +187,12 @@ public class FXMLDocumentParserTest {
 
         @Test
         void shouldThrowErrorOnUnclosedExpression() {
-            assertThatThrownBy(() -> parseValueString.invoke(classUnderTest, "${unclosedExpr", String.class, buildContext))
+            assertThatThrownBy(() -> parseValueString.invoke(
+                    classUnderTest,
+                    "${unclosedExpr",
+                    String.class,
+                    buildContext
+            ))
                     .hasCauseInstanceOf(IllegalArgumentException.class)
                     .hasStackTraceContaining("`name` must be a valid Java identifier: {unclosedExpr");
         }
@@ -574,10 +579,7 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
                     .hasFieldOrPropertyWithValue(
                             "type",
-                            new FXMLGenericType(
-                                    HashMap.class,
-                                    List.of(new FXMLClassType(Object.class), new FXMLClassType(Object.class))
-                            )
+                            new FXMLClassType(HashMap.class)
                     )
                     .satisfies(
                             map -> assertThat(map.entries())

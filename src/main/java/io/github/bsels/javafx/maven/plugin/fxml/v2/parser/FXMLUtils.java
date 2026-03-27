@@ -1,32 +1,69 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLConstants;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLWildcardType;
+import io.github.bsels.javafx.maven.plugin.utils.InternalClassNotFoundException;
 import io.github.bsels.javafx.maven.plugin.utils.Utils;
+import javafx.beans.DefaultProperty;
+import javafx.event.EventHandler;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /// Utility class for common FXML-related validation tasks.
 public final class FXMLUtils {
+    private static final Pattern GENERICS = Pattern.compile(
+            "^\\s*generic\\s+(?<index>\\d+)\\s*:\\s*(?<type>\\S(.*\\S)?)\\s*$");
+    /// A regular expression pattern used to match and parse nested generic type definitions.
+    ///
+    /// This pattern identifies sequences of generic type declarations that may be nested
+    /// and separated by commas. It considers fully qualified names, optional generic type
+    /// parameters enclosed in angle brackets, and allows for whitespace around elements.
+    ///
+    /// The pattern handles:
+    /// - Nested generic definitions, e.g., `List<Map<String, Integer>>`.
+    /// - Fully qualified class names with optional generics, e.g., `java.util.Map<String, Integer>`.
+    /// - Multiple generic type declarations separated by commas, e.g., `Map<String, Integer>, List<String>`.
+    /// - Arbitrary whitespace around the types and delimiters.
+    ///
+    /// It uses named groups `first` for the preceding types, `rawType` for the current class name,
+    /// and `generics` for its type arguments.
+    private static final Pattern NESTED_GENERICS = Pattern.compile(
+            "^\\s*((?<first>((((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*),\\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?)$"
+    );
     /// Pattern to validate standard Java identifier names.
     private static final Predicate<String> VALID_NAME_PATTERN = Pattern.compile("^[a-zA-Z$][a-zA-Z0-9_$]*$")
             .asPredicate();
+
+    private static final Map<Class<?>, Optional<String>> CLASS_TO_DEFAULT_PROPERTY_NAME_CACHE = new HashMap<>();
+    private static final Map<ClassAndString, Type> CLASS_FACTORY_METHOD_TYPE_CACHE = new HashMap<>();
+    private static final Map<ClassAndString, Type> CLASS_CONSTANT_TYPE_CACHE = new HashMap<>();
 
     /// Private constructor to prevent instantiation.
     private FXMLUtils() {
@@ -91,7 +128,7 @@ public final class FXMLUtils {
     ///
     /// @param type The [FXMLType] representing the map type.
     /// @return A [Map.Entry] where the key is the [FXMLType] of the map's key type and the value is the [FXMLType]
-    ///                         of the map's value type, both defaulting to `FXMLType.of(Object.class)` if they cannot be determined.
+    ///                                                                                                                                                                                                 of the map's value type, both defaulting to `FXMLType.of(Object.class)` if they cannot be determined.
     public static Map.Entry<FXMLType, FXMLType> findMapKeyAndValueTypes(FXMLType type) {
         return switch (type) {
             case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ ->
@@ -181,6 +218,161 @@ public final class FXMLUtils {
         return !VALID_NAME_PATTERN.test(name);
     }
 
+    /// Checks whether the given class is or extends `javafx.event.EventHandler`.
+    ///
+    /// @param clazz The class to check.
+    /// @return `true` if the class is assignable to `javafx.event.EventHandler`; `false` otherwise.
+    /// @throws NullPointerException if `clazz` is `null`.
+    public static boolean isEventHandlerType(Class<?> clazz) throws NullPointerException {
+        Objects.requireNonNull(clazz, "`clazz` must not be null");
+        return EventHandler.class.isAssignableFrom(clazz);
+    }
+
+    /// Checks whether the given class is a functional interface.
+    ///
+    /// The logic:
+    /// 1. Verifies the class is an interface.
+    /// 2. Checks for the [@FunctionalInterface] annotation.
+    /// 3. Alternatively, counts the number of abstract methods; if exactly one, it's considered a functional interface.
+    ///
+    /// @param clazz The class to check.
+    /// @return `true` if the class is a functional interface; `false` otherwise.
+    /// @throws NullPointerException if `clazz` is `null`.
+    public static boolean isFunctionalInterface(Class<?> clazz) throws NullPointerException {
+        Objects.requireNonNull(clazz, "`clazz` must not be null");
+        if (!clazz.isInterface()) {
+            return false;
+        }
+        if (clazz.isAnnotationPresent(FunctionalInterface.class)) {
+            return true;
+        }
+        long abstractMethodCount = Stream.of(clazz.getMethods())
+                .map(Method::getModifiers)
+                .filter(Modifier::isAbstract)
+                .count();
+        return abstractMethodCount == 1;
+    }
+
+    /// Resolves the [Type] of a constant field on the given class.
+    ///
+    /// The logic:
+    /// 1. Attempts to find a public field with the given name.
+    /// 2. Verifies that the field is static.
+    /// 3. Returns the field's generic type.
+    ///
+    /// @param clazz        The class defining the constant.
+    /// @param constantName The name of the constant field.
+    /// @return The [Type] of the constant field.
+    /// @throws IllegalArgumentException if the field does not exist or is not static.
+    /// @throws NullPointerException     if `clazz` or `constantName` is `null`.
+    public static Type resolveConstantType(Class<?> clazz, String constantName)
+            throws IllegalArgumentException, NullPointerException {
+        Objects.requireNonNull(clazz, "`clazz` must not be null");
+        Objects.requireNonNull(constantName, "`constantName` must not be null");
+        return CLASS_CONSTANT_TYPE_CACHE.computeIfAbsent(
+                new ClassAndString(clazz, constantName),
+                FXMLUtils::internalResolveConstantType
+        );
+    }
+
+    /// Finds the return type of the static factory method.
+    ///
+    /// The logic searches for a static method on the given class that:
+    /// - Matches the provided `factoryMethodName`.
+    /// - Has no parameters.
+    /// - Is public and accessible.
+    ///
+    /// @param clazz             The class declaring the factory method.
+    /// @param factoryMethodName The name of the factory method.
+    /// @return The return [Type] of the factory method.
+    /// @throws IllegalArgumentException if the factory method cannot be found.
+    /// @throws NullPointerException     if either `clazz` or `factoryMethodName` is null.
+    public static Type findFactoryMethodReturnType(Class<?> clazz, String factoryMethodName)
+            throws IllegalArgumentException, NullPointerException {
+        Objects.requireNonNull(clazz, "`clazz` must not be null");
+        Objects.requireNonNull(factoryMethodName, "`factoryMethodName` must not be null");
+        return CLASS_FACTORY_METHOD_TYPE_CACHE.computeIfAbsent(
+                new ClassAndString(clazz, factoryMethodName),
+                FXMLUtils::internalFindFactoryMethodReturnType
+        );
+    }
+
+    /// Resolves the default property name for a class using the [DefaultProperty] annotation.
+    ///
+    /// The logic traverses the class hierarchy (including superclasses) to find the first
+    /// occurrence of the [DefaultProperty] annotation and returns its value.
+    ///
+    /// @param clazz The class to inspect for a [DefaultProperty] annotation.
+    /// @return The default property name if found, or an empty [Optional] if not found.
+    /// @throws NullPointerException if `clazz` is null.
+    public static Optional<String> resolveDefaultPropertyName(Class<?> clazz) throws NullPointerException {
+        Objects.requireNonNull(clazz, "`clazz` must not be null");
+        return CLASS_TO_DEFAULT_PROPERTY_NAME_CACHE.computeIfAbsent(
+                clazz,
+                FXMLUtils::internalResolveDefaultPropertyName
+        );
+    }
+
+    /// Determines if the given string has a non-skippable prefix.
+    ///
+    /// The logic checks if the string starts with `fx:` or `xmlns`.
+    ///
+    /// @param key The string to check for skippable prefixes.
+    /// @return `true` if the string starts with a non skippable prefix; `false` otherwise.
+    /// @throws NullPointerException if `key` is null.
+    public static boolean hasNonSkippablePrefix(String key) throws NullPointerException {
+        Objects.requireNonNull(key, "`key` must not be null");
+        return !key.startsWith(FXMLConstants.FX_PREFIX) && !key.startsWith(FXMLConstants.XML_NAMESPACE_PREFIX);
+    }
+
+    public static FXMLType constructGenericType(Class<?> rawClass, List<String> comments, List<String> imports)
+            throws NullPointerException, IllegalArgumentException {
+        Objects.requireNonNull(rawClass, "`rawClass` must not be null");
+        Objects.requireNonNull(comments, "`comments` must not be null");
+        Objects.requireNonNull(imports, "`imports` must not be null");
+        List<FXMLType> genericTypes = parseGenericsFromComments(comments, imports);
+        int typeParameters = rawClass.getTypeParameters().length;
+        int numberOfGenerics = genericTypes.size();
+        if (!genericTypes.isEmpty() && numberOfGenerics != typeParameters) {
+            throw new IllegalArgumentException(
+                    "Generic types count (%d) does not match the number of type parameters (%d).".formatted(
+                            numberOfGenerics,
+                            typeParameters
+                    )
+            );
+        }
+        return FXMLType.of(rawClass, genericTypes);
+    }
+
+    private static List<FXMLType> parseGenericsFromComments(List<String> comments, List<String> imports)
+            throws IllegalArgumentException {
+        return extractGenericsFromComments(comments)
+                .stream()
+                .map(generic -> parseGenericString(generic, imports))
+                .toList();
+    }
+
+    private static List<String> extractGenericsFromComments(List<String> comments)
+            throws IllegalArgumentException {
+        Map<Integer, String> genericTypes = new TreeMap<>(Comparator.naturalOrder());
+        for (String comment : comments) {
+            Matcher matcher = GENERICS.matcher(comment);
+            if (matcher.find()) {
+                genericTypes.put(Integer.parseInt(matcher.group("index")), matcher.group("type"));
+            }
+        }
+        List<Integer> sortedKeys = genericTypes.keySet().stream().sorted().toList();
+        List<String> generics = new ArrayList<>();
+        for (int i = 0; i < sortedKeys.size(); i++) {
+            if (i != sortedKeys.get(i)) {
+                throw new IllegalArgumentException("Generic types are having non-sequential indices: %s".formatted(
+                        sortedKeys));
+            }
+            generics.add(genericTypes.get(i));
+        }
+        return generics;
+    }
+
     /// Builds an initial type variable mapping from a class's own type parameters to the provided generic arguments.
     ///
     /// @param clazz    The class whose type parameters are to be mapped.
@@ -196,4 +388,131 @@ public final class FXMLUtils {
         return mapping;
     }
 
+    /// Resolves the default property name for a class using the [DefaultProperty] annotation.
+    ///
+    /// The logic traverses the class hierarchy (including superclasses) to find the first
+    /// occurrence of the [DefaultProperty] annotation and returns its value.
+    ///
+    /// @param clazz The class to inspect for a [DefaultProperty] annotation.
+    /// @return The default property name if found, or an empty [Optional] if not found.
+    private static Optional<String> internalResolveDefaultPropertyName(Class<?> clazz) {
+        Class<?> current = clazz;
+        while (current != null) {
+            DefaultProperty annotation = current.getDeclaredAnnotation(DefaultProperty.class);
+            if (annotation != null) {
+                return Optional.of(annotation.value());
+            }
+            current = current.getSuperclass();
+        }
+        return Optional.empty();
+    }
+
+    /// Finds the return type of the static factory method.
+    ///
+    /// The logic searches for a static method on the given class that:
+    /// - Matches the provided `factoryMethodName`.
+    /// - Has no parameters.
+    /// - Is public and accessible.
+    ///
+    /// @param classAndString The class declaring the factory method and the name of the factory method.
+    /// @return The return [Type] of the factory method.
+    /// @throws IllegalArgumentException if the factory method cannot be found.
+    private static Type internalFindFactoryMethodReturnType(ClassAndString classAndString)
+            throws IllegalArgumentException {
+        Class<?> clazz = classAndString.clazz();
+        String factoryMethodName = classAndString.string();
+        return Stream.of(clazz.getMethods())
+                .filter(method -> Modifier.isStatic(method.getModifiers()))
+                .filter(method -> method.getName().equals(factoryMethodName))
+                .filter(method -> method.getParameterCount() == 0)
+                .map(Method::getGenericReturnType)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("No static factory method '%s' found on '%s'".formatted(
+                        factoryMethodName,
+                        clazz.getName()
+                )));
+    }
+
+    /// Resolves the [Type] of a constant field on the given class.
+    ///
+    /// The logic:
+    /// 1. Attempts to find a public field with the given name.
+    /// 2. Verifies that the field is static.
+    /// 3. Returns the field's generic type.
+    ///
+    /// @param classAndString The class defining the constant and the name of the constant field.
+    /// @return The [Type] of the constant field.
+    /// @throws IllegalArgumentException if the field does not exist or is not static.
+    private static Type internalResolveConstantType(ClassAndString classAndString)
+            throws IllegalArgumentException {
+        Class<?> clazz = classAndString.clazz();
+        String constantName = classAndString.string();
+        try {
+            Field field = clazz.getField(constantName);
+            if (!Modifier.isStatic(field.getModifiers())) {
+                throw new IllegalArgumentException("Field `%s` on `%s` is not static".formatted(
+                        constantName,
+                        clazz.getName()
+                ));
+            }
+            return field.getGenericType();
+        } catch (NoSuchFieldException e) {
+            throw new IllegalArgumentException(
+                    "No such constant field `%s` on `%s`".formatted(
+                            constantName,
+                            clazz.getName()
+                    ), e
+            );
+        }
+    }
+
+    private static FXMLType parseGenericString(String genericString, List<String> imports) {
+        Matcher matcher = NESTED_GENERICS.matcher(genericString);
+        if (!matcher.find()) {
+            throw new IllegalArgumentException("Invalid generic type string: %s".formatted(genericString));
+        }
+        String rawType = matcher.group("rawType").strip();
+        String nestedGenerics = matcher.group("generics");
+        List<FXMLType> nestedTypeArgs = parseNestedGenerics(nestedGenerics, imports);
+        try {
+            Class<?> resolvedClass = Utils.findType(imports, rawType);
+            return FXMLType.of(resolvedClass, nestedTypeArgs);
+        } catch (InternalClassNotFoundException _) {
+            return FXMLType.of(rawType, nestedTypeArgs);
+        }
+    }
+
+    private static List<FXMLType> parseNestedGenerics(String nestedGenerics, List<String> imports) {
+        if (nestedGenerics == null || nestedGenerics.isBlank()) {
+            return List.of();
+        }
+        List<FXMLType> result = new LinkedList<>();
+        String remaining = nestedGenerics;
+        while (remaining != null) {
+            Matcher matcher = NESTED_GENERICS.matcher(remaining);
+            if (!matcher.find()) {
+                break;
+            }
+            String rawType = matcher.group("rawType").strip();
+            String deeper = matcher.group("generics");
+            List<FXMLType> deeperArgs = parseNestedGenerics(deeper, imports);
+            FXMLType type;
+            try {
+                Class<?> resolvedClass = Utils.findType(imports, rawType);
+                type = FXMLType.of(resolvedClass, deeperArgs);
+            } catch (InternalClassNotFoundException _) {
+                type = FXMLType.of(rawType, deeperArgs);
+            }
+            result.addFirst(type);
+            remaining = matcher.group("first");
+        }
+        return List.copyOf(result);
+    }
+
+    private record ClassAndString(Class<?> clazz, String string) {
+        private ClassAndString {
+            Objects.requireNonNull(clazz, "`clazz` must not be null");
+            Objects.requireNonNull(string, "`string` must not be null");
+        }
+    }
 }
