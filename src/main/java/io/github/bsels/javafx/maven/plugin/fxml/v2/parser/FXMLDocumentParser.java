@@ -112,6 +112,9 @@ public final class FXMLDocumentParser {
     /// throughout the application. It is used to report warnings for unresolvable types or properties
     /// and to provide debug information during the parsing process.
     private final Log log;
+    /// A utility object that helps with parsing FXML documents.
+    /// This helper provides methods and functionality specific to processing and interpreting FXML content within
+    /// the application.
     private final FXMLDocumentParserHelper helper;
 
     /// Compact constructor to validate the log dependency.
@@ -407,12 +410,7 @@ public final class FXMLDocumentParser {
     /// @param context The [ParseContext] containing the parsed XML structure, build context, class and identifier, and FXML type.
     /// @return An [FXMLCollection] object constructed from the parsed XML structure, generics, factory method, and child values.
     private FXMLCollection parseCollection(ParseContext context) {
-        List<AbstractFXMLValue> values = context.structure()
-                .children()
-                .stream()
-                .map(child -> parseElement(child, context.buildContext()))
-                .gather(Utils.optional())
-                .toList();
+        List<AbstractFXMLValue> values = parseChildrenAsValues(context.buildContext(), context.structure());
         return new FXMLCollection(
                 context.classAndIdentifier().identifier(),
                 context.type(),
@@ -543,7 +541,10 @@ public final class FXMLDocumentParser {
         Map<String, String> properties = structure.properties();
         if (properties.containsKey(FXMLConstants.FX_CONSTANT_ATTRIBUTE)) {
             String constantName = properties.get(FXMLConstants.FX_CONSTANT_ATTRIBUTE);
-            FXMLType constantType = helper.buildFXMLType(FXMLUtils.resolveConstantType(clazz, constantName), buildContext);
+            FXMLType constantType = helper.buildFXMLType(
+                    FXMLUtils.resolveConstantType(clazz, constantName),
+                    buildContext
+            );
             return Optional.of(new FXMLConstant(clazz, constantName, constantType));
         }
         if (properties.containsKey(FXMLConstants.FX_VALUE_ATTRIBUTE)) {
@@ -750,11 +751,7 @@ public final class FXMLDocumentParser {
         }
         // endregion
         // region: child elements
-        List<AbstractFXMLValue> values = value.children()
-                .stream()
-                .map(child -> parseElement(child, buildContext))
-                .gather(Utils.optional())
-                .toList();
+        List<AbstractFXMLValue> values = parseChildrenAsValues(buildContext, value);
         if (values.size() == 1) {
             return values.getFirst();
         }
@@ -809,12 +806,21 @@ public final class FXMLDocumentParser {
             };
         }
         // endregion
-        List<AbstractFXMLValue> values = value.children()
+        List<AbstractFXMLValue> values = parseChildrenAsValues(buildContext, value);
+        return handleObjectPropertyOrCollectionProperties(buildContext, property, value.properties(), values);
+    }
+
+    /// Parses the children of the given XML structure into a list of AbstractFXMLValue instances.
+    ///
+    /// @param buildContext the context for building and maintaining state during the parsing process
+    /// @param value        the parsed XML structure containing the children to be processed
+    /// @return a list of AbstractFXMLValue instances resulting from parsing the children elements
+    private List<AbstractFXMLValue> parseChildrenAsValues(BuildContext buildContext, ParsedXMLStructure value) {
+        return value.children()
                 .stream()
                 .map(child -> parseElement(child, buildContext))
                 .gather(Utils.optional())
                 .toList();
-        return handleObjectPropertyOrCollectionProperties(buildContext, property, value.properties(), values);
     }
 
     /// Handles the resolution of an object property or collection properties from a list of values.
@@ -826,7 +832,7 @@ public final class FXMLDocumentParser {
     /// @param property     The [ObjectProperty] definition being handled.
     /// @param attributes   A [Map] of attributes associated with the property element.
     /// @param values       A [List] of [AbstractFXMLValue] objects representing the property's content.
-    /// @return An [Optional] containing the resolved [FXMLProperty], or empty if no values are provided or the configuration is unsupported.
+    /// @return An [Optional] containing the resolved [FXMLProperty] or empty if no values are provided or the configuration is unsupported.
     /// @throws IllegalArgumentException If multiple values are provided for a non-collection property.
     private Optional<FXMLProperty> handleObjectPropertyOrCollectionProperties(
             BuildContext buildContext,
@@ -943,7 +949,7 @@ public final class FXMLDocumentParser {
             Charset charset = helper.getCharsetOfElement(structure);
             return new FXMLFileScript(helper.resolveResourcePath(source, buildContext), charset);
         }
-        return new FXMLSourceScript(structure.getTextValue());
+        return new FXMLSourceScript(structure.textValue().orElse(""));
     }
 
     /// Parses an attribute value string into an [AbstractFXMLValue], with awareness of the expected getter

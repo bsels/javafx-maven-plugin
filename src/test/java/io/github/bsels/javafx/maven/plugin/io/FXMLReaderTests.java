@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -182,12 +184,12 @@ class FXMLReaderTests {
             assertThat(root.name()).isEqualTo("VBox");
             assertThat(root.children()).hasSize(1);
 
-            ParsedXMLStructure innerVBox = root.children().get(0);
+            ParsedXMLStructure innerVBox = root.children().getFirst();
             assertThat(innerVBox.name()).isEqualTo("VBox");
             assertThat(innerVBox.properties()).containsEntry("id", "inner");
             assertThat(innerVBox.children()).hasSize(1);
 
-            ParsedXMLStructure label = innerVBox.children().get(0);
+            ParsedXMLStructure label = innerVBox.children().getFirst();
             assertThat(label.name()).isEqualTo("Label");
             assertThat(label.properties()).containsEntry("text", "Nested Label");
             assertThat(label.children()).isEmpty();
@@ -332,7 +334,7 @@ class FXMLReaderTests {
                     
                     <?import javafx.scene.layout.VBox?>
                     
-                    <VBox xmlns="http://javafx.com/javafx/17.0.12" 
+                    <VBox xmlns="http://javafx.com/javafx/17.0.12"
                           xmlns:fx="http://javafx.com/fxml/1">
                         <fx:define>
                             <fx:String fx:id="testString">Test Value</fx:String>
@@ -410,10 +412,11 @@ class FXMLReaderTests {
         private static final InstanceOfAssertFactory<Optional, OptionalAssert<String>> STRING_OPTIONAL_ASSERT_FACTORY =
                 InstanceOfAssertFactories.optional(String.class);
 
-        @Test
-        void inMemoryScript_ReturnExpectedIncludingPlainText() throws MojoExecutionException {
+        @ParameterizedTest
+        @ValueSource(strings = {"InMemoryScript", "InMemoryScriptCData"})
+        void inMemoryScript_ReturnExpectedIncludingPlainText(String fileName) throws MojoExecutionException {
             // Prepare
-            Path fxmlFile = TestHelpers.getTestResourcePath("/examples/InMemoryScript.fxml");
+            Path fxmlFile = TestHelpers.getTestResourcePath("/examples/%s.fxml".formatted(fileName));
 
             // Act
             ParsedFXML result = fxmlReader.readFXML(fxmlFile);
@@ -422,7 +425,7 @@ class FXMLReaderTests {
             assertThat(result)
                     .isNotNull()
                     .hasFieldOrPropertyWithValue("scriptNamespace", Optional.of("javascript"))
-                    .hasFieldOrPropertyWithValue("className", "InMemoryScript")
+                    .hasFieldOrPropertyWithValue("className", fileName)
                     .satisfies(
                             parsedFXML -> assertThat(parsedFXML.imports())
                                     .hasSize(2)
@@ -501,7 +504,7 @@ class FXMLReaderTests {
                             first -> assertThat(first)
                                     .hasFieldOrPropertyWithValue("name", FXMLConstants.FX_SCRIPT_ELEMENT)
                                     .hasFieldOrPropertyWithValue("children", List.of())
-                                    .hasFieldOrPropertyWithValue("comments", List.of())
+                                    .hasFieldOrPropertyWithValue("comments", List.of("ignored"))
                                     .returns(Optional.empty(), ParsedXMLStructure::textValue)
                                     .extracting(ParsedXMLStructure::properties, STRING_STRING_MAP_ASSERT_FACTORY)
                                     .hasSize(2)

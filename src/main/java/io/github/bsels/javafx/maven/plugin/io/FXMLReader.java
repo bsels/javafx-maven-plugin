@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -72,6 +73,14 @@ public record FXMLReader(Log log) {
     /// structured information. Its primary usage is likely to assist in identifying invalid characters in
     /// names or identifiers during processing.
     private static final Pattern NON_NAME_CHAR_PATTERN = Pattern.compile("\\W");
+    /// A constant set of node types representing textual content in an XML document.
+    /// This includes:
+    /// - [Node#TEXT_NODE]: A node containing text content.
+    /// - [Node#CDATA_SECTION_NODE]: A node containing a CDATA section.
+    ///
+    /// These node types are typically used for extracting or processing text content
+    /// during XML parsing in FXML files.
+    private static final Set<Short> TEXT_NODE_TYPES = Set.of(Node.TEXT_NODE, Node.CDATA_SECTION_NODE);
 
     /// Constructs an instance of the [FXMLReader] class.
     ///
@@ -181,13 +190,13 @@ public record FXMLReader(Log log) {
         if (!children.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(
-                IntStream.range(0, childNodes.getLength())
-                        .mapToObj(childNodes::item)
-                        .filter(childNode -> Node.TEXT_NODE == childNode.getNodeType() || Node.CDATA_SECTION_NODE == childNode.getNodeType())
-                        .map(Node::getNodeValue)
-                        .collect(Collectors.collectingAndThen(Collectors.joining(), Utils::stripIndentNonBlankLines))
-        ).filter(Predicate.not(String::isBlank));
+        return IntStream.range(0, childNodes.getLength())
+                .mapToObj(childNodes::item)
+                .filter(childNode -> TEXT_NODE_TYPES.contains(childNode.getNodeType()))
+                .map(Node::getNodeValue)
+                .collect(Collectors.collectingAndThen(Collectors.joining(), Optional::of))
+                .map(Utils::stripIndentNonBlankLines)
+                .filter(Predicate.not(String::isBlank));
     }
 
     /// Derives the class name corresponding to the given FXML file path.

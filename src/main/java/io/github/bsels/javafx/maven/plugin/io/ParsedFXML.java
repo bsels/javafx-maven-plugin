@@ -34,15 +34,4 @@ public record ParsedFXML(
         Objects.requireNonNull(root);
         Objects.requireNonNull(className);
     }
-
-    /// Constructs an instance of the [ParsedFXML] record with an empty list of imports.
-    ///
-    /// @param imports   a list of import statements associated with the FXML file. The list is defensively copied to ensure immutability.
-    /// @param root      the root element of the FXML file, represented as a [ParsedXMLStructure]. Must not be null.
-    /// @param className the name of the Java class generated from the FXML file.
-    /// @throws NullPointerException if the root element is null.
-    public ParsedFXML(List<String> imports, ParsedXMLStructure root, String className)
-            throws NullPointerException {
-        this(Optional.empty(), imports, root, className);
-    }
 }
