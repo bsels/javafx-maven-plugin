@@ -14,7 +14,6 @@ import javafx.beans.NamedArg;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import org.apache.maven.monitor.logging.DefaultLog;
-import org.assertj.core.api.InstanceOfAssertFactories;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -25,12 +24,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/// Unit tests for [FMXLDocumentParserHelper].
-class FMXLDocumentParserHelperTest {
+/// Unit tests for [FXMLDocumentParserHelper].
+class FXMLDocumentParserHelperTest {
 
     // -------------------------------------------------------------------------
     // Helper fixtures
@@ -84,7 +84,7 @@ class FMXLDocumentParserHelperTest {
         void methodB();
     }
 
-    /// A class with a static setter for testing [FMXLDocumentParserHelper#findStaticSetter].
+    /// A class with a static setter for testing [FXMLDocumentParserHelper#findStaticSetter].
     static class StaticSetterClass {
         public static void setConstraint(Object node, String value) {}
     }
@@ -99,14 +99,14 @@ class FMXLDocumentParserHelperTest {
     // Test setup
     // -------------------------------------------------------------------------
 
-    private FMXLDocumentParserHelper helper;
+    private FXMLDocumentParserHelper helper;
     private BuildContext buildContext;
 
-    /// Creates a fresh [FMXLDocumentParserHelper] and a default [BuildContext] before each test.
+    /// Creates a fresh [FXMLDocumentParserHelper] and a default [BuildContext] before each test.
     @BeforeEach
     void setUp() {
         DefaultLog log = new DefaultLog(new ConsoleLogger());
-        helper = new FMXLDocumentParserHelper(log, StandardCharsets.UTF_8);
+        helper = new FXMLDocumentParserHelper(log, StandardCharsets.UTF_8);
         buildContext = new BuildContext(
                 List.of(
                         SimpleBean.class.getName(),
@@ -126,14 +126,14 @@ class FMXLDocumentParserHelperTest {
     // Constructor tests
     // -------------------------------------------------------------------------
 
-    /// Tests for the constructor of [FMXLDocumentParserHelper].
+    /// Tests for the constructor of [FXMLDocumentParserHelper].
     @Nested
     class ConstructorTest {
 
         /// Verifies that a null `log` throws [NullPointerException].
         @Test
         void nullLogThrowsNullPointerException() {
-            assertThatThrownBy(() -> new FMXLDocumentParserHelper(null, StandardCharsets.UTF_8))
+            assertThatThrownBy(() -> new FXMLDocumentParserHelper(null, StandardCharsets.UTF_8))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("`log` must not be null");
         }
@@ -142,7 +142,7 @@ class FMXLDocumentParserHelperTest {
         @Test
         void nullDefaultCharsetThrowsNullPointerException() {
             DefaultLog log = new DefaultLog(new ConsoleLogger());
-            assertThatThrownBy(() -> new FMXLDocumentParserHelper(log, null))
+            assertThatThrownBy(() -> new FXMLDocumentParserHelper(log, null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("`defaultCharset` must not be null");
         }
@@ -151,7 +151,7 @@ class FMXLDocumentParserHelperTest {
         @Test
         void validArgumentsConstructSuccessfully() {
             DefaultLog log = new DefaultLog(new ConsoleLogger());
-            assertThat(new FMXLDocumentParserHelper(log, StandardCharsets.UTF_8)).isNotNull();
+            assertThat(new FXMLDocumentParserHelper(log, StandardCharsets.UTF_8)).isNotNull();
         }
     }
 
@@ -159,7 +159,7 @@ class FMXLDocumentParserHelperTest {
     // buildFXMLType tests
     // -------------------------------------------------------------------------
 
-    /// Tests for [FMXLDocumentParserHelper#buildFXMLType].
+    /// Tests for [FXMLDocumentParserHelper#buildFXMLType].
     @Nested
     class BuildFXMLTypeTest {
 
@@ -184,9 +184,7 @@ class FMXLDocumentParserHelperTest {
         void plainClassReturnsClassType() {
             assertThat(helper.buildFXMLType(String.class, buildContext))
                     .isInstanceOf(FXMLClassType.class)
-                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLClassType.class))
-                    .extracting(FXMLClassType::clazz)
-                    .isEqualTo(String.class);
+                    .hasFieldOrPropertyWithValue("clazz", String.class);
         }
 
         /// Verifies that a [Class] with type parameters returns [FXMLGenericType].
@@ -194,9 +192,7 @@ class FMXLDocumentParserHelperTest {
         void classWithTypeParametersReturnsGenericType() {
             assertThat(helper.buildFXMLType(List.class, buildContext))
                     .isInstanceOf(FXMLGenericType.class)
-                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLGenericType.class))
-                    .extracting(FXMLGenericType::type)
-                    .isEqualTo(List.class);
+                    .hasFieldOrPropertyWithValue("type", List.class);
         }
 
         /// Verifies that a [ParameterizedType] (e.g. List&lt;String&gt;) returns [FXMLGenericType] with resolved args.
@@ -206,9 +202,7 @@ class FMXLDocumentParserHelperTest {
             var paramType = Holder.class.getDeclaredField("field").getGenericType();
             assertThat(helper.buildFXMLType(paramType, buildContext))
                     .isInstanceOf(FXMLGenericType.class)
-                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLGenericType.class))
-                    .extracting(FXMLGenericType::type)
-                    .isEqualTo(List.class);
+                    .hasFieldOrPropertyWithValue("type", List.class);
         }
 
         /// Verifies that a [TypeVariable] not in the mapping returns a wildcard type.
@@ -241,9 +235,7 @@ class FMXLDocumentParserHelperTest {
                     .getActualTypeArguments()[0];
             assertThat(helper.buildFXMLType(wildcardType, buildContext))
                     .isInstanceOf(FXMLClassType.class)
-                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLClassType.class))
-                    .extracting(FXMLClassType::clazz)
-                    .isEqualTo(String.class);
+                    .hasFieldOrPropertyWithValue("clazz", String.class);
         }
 
         /// Verifies that a [WildcardType] with a lower bound resolves to the lower bound.
@@ -254,9 +246,7 @@ class FMXLDocumentParserHelperTest {
                     .getActualTypeArguments()[0];
             assertThat(helper.buildFXMLType(wildcardType, buildContext))
                     .isInstanceOf(FXMLClassType.class)
-                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLClassType.class))
-                    .extracting(FXMLClassType::clazz)
-                    .isEqualTo(String.class);
+                    .hasFieldOrPropertyWithValue("clazz", String.class);
         }
 
         /// Verifies that an unbounded [WildcardType] (&lt;?&gt;) returns a wildcard type.
@@ -294,7 +284,7 @@ class FMXLDocumentParserHelperTest {
     // resolveTypeMapping tests
     // -------------------------------------------------------------------------
 
-    /// Tests for [FMXLDocumentParserHelper#resolveTypeMapping].
+    /// Tests for [FXMLDocumentParserHelper#resolveTypeMapping].
     @Nested
     class ResolveTypeMappingTest {
 
@@ -340,7 +330,7 @@ class FMXLDocumentParserHelperTest {
     // findStaticSetter tests
     // -------------------------------------------------------------------------
 
-    /// Tests for [FMXLDocumentParserHelper#findStaticSetter].
+    /// Tests for [FXMLDocumentParserHelper#findStaticSetter].
     @Nested
     class FindStaticSetterTest {
 
@@ -375,11 +365,9 @@ class FMXLDocumentParserHelperTest {
             assertThat(helper.findStaticSetter(buildContext, qualifiedName))
                     .isPresent()
                     .get()
-                    .satisfies(prop -> {
-                        assertThat(prop.name()).isEqualTo("constraint");
-                        assertThat(prop.staticClass()).isEqualTo(StaticSetterClass.class);
-                        assertThat(prop.setter()).isEqualTo("setConstraint");
-                    });
+                    .hasFieldOrPropertyWithValue("name", "constraint")
+                    .hasFieldOrPropertyWithValue("staticClass", StaticSetterClass.class)
+                    .hasFieldOrPropertyWithValue("setter", "setConstraint");
         }
 
         /// Verifies that a property with no matching static setter returns empty.
@@ -403,7 +391,7 @@ class FMXLDocumentParserHelperTest {
     // findObjectProperty tests
     // -------------------------------------------------------------------------
 
-    /// Tests for [FMXLDocumentParserHelper#findObjectProperty].
+    /// Tests for [FXMLDocumentParserHelper#findObjectProperty].
     @Nested
     class FindObjectPropertyTest {
 
@@ -437,11 +425,9 @@ class FMXLDocumentParserHelperTest {
             assertThat(helper.findObjectProperty(buildContext, SimpleBean.class, "value"))
                     .isPresent()
                     .get()
-                    .satisfies(prop -> {
-                        assertThat(prop.methodType()).isEqualTo(ObjectProperty.MethodType.SETTER);
-                        assertThat(prop.name()).isEqualTo("value");
-                        assertThat(prop.methodName()).contains("setValue");
-                    });
+                    .hasFieldOrPropertyWithValue("methodType", ObjectProperty.MethodType.SETTER)
+                    .hasFieldOrPropertyWithValue("name", "value")
+                    .hasFieldOrPropertyWithValue("methodName", Optional.of("setValue"));
         }
 
         /// Verifies that multiple setters for the same property returns empty.
@@ -457,11 +443,9 @@ class FMXLDocumentParserHelperTest {
             assertThat(helper.findObjectProperty(buildContext, ConstructorParamBean.class, "label"))
                     .isPresent()
                     .get()
-                    .satisfies(prop -> {
-                        assertThat(prop.methodType()).isEqualTo(ObjectProperty.MethodType.CONSTRUCTOR);
-                        assertThat(prop.name()).isEqualTo("label");
-                        assertThat(prop.methodName()).isEmpty();
-                    });
+                    .hasFieldOrPropertyWithValue("methodType", ObjectProperty.MethodType.CONSTRUCTOR)
+                    .hasFieldOrPropertyWithValue("name", "label")
+                    .hasFieldOrPropertyWithValue("methodName", Optional.empty());
         }
 
         /// Verifies that multiple constructor parameters with the same name returns empty.
@@ -477,11 +461,9 @@ class FMXLDocumentParserHelperTest {
             assertThat(helper.findObjectProperty(buildContext, GetterOnlyBean.class, "name"))
                     .isPresent()
                     .get()
-                    .satisfies(prop -> {
-                        assertThat(prop.methodType()).isEqualTo(ObjectProperty.MethodType.GETTER);
-                        assertThat(prop.name()).isEqualTo("name");
-                        assertThat(prop.methodName()).contains("getName");
-                    });
+                    .hasFieldOrPropertyWithValue("methodType", ObjectProperty.MethodType.GETTER)
+                    .hasFieldOrPropertyWithValue("name", "name")
+                    .hasFieldOrPropertyWithValue("methodName", Optional.of("getName"));
         }
 
         /// Verifies that a property with no setter, constructor param, or getter returns empty.
@@ -496,7 +478,7 @@ class FMXLDocumentParserHelperTest {
     // findMethodReferenceType tests
     // -------------------------------------------------------------------------
 
-    /// Tests for [FMXLDocumentParserHelper#findMethodReferenceType].
+    /// Tests for [FXMLDocumentParserHelper#findMethodReferenceType].
     @Nested
     class FindMethodReferenceTypeTest {
 
@@ -529,15 +511,13 @@ class FMXLDocumentParserHelperTest {
         void functionalInterfaceReturnsCorrectFXMLMethod() {
             assertThat(helper.findMethodReferenceType("onAction", MyEventHandler.class, buildContext))
                     .isNotNull()
+                    .hasFieldOrPropertyWithValue("name", "onAction")
                     .satisfies(method -> {
-                        assertThat(method.name()).isEqualTo("onAction");
                         assertThat(method.parameters())
                                 .hasSize(1)
                                 .first()
                                 .isInstanceOf(FXMLClassType.class)
-                                .asInstanceOf(InstanceOfAssertFactories.type(FXMLClassType.class))
-                                .extracting(FXMLClassType::clazz)
-                                .isEqualTo(ActionEvent.class);
+                                .hasFieldOrPropertyWithValue("clazz", ActionEvent.class);
                     });
         }
 
@@ -546,8 +526,7 @@ class FMXLDocumentParserHelperTest {
         void standardFunctionalInterfaceEventHandlerResolves() {
             assertThat(helper.findMethodReferenceType("onAction", EventHandler.class, buildContext))
                     .isNotNull()
-                    .extracting(FXMLMethod::name)
-                    .isEqualTo("onAction");
+                    .hasFieldOrPropertyWithValue("name", "onAction");
         }
 
         /// Verifies that a non-functional interface throws [IllegalArgumentException].
@@ -571,7 +550,7 @@ class FMXLDocumentParserHelperTest {
     // resolveResourcePath tests
     // -------------------------------------------------------------------------
 
-    /// Tests for [FMXLDocumentParserHelper#resolveResourcePath].
+    /// Tests for [FXMLDocumentParserHelper#resolveResourcePath].
     @Nested
     class ResolveResourcePathTest {
 
@@ -627,7 +606,7 @@ class FMXLDocumentParserHelperTest {
     // resolveOptionalIdentifier tests
     // -------------------------------------------------------------------------
 
-    /// Tests for [FMXLDocumentParserHelper#resolveOptionalIdentifier].
+    /// Tests for [FXMLDocumentParserHelper#resolveOptionalIdentifier].
     @Nested
     class ResolveOptionalIdentifierTest {
 
@@ -667,7 +646,7 @@ class FMXLDocumentParserHelperTest {
     // resolveClassAndIdentifier tests
     // -------------------------------------------------------------------------
 
-    /// Tests for [FMXLDocumentParserHelper#resolveClassAndIdentifier].
+    /// Tests for [FXMLDocumentParserHelper#resolveClassAndIdentifier].
     @Nested
     class ResolveClassAndIdentifierTest {
 
@@ -693,10 +672,8 @@ class FMXLDocumentParserHelperTest {
         void rootNodeWithoutFxIdGetsRootIdentifier() {
             ParsedXMLStructure structure = new ParsedXMLStructure("String", Map.of(), List.of());
             assertThat(helper.resolveClassAndIdentifier(structure, buildContext, true))
-                    .satisfies(result -> {
-                        assertThat(result.identifier()).isEqualTo(FXMLRootIdentifier.INSTANCE);
-                        assertThat(result.clazz()).isEqualTo(String.class);
-                    });
+                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                    .hasFieldOrPropertyWithValue("clazz", String.class);
         }
 
         /// Verifies that a root node with `fx:id` gets [FXMLNamedRootIdentifier].
@@ -743,7 +720,7 @@ class FMXLDocumentParserHelperTest {
     // getCharsetOfElement tests
     // -------------------------------------------------------------------------
 
-    /// Tests for [FMXLDocumentParserHelper#getCharsetOfElement].
+    /// Tests for [FXMLDocumentParserHelper#getCharsetOfElement].
     @Nested
     class GetCharsetOfElementTest {
 
@@ -775,7 +752,7 @@ class FMXLDocumentParserHelperTest {
         @Test
         void defaultCharsetFromConstructorIsUsedWhenNoCharsetAttribute() {
             DefaultLog log = new DefaultLog(new ConsoleLogger());
-            FMXLDocumentParserHelper helperWithLatin1 = new FMXLDocumentParserHelper(log, StandardCharsets.ISO_8859_1);
+            FXMLDocumentParserHelper helperWithLatin1 = new FXMLDocumentParserHelper(log, StandardCharsets.ISO_8859_1);
             assertThat(helperWithLatin1.getCharsetOfElement(new ParsedXMLStructure("element", Map.of(), List.of())))
                     .isEqualTo(StandardCharsets.ISO_8859_1);
         }

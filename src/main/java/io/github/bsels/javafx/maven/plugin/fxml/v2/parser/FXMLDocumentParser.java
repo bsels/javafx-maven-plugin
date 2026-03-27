@@ -2,7 +2,6 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLConstants;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
@@ -113,7 +112,7 @@ public final class FXMLDocumentParser {
     /// throughout the application. It is used to report warnings for unresolvable types or properties
     /// and to provide debug information during the parsing process.
     private final Log log;
-    private final FMXLDocumentParserHelper helper;
+    private final FXMLDocumentParserHelper helper;
 
     /// Compact constructor to validate the log dependency.
     ///
@@ -125,7 +124,7 @@ public final class FXMLDocumentParser {
     public FXMLDocumentParser(Log log, Charset defaultCharset) {
         this.log = Objects.requireNonNull(log, "`log` must not be null");
         Objects.requireNonNull(defaultCharset, "`defaultCharset` must not be null");
-        this.helper = new FMXLDocumentParserHelper(log, defaultCharset);
+        this.helper = new FXMLDocumentParserHelper(log, defaultCharset);
     }
 
     /// Parses the provided [ParsedFXML] instance and constructs an [FXMLDocument].
@@ -953,7 +952,7 @@ public final class FXMLDocumentParser {
     /// The logic handles various FXML prefixes:
     /// - `%`: Returns [FXMLTranslation].
     /// - `@`: Returns [FXMLResource].
-    /// - `#`: Returns [FXMLMethod] via [FMXLDocumentParserHelper#findMethodReferenceType(String, Class, BuildContext)].
+    /// - `#`: Returns [FXMLMethod] via [FXMLDocumentParserHelper#findMethodReferenceType(String, Class, BuildContext)].
     /// - `$`: Returns [FXMLReference].
     /// - `${...}`: Returns [FXMLExpression] if the expression is valid, otherwise throws [IllegalArgumentException].
     /// - `\`: Returns [FXMLLiteral] (escaped).

@@ -38,7 +38,7 @@ import java.util.stream.Stream;
 /// This class handles type resolution, property identification (static and instance), method reference resolution,
 /// resource path handling, and identifier extraction. It is designed to work in conjunction with
 /// [FXMLDocumentParser] to transform parsed XML structures into JavaFX-compatible FXML model representations.
-final class FMXLDocumentParserHelper {
+final class FXMLDocumentParserHelper {
     /// Provides a logger instance for recording runtime information, debugging, and error messages.
     ///
     /// This logger is immutable and initialized once via the constructor, ensuring consistent logging
@@ -51,12 +51,12 @@ final class FMXLDocumentParserHelper {
     /// It is immutable and cannot be changed after initialization.
     private final Charset defaultCharset;
 
-    /// Constructs a new [FMXLDocumentParserHelper] with the specified logger and default charset.
+    /// Constructs a new [FXMLDocumentParserHelper] with the specified logger and default charset.
     ///
     /// @param log            The logger instance for reporting information and warnings.
     /// @param defaultCharset The default character set for text encoding operations.
     /// @throws NullPointerException if `log` or `defaultCharset` is null.
-    FMXLDocumentParserHelper(Log log, Charset defaultCharset) throws NullPointerException {
+    FXMLDocumentParserHelper(Log log, Charset defaultCharset) throws NullPointerException {
         this.log = Objects.requireNonNull(log, "`log` must not be null");
         this.defaultCharset = Objects.requireNonNull(defaultCharset, "`defaultCharset` must not be null");
     }
