@@ -121,24 +121,18 @@ public class FXMLDocumentParserTest {
     @Nested
     class ParseValueStringTest {
         private Method parseValueString;
-        private Object buildContext;
+        private BuildContext buildContext;
 
         @BeforeEach
         void setUp() throws Exception {
-            Class<?> buildContextClass = Arrays.stream(FXMLDocumentParser.class.getDeclaredClasses())
-                    .filter(clazz -> clazz.getSimpleName().equals("BuildContext"))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("BuildContext class not found"));
             parseValueString = FXMLDocumentParser.class.getDeclaredMethod(
                     "parseValueString",
                     String.class,
                     Class.class,
-                    buildContextClass
+                    BuildContext.class
             );
             parseValueString.setAccessible(true);
-            Constructor<?> buildContextConstructor = buildContextClass.getDeclaredConstructor(List.class, String.class);
-            buildContextConstructor.setAccessible(true);
-            buildContext = buildContextConstructor.newInstance(List.of(), "/base");
+            buildContext = new BuildContext(List.of(), "/base");
         }
 
         @Test
