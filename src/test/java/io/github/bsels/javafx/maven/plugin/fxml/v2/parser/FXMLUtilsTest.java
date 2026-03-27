@@ -2,6 +2,8 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -22,6 +24,7 @@ import java.util.TreeMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/// Unit tests for [FXMLUtils].
 class FXMLUtilsTest {
 
     // -------------------------------------------------------------------------
@@ -83,6 +86,27 @@ class FXMLUtilsTest {
             return null;
         }
     }
+
+    /** Fixtures for testing FXMLUtils methods. */
+    static class FXMLUtilsFixtures {
+        public static final String CONSTANT = "value";
+        public String nonStaticField = "oops";
+        @javafx.beans.DefaultProperty("myDefaultProperty")
+        public static class WithDefaultProperty {}
+        public static class WithoutDefaultProperty {}
+        public static class SubWithDefaultProperty extends WithDefaultProperty {}
+
+        public static String factory() { return "factory"; }
+        public String nonStaticFactory() { return "nonStatic"; }
+        public static String factoryWithParam(String p) { return p; }
+    }
+
+    /** Fixtures for functional interface testing. */
+    interface EmptyInterface {}
+    @FunctionalInterface
+    interface MyFunctionalInterface { void run(); }
+    interface ImplicitFunctionalInterface { void run(); }
+    interface NotAFunctionalInterface { void run(); void walk(); }
 
     // -------------------------------------------------------------------------
     // findRawType
@@ -605,6 +629,352 @@ class FXMLUtilsTest {
 
             // Then
             assertThat(result).isTrue();
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // isEventHandlerType
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class IsEventHandlerTypeTest {
+
+        @Test
+        void shouldReturnTrueForEventHandler() {
+            assertThat(FXMLUtils.isEventHandlerType(javafx.event.EventHandler.class)).isTrue();
+        }
+
+        @Test
+        void shouldReturnFalseForNonEventHandler() {
+            assertThat(FXMLUtils.isEventHandlerType(String.class)).isFalse();
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullClass() {
+            assertThatThrownBy(() -> FXMLUtils.isEventHandlerType(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`clazz` must not be null");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // isFunctionalInterface
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class IsFunctionalInterfaceTest {
+
+        @Test
+        void shouldReturnTrueForAnnotatedInterface() {
+            assertThat(FXMLUtils.isFunctionalInterface(MyFunctionalInterface.class)).isTrue();
+        }
+
+        @Test
+        void shouldReturnTrueForImplicitFunctionalInterface() {
+            assertThat(FXMLUtils.isFunctionalInterface(ImplicitFunctionalInterface.class)).isTrue();
+        }
+
+        @Test
+        void shouldReturnFalseForNonInterface() {
+            assertThat(FXMLUtils.isFunctionalInterface(String.class)).isFalse();
+        }
+
+        @Test
+        void shouldReturnFalseForEmptyInterface() {
+            assertThat(FXMLUtils.isFunctionalInterface(EmptyInterface.class)).isFalse();
+        }
+
+        @Test
+        void shouldReturnFalseForInterfaceWithMultipleMethods() {
+            assertThat(FXMLUtils.isFunctionalInterface(NotAFunctionalInterface.class)).isFalse();
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullClass() {
+            assertThatThrownBy(() -> FXMLUtils.isFunctionalInterface(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`clazz` must not be null");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // resolveConstantType
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class ResolveConstantTypeTest {
+
+        @Test
+        void shouldResolveConstantType() {
+            Type result = FXMLUtils.resolveConstantType(FXMLUtilsFixtures.class, "CONSTANT");
+            assertThat(result).isEqualTo(String.class);
+        }
+
+        @Test
+        void shouldThrowExceptionForNonStaticField() {
+            assertThatThrownBy(() -> FXMLUtils.resolveConstantType(FXMLUtilsFixtures.class, "nonStaticField"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("is not static");
+        }
+
+        @Test
+        void shouldThrowExceptionForMissingField() {
+            assertThatThrownBy(() -> FXMLUtils.resolveConstantType(FXMLUtilsFixtures.class, "MISSING"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("No such constant field");
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullArgs() {
+            assertThatThrownBy(() -> FXMLUtils.resolveConstantType(null, "CONSTANT"))
+                    .isInstanceOf(NullPointerException.class);
+            assertThatThrownBy(() -> FXMLUtils.resolveConstantType(FXMLUtilsFixtures.class, null))
+                    .isInstanceOf(NullPointerException.class);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // findFactoryMethodReturnType
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class FindFactoryMethodReturnTypeTest {
+
+        @Test
+        void shouldResolveFactoryMethodReturnType() {
+            Type result = FXMLUtils.findFactoryMethodReturnType(FXMLUtilsFixtures.class, "factory");
+            assertThat(result).isEqualTo(String.class);
+        }
+
+        @Test
+        void shouldThrowExceptionForNonStaticMethod() {
+            assertThatThrownBy(() -> FXMLUtils.findFactoryMethodReturnType(FXMLUtilsFixtures.class, "nonStaticFactory"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("No static factory method");
+        }
+
+        @Test
+        void shouldThrowExceptionForMethodWithParam() {
+            assertThatThrownBy(() -> FXMLUtils.findFactoryMethodReturnType(FXMLUtilsFixtures.class, "factoryWithParam"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("No static factory method");
+        }
+
+        @Test
+        void shouldThrowExceptionForMissingMethod() {
+            assertThatThrownBy(() -> FXMLUtils.findFactoryMethodReturnType(FXMLUtilsFixtures.class, "missing"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("No static factory method");
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullArgs() {
+            assertThatThrownBy(() -> FXMLUtils.findFactoryMethodReturnType(null, "factory"))
+                    .isInstanceOf(NullPointerException.class);
+            assertThatThrownBy(() -> FXMLUtils.findFactoryMethodReturnType(FXMLUtilsFixtures.class, null))
+                    .isInstanceOf(NullPointerException.class);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // resolveDefaultPropertyName
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class ResolveDefaultPropertyNameTest {
+
+        @Test
+        void shouldResolveDefaultProperty() {
+            assertThat(FXMLUtils.resolveDefaultPropertyName(FXMLUtilsFixtures.WithDefaultProperty.class))
+                    .contains("myDefaultProperty");
+        }
+
+        @Test
+        void shouldResolveDefaultPropertyFromSuperclass() {
+            assertThat(FXMLUtils.resolveDefaultPropertyName(FXMLUtilsFixtures.SubWithDefaultProperty.class))
+                    .contains("myDefaultProperty");
+        }
+
+        @Test
+        void shouldReturnEmptyForNoDefaultProperty() {
+            assertThat(FXMLUtils.resolveDefaultPropertyName(FXMLUtilsFixtures.WithoutDefaultProperty.class))
+                    .isEmpty();
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullClass() {
+            assertThatThrownBy(() -> FXMLUtils.resolveDefaultPropertyName(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`clazz` must not be null");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // hasNonSkippablePrefix
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class HasNonSkippablePrefixTest {
+
+        @Test
+        void shouldReturnTrueForNonSkippable() {
+            assertThat(FXMLUtils.hasNonSkippablePrefix("myId")).isTrue();
+        }
+
+        @Test
+        void shouldReturnFalseForFxPrefix() {
+            assertThat(FXMLUtils.hasNonSkippablePrefix("fx:id")).isFalse();
+        }
+
+        @Test
+        void shouldReturnFalseForXmlns() {
+            assertThat(FXMLUtils.hasNonSkippablePrefix("xmlns:fx")).isFalse();
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullKey() {
+            assertThatThrownBy(() -> FXMLUtils.hasNonSkippablePrefix(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`key` must not be null");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // constructGenericType
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class ConstructGenericTypeTest {
+
+        @Test
+        void shouldConstructGenericType() {
+            FXMLType result = FXMLUtils.constructGenericType(
+                    List.class,
+                    List.of("generic 0: java.lang.String"),
+                    List.of()
+            );
+            assertThat(result).isEqualTo(FXMLType.of(List.class, List.of(FXMLType.of(String.class))));
+        }
+
+        @Test
+        void shouldConstructNestedGenericType() {
+            FXMLType result = FXMLUtils.constructGenericType(
+                    List.class,
+                    List.of("generic 0: java.util.List<java.lang.String>"),
+                    List.of()
+            );
+            assertThat(result).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType gt = (FXMLGenericType) result;
+            assertThat(gt.type()).isEqualTo(List.class);
+            assertThat(gt.typeArguments().getFirst()).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType inner = (FXMLGenericType) gt.typeArguments().getFirst();
+            assertThat(inner.type()).isEqualTo(List.class);
+            assertThat(inner.typeArguments().getFirst()).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldHandleDeeplyNestedGenerics() {
+            FXMLType result = FXMLUtils.constructGenericType(
+                    List.class,
+                    List.of("generic 0: java.util.List<java.util.List<java.lang.String>>"),
+                    List.of()
+            );
+            assertThat(result.toString()).contains("List").contains("String");
+        }
+
+        @Test
+        void shouldHandleUncompiledTypesInGenerics() {
+            FXMLType result = FXMLUtils.constructGenericType(
+                    List.class,
+                    List.of("generic 0: com.example.Uncompiled<java.lang.String>"),
+                    List.of()
+            );
+            assertThat(result.toString()).contains("Uncompiled").contains("String");
+        }
+
+        @Test
+        void shouldReturnUncompiledTypeWhenGenericTypeNotFound() {
+            // Given
+            Class<?> rawClass = List.class;
+            List<String> comments = List.of("generic 0: com.example.DoesNotExist");
+            List<String> imports = List.of();
+
+            // When
+            FXMLType result = FXMLUtils.constructGenericType(rawClass, comments, imports);
+
+            // Then
+            assertThat(result).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType gt = (FXMLGenericType) result;
+            assertThat(gt.typeArguments().getFirst())
+                    .isInstanceOf(FXMLUncompiledClassType.class)
+                    .hasFieldOrPropertyWithValue("name", "com.example.DoesNotExist");
+        }
+
+        @Test
+        void shouldReturnUncompiledTypeWhenNestedGenericTypeNotFound() {
+            // Given
+            Class<?> rawClass = List.class;
+            List<String> comments = List.of("generic 0: java.util.List<com.example.DoesNotExist>");
+            List<String> imports = List.of();
+
+            // When
+            FXMLType result = FXMLUtils.constructGenericType(rawClass, comments, imports);
+
+            // Then
+            assertThat(result)
+                    .isInstanceOf(FXMLGenericType.class)
+                    .extracting(FXMLGenericType.class::cast)
+                    .hasFieldOrPropertyWithValue("type", List.class)
+                    .extracting(FXMLGenericType::typeArguments, InstanceOfAssertFactories.list(FXMLType.class))
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLGenericType.class)
+                    .extracting(FXMLGenericType.class::cast)
+                    .hasFieldOrPropertyWithValue("type", List.class)
+                    .extracting(FXMLGenericType::typeArguments, InstanceOfAssertFactories.list(FXMLType.class))
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLUncompiledClassType.class)
+                    .hasFieldOrPropertyWithValue("name", "com.example.DoesNotExist");
+        }
+
+        @Test
+        void shouldThrowExceptionForInvalidGenericString() {
+            assertThatThrownBy(() -> FXMLUtils.constructGenericType(
+                    List.class,
+                    List.of("generic 0: invalid[String]"),
+                    List.of()
+            )).isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        void shouldThrowExceptionForMismatchingGenericCount() {
+            assertThatThrownBy(() -> FXMLUtils.constructGenericType(
+                    List.class,
+                    List.of("generic 0: String", "generic 1: Integer"),
+                    List.of()
+            )).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Generic types count (2) does not match the number of type parameters (1)");
+        }
+
+        @Test
+        void shouldThrowExceptionForNonSequentialGenericIndices() {
+            assertThatThrownBy(() -> FXMLUtils.constructGenericType(
+                    List.class,
+                    List.of("generic 1: String"),
+                    List.of()
+            )).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Generic types are having non-sequential indices");
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullArgs() {
+            assertThatThrownBy(() -> FXMLUtils.constructGenericType(null, List.of(), List.of()))
+                    .isInstanceOf(NullPointerException.class);
+            assertThatThrownBy(() -> FXMLUtils.constructGenericType(List.class, null, List.of()))
+                    .isInstanceOf(NullPointerException.class);
+            assertThatThrownBy(() -> FXMLUtils.constructGenericType(List.class, List.of(), null))
+                    .isInstanceOf(NullPointerException.class);
         }
     }
 }

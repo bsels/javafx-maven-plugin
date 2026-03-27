@@ -32,12 +32,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Predicate;
+import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /// Utility class for common FXML-related validation tasks.
 public final class FXMLUtils {
+    /// Pattern to match generic type definitions in comments (e.g., `generic 0: java.lang.String`).
     private static final Pattern GENERICS = Pattern.compile(
             "^\\s*generic\\s+(?<index>\\d+)\\s*:\\s*(?<type>\\S(.*\\S)?)\\s*$");
     /// A regular expression pattern used to match and parse nested generic type definitions.
@@ -61,8 +63,11 @@ public final class FXMLUtils {
     private static final Predicate<String> VALID_NAME_PATTERN = Pattern.compile("^[a-zA-Z$][a-zA-Z0-9_$]*$")
             .asPredicate();
 
+    /// A cache for storing resolved default property names for classes.
     private static final Map<Class<?>, Optional<String>> CLASS_TO_DEFAULT_PROPERTY_NAME_CACHE = new HashMap<>();
+    /// A cache for storing resolved return types for static factory methods.
     private static final Map<ClassAndString, Type> CLASS_FACTORY_METHOD_TYPE_CACHE = new HashMap<>();
+    /// A cache for storing resolved types for constant fields.
     private static final Map<ClassAndString, Type> CLASS_CONSTANT_TYPE_CACHE = new HashMap<>();
 
     /// Private constructor to prevent instantiation.
@@ -128,7 +133,7 @@ public final class FXMLUtils {
     ///
     /// @param type The [FXMLType] representing the map type.
     /// @return A [Map.Entry] where the key is the [FXMLType] of the map's key type and the value is the [FXMLType]
-    ///                                                                                                                                                                                                 of the map's value type, both defaulting to `FXMLType.of(Object.class)` if they cannot be determined.
+    ///                                                                                                                                                                                                         of the map's value type, both defaulting to `FXMLType.of(Object.class)` if they cannot be determined.
     public static Map.Entry<FXMLType, FXMLType> findMapKeyAndValueTypes(FXMLType type) {
         return switch (type) {
             case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ ->
@@ -325,6 +330,17 @@ public final class FXMLUtils {
         return !key.startsWith(FXMLConstants.FX_PREFIX) && !key.startsWith(FXMLConstants.XML_NAMESPACE_PREFIX);
     }
 
+    /// Constructs an [FXMLType] representing a generic type based on a raw class and FXML comments.
+    ///
+    /// The logic parses generic type definitions from comments (e.g., `generic 0: T`)
+    /// and ensures the number of provided generics matches the class's type parameters.
+    ///
+    /// @param rawClass The raw class of the generic type.
+    /// @param comments The list of comments to parse for generic definitions.
+    /// @param imports  The list of imports to resolve type names in the generic definitions.
+    /// @return The constructed [FXMLType] representing the generic type.
+    /// @throws NullPointerException     if `rawClass`, `comments`, or `imports` is `null`.
+    /// @throws IllegalArgumentException if the number of generic types does not match the class's type parameters.
     public static FXMLType constructGenericType(Class<?> rawClass, List<String> comments, List<String> imports)
             throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(rawClass, "`rawClass` must not be null");
@@ -344,6 +360,12 @@ public final class FXMLUtils {
         return FXMLType.of(rawClass, genericTypes);
     }
 
+    /// Parses generic type definitions from comments and resolves them using the provided imports.
+    ///
+    /// @param comments The list of comments to parse.
+    /// @param imports  The list of imports to resolve type names.
+    /// @return A list of [FXMLType]s parsed from the comments.
+    /// @throws IllegalArgumentException if generic indices are not sequential.
     private static List<FXMLType> parseGenericsFromComments(List<String> comments, List<String> imports)
             throws IllegalArgumentException {
         return extractGenericsFromComments(comments)
@@ -352,6 +374,11 @@ public final class FXMLUtils {
                 .toList();
     }
 
+    /// Extracts generic type strings from comments and sorts them by their index.
+    ///
+    /// @param comments The list of comments to extract from.
+    /// @return A list of generic type strings in sequential order.
+    /// @throws IllegalArgumentException if generic indices are non-sequential or missing.
     private static List<String> extractGenericsFromComments(List<String> comments)
             throws IllegalArgumentException {
         Map<Integer, String> genericTypes = new TreeMap<>(Comparator.naturalOrder());
@@ -466,6 +493,14 @@ public final class FXMLUtils {
         }
     }
 
+    /// Parses a generic type string into an [FXMLType].
+    ///
+    /// The logic handles nested generics and type resolution using the provided imports.
+    ///
+    /// @param genericString The string representing the generic type.
+    /// @param imports       The list of imports for type resolution.
+    /// @return The parsed [FXMLType].
+    /// @throws IllegalArgumentException if the generic string is invalid.
     private static FXMLType parseGenericString(String genericString, List<String> imports) {
         Matcher matcher = NESTED_GENERICS.matcher(genericString);
         if (!matcher.find()) {
@@ -482,17 +517,22 @@ public final class FXMLUtils {
         }
     }
 
+    /// Recursively parses nested generic types from a string.
+    ///
+    /// @param nestedGenerics The string containing nested generic type definitions.
+    /// @param imports        The list of imports for type resolution.
+    /// @return A list of parsed [FXMLType]s.
     private static List<FXMLType> parseNestedGenerics(String nestedGenerics, List<String> imports) {
-        if (nestedGenerics == null || nestedGenerics.isBlank()) {
+        if (nestedGenerics == null) {
             return List.of();
         }
         List<FXMLType> result = new LinkedList<>();
         String remaining = nestedGenerics;
         while (remaining != null) {
-            Matcher matcher = NESTED_GENERICS.matcher(remaining);
-            if (!matcher.find()) {
-                break;
-            }
+            MatchResult matcher = NESTED_GENERICS.matcher(remaining)
+                    .results()
+                    .findFirst()
+                    .orElseThrow();
             String rawType = matcher.group("rawType").strip();
             String deeper = matcher.group("generics");
             List<FXMLType> deeperArgs = parseNestedGenerics(deeper, imports);
@@ -509,7 +549,16 @@ public final class FXMLUtils {
         return List.copyOf(result);
     }
 
+    /// Internal record used as a cache key, combining a class and a related string (e.g., method or field name).
+    ///
+    /// @param clazz  The class component of the key.
+    /// @param string The string component of the key.
     private record ClassAndString(Class<?> clazz, String string) {
+        /// Constructs a `ClassAndString` record.
+        ///
+        /// @param clazz  The class component.
+        /// @param string The string component.
+        /// @throws NullPointerException if `clazz` or `string` is `null`.
         private ClassAndString {
             Objects.requireNonNull(clazz, "`clazz` must not be null");
             Objects.requireNonNull(string, "`string` must not be null");
