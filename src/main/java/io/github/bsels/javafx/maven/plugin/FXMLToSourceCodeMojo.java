@@ -1,23 +1,9 @@
 package io.github.bsels.javafx.maven.plugin;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLField;
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLMethod;
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLObjectNode;
-import io.github.bsels.javafx.maven.plugin.fxml.ProcessedFXML;
-import io.github.bsels.javafx.maven.plugin.in.memory.compiler.OptimisticInMemoryCompiler;
 import io.github.bsels.javafx.maven.plugin.io.FXMLReader;
-import io.github.bsels.javafx.maven.plugin.io.FXMLSourceCodeBuilder;
-import io.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import io.github.bsels.javafx.maven.plugin.parameters.FXMLParameterized;
-import io.github.bsels.javafx.maven.plugin.parameters.InterfacesWithMethod;
-import io.github.bsels.javafx.maven.plugin.utils.FXMLProcessor;
-import io.github.bsels.javafx.maven.plugin.utils.ObjectMapperProvider;
-import io.github.bsels.javafx.maven.plugin.utils.Utils;
-import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugins.annotations.Execute;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -26,23 +12,9 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 
 import java.io.IOException;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /// Maven plugin for converting FXML files into Java source code.
 ///
@@ -218,6 +190,7 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         Objects.requireNonNull(project, "Maven project must be specified");
         Objects.requireNonNull(generatedSourceDirectory, "Generated source directory must be specified");
 
+        /*
         ClassLoader classLoader = addClassPathToThreadContext();
         try {
             Log log = getLog();
@@ -272,9 +245,9 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
             }
         } finally {
             Thread.currentThread().setContextClassLoader(classLoader);
-        }
+        }*/
     }
-
+/*
     /// Generates a mapping of class names to their corresponding [FXMLParameterized] instances
     /// based on the configured FXML parameterization.
     ///
@@ -292,15 +265,13 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
                 .collect(Collectors.toMap(FXMLParameterized::getClassName, Function.identity()));
     }
 
-    /**
-     * Creates a directory for the generated package based on the resolved path derived from the configured package name
-     * and the generated source directory.
-     * If the directory already exists, it is reused.
-     * If the directory cannot be created due to an [IOException], a [MojoExecutionException] is thrown.
-     *
-     * @return the path to the generated package directory
-     * @throws MojoExecutionException if the directory creation fails
-     */
+    /// Creates a directory for the generated package based on the resolved path derived from the configured package name
+    /// and the generated source directory.
+    /// If the directory already exists, it is reused.
+    /// If the directory cannot be created due to an [IOException], a [MojoExecutionException] is thrown.
+    ///
+    /// @return the path to the generated package directory
+    /// @throws MojoExecutionException if the directory creation fails
     private Path createGeneratedPackageDirectory() throws MojoExecutionException {
         Path generatedPackageDirectory;
         if (packageName == null) {
@@ -461,5 +432,5 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
                 .reduce(sourceCodeBuilder, FXMLSourceCodeBuilder::addMethod, Utils.getFirstLambda())
                 // Create a string representation of the class
                 .build();
-    }
+    }*/
 }

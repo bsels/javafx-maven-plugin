@@ -1,12 +1,6 @@
 package io.github.bsels.javafx.maven.plugin.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLConstantNode;
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLNode;
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLObjectNode;
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLStaticMethod;
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLValueNode;
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLWrapperNode;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -197,20 +191,6 @@ public final class TypeEncoder {
         } else {
             return "null";
         }
-    }
-
-    /// Retrieves the identifier string associated with the given FXML node.
-    ///
-    /// @param fxmlNode the FXML node whose identifier is to be fetched
-    /// @return the identifier string if the node type has an identifier, or a qualified identifier if the node is an [FXMLConstantNode]
-    /// @throws IllegalStateException if the provided FXML node is an [FXMLWrapperNode]
-    public static String getIdentifier(FXMLNode fxmlNode) {
-        return switch (fxmlNode) {
-            case FXMLObjectNode(_, String identifier, _, _, _, _) -> identifier;
-            case FXMLValueNode(_, String identifier, _, _) -> identifier;
-            case FXMLConstantNode(Class<?> clazz, String identifier, _) -> clazz.getSimpleName() + "." + identifier;
-            case FXMLWrapperNode _, FXMLStaticMethod _ -> throw new IllegalStateException("Unexpected child node");
-        };
     }
 
     /// Escapes the provided string by converting it into a JSON-compliant format.

@@ -1,10 +1,5 @@
 package io.github.bsels.javafx.maven.plugin.utils;
 
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLConstantNode;
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLObjectNode;
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLStaticMethod;
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLValueNode;
-import io.github.bsels.javafx.maven.plugin.fxml.FXMLWrapperNode;
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
