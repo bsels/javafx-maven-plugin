@@ -30,8 +30,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
+/// A helper class providing utility methods for parsing FXML documents.
+///
+/// This class handles type resolution, property identification (static and instance), method reference resolution,
+/// resource path handling, and identifier extraction. It is designed to work in conjunction with
+/// [FXMLDocumentParser] to transform parsed XML structures into JavaFX-compatible FXML model representations.
 final class FMXLDocumentParserHelper {
     /// Provides a logger instance for recording runtime information, debugging, and error messages.
     ///
@@ -45,6 +51,11 @@ final class FMXLDocumentParserHelper {
     /// It is immutable and cannot be changed after initialization.
     private final Charset defaultCharset;
 
+    /// Constructs a new [FMXLDocumentParserHelper] with the specified logger and default charset.
+    ///
+    /// @param log            The logger instance for reporting information and warnings.
+    /// @param defaultCharset The default character set for text encoding operations.
+    /// @throws NullPointerException if `log` or `defaultCharset` is null.
     FMXLDocumentParserHelper(Log log, Charset defaultCharset) throws NullPointerException {
         this.log = Objects.requireNonNull(log, "`log` must not be null");
         this.defaultCharset = Objects.requireNonNull(defaultCharset, "`defaultCharset` must not be null");
@@ -89,17 +100,12 @@ final class FMXLDocumentParserHelper {
                 yield FXMLType.of(rawClass, typeArgs);
             }
             case TypeVariable<?> tv -> typeMapping.getOrDefault(tv.getName(), FXMLType.wildcard());
-            case WildcardType wt -> {
-                Type[] upperBounds = wt.getUpperBounds();
-                Type[] lowerBounds = wt.getLowerBounds();
-                if (upperBounds.length > 0 && upperBounds[0] != Object.class) {
-                    yield buildFXMLType(upperBounds[0], buildContext);
-                } else if (lowerBounds.length > 0) {
-                    yield buildFXMLType(lowerBounds[0], buildContext);
-                } else {
-                    yield FXMLType.wildcard();
-                }
-            }
+            case WildcardType wt -> Arrays.stream(wt.getUpperBounds())
+                    .findFirst()
+                    .filter(Predicate.not(Predicate.isEqual(Object.class)))
+                    .or(() -> Arrays.stream(wt.getLowerBounds()).findFirst())
+                    .map(bound -> buildFXMLType(bound, buildContext))
+                    .orElseGet(FXMLType::wildcard);
             default -> FXMLType.of(Utils.getClassType(type));
         };
     }
