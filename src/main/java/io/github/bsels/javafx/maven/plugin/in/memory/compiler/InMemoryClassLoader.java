@@ -47,7 +47,7 @@ public final class InMemoryClassLoader extends ClassLoader {
     ///
     /// @param name the fully qualified name of the class to find.
     /// @return the resulting Class object representing the loaded class.
-    /// @throws ClassNotFoundException if the class cannot be found by this class loader or its parent class loader.
+    /// @throws ClassNotFoundException if the class cannot be found by this class loader
     /// @throws ClassFormatError       if the byte code of the internal compiled classes is invalid
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException, ClassFormatError {
@@ -56,6 +56,6 @@ public final class InMemoryClassLoader extends ClassLoader {
             byte[] byteCode = inMemoryCompiledClass.getBytes();
             return defineClass(name, byteCode, 0, byteCode.length);
         }
-        return super.findClass(name);
+        throw new ClassNotFoundException(name);
     }
 }
