@@ -1381,7 +1381,8 @@ public final class FXMLDocumentParser {
     /// - `%`: Returns [FXMLTranslation].
     /// - `@`: Returns [FXMLResource].
     /// - `#`: Returns [FXMLMethod] via [#resolveMethodReference(String, Class)].
-    /// - `$`: Returns [FXMLExpression].
+    /// - `$`: Returns [FXMLReference].
+    /// - `${...}`: Returns [FXMLExpression] if the expression is valid, otherwise throws [IllegalArgumentException].
     /// - `\`: Returns [FXMLLiteral] (escaped).
     /// - No prefix: Returns [FXMLInlineScript] if `paramType` is an `EventHandler`, otherwise returns [FXMLLiteral].
     ///

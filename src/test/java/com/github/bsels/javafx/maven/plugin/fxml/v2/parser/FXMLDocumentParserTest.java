@@ -26,9 +26,11 @@ import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInclude;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInlineScript;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLLiteral;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMap;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMethod;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLObject;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLReference;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLResource;
+import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLTranslation;
 import com.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
 import com.github.bsels.javafx.maven.plugin.io.FXMLReader;
 import com.github.bsels.javafx.maven.plugin.io.ParsedFXML;
@@ -70,6 +72,7 @@ import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -126,67 +129,95 @@ public class FXMLDocumentParserTest {
 
     @Nested
     class ParseValueStringTest {
-        @Test
-        void shouldParseReference() throws Exception {
-            Method parseValueString = FXMLDocumentParser.class.getDeclaredMethod(
+        private Method parseValueString;
+        private Object buildContext;
+
+        @BeforeEach
+        void setUp() throws Exception {
+            Class<?> buildContextClass = Arrays.stream(FXMLDocumentParser.class.getDeclaredClasses())
+                    .filter(clazz -> clazz.getSimpleName().equals("BuildContext"))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("BuildContext class not found"));
+            parseValueString = FXMLDocumentParser.class.getDeclaredMethod(
                     "parseValueString",
                     String.class,
                     Class.class,
-                    FXMLDocumentParser.class.getDeclaredClasses()[0]
+                    buildContextClass
             );
             parseValueString.setAccessible(true);
-
-            Constructor<?> buildContextConstructor = FXMLDocumentParser.class.getDeclaredClasses()[0].getDeclaredConstructor(
-                    List.class,
-                    String.class
-            );
+            Constructor<?> buildContextConstructor = buildContextClass.getDeclaredConstructor(List.class, String.class);
             buildContextConstructor.setAccessible(true);
-            Object context = buildContextConstructor.newInstance(List.of(), "");
-            Object result = parseValueString.invoke(classUnderTest, "$myId", String.class, context);
+            buildContext = buildContextConstructor.newInstance(List.of(), "/base");
+        }
 
-            assertThat(result).isEqualTo(new FXMLReference("myId"));
+        @Test
+        void shouldParseTranslation() throws Exception {
+            Object result = parseValueString.invoke(classUnderTest, "%myKey", String.class, buildContext);
+            assertThat(result)
+                    .isEqualTo(new FXMLTranslation("myKey"));
+        }
+
+        @Test
+        void shouldParseLocationWithRelativePath() throws Exception {
+            Object result = parseValueString.invoke(classUnderTest, "@my_image.png", String.class, buildContext);
+            assertThat(result)
+                    .isEqualTo(new FXMLResource("/base/my_image.png"));
+        }
+
+        @Test
+        void shouldParseLocationWithAbsolutePath() throws Exception {
+            Object result = parseValueString.invoke(classUnderTest, "@/other/image.png", String.class, buildContext);
+            assertThat(result)
+                    .isEqualTo(new FXMLResource("/other/image.png"));
+        }
+
+        @Test
+        void shouldParseMethodReference() throws Exception {
+            Object result = parseValueString.invoke(classUnderTest, "#myMethod", String.class, buildContext);
+            assertThat(result)
+                    .isEqualTo(new FXMLMethod("myMethod", List.of(), new FXMLClassType(void.class)));
+        }
+
+        @Test
+        void shouldParseReference() throws Exception {
+            Object result = parseValueString.invoke(classUnderTest, "$myId", String.class, buildContext);
+            assertThat(result)
+                    .isEqualTo(new FXMLReference("myId"));
         }
 
         @Test
         void shouldParseExpression() throws Exception {
-            Method parseValueString = FXMLDocumentParser.class.getDeclaredMethod(
-                    "parseValueString",
-                    String.class,
-                    Class.class,
-                    FXMLDocumentParser.class.getDeclaredClasses()[0]
-            );
-            parseValueString.setAccessible(true);
+            Object result = parseValueString.invoke(classUnderTest, "${myExpr}", String.class, buildContext);
+            assertThat(result)
+                    .isEqualTo(new FXMLExpression("myExpr"));
+        }
 
-            Constructor<?> buildContextConstructor = FXMLDocumentParser.class.getDeclaredClasses()[0].getDeclaredConstructor(
-                    List.class,
-                    String.class
-            );
-            buildContextConstructor.setAccessible(true);
-            Object context = buildContextConstructor.newInstance(List.of(), "");
-            Object result = parseValueString.invoke(classUnderTest, "${myExpr}", String.class, context);
-
-            assertThat(result).isEqualTo(new FXMLExpression("myExpr"));
+        @Test
+        void shouldThrowErrorOnUnclosedExpression() {
+            assertThatThrownBy(() -> parseValueString.invoke(classUnderTest, "${unclosedExpr", String.class, buildContext))
+                    .hasCauseInstanceOf(IllegalArgumentException.class)
+                    .hasStackTraceContaining("`name` must be a valid Java identifier: {unclosedExpr");
         }
 
         @Test
         void shouldParseEscaped() throws Exception {
-            Method parseValueString = FXMLDocumentParser.class.getDeclaredMethod(
-                    "parseValueString",
-                    String.class,
-                    Class.class,
-                    FXMLDocumentParser.class.getDeclaredClasses()[0]
-            );
-            parseValueString.setAccessible(true);
+            Object result = parseValueString.invoke(classUnderTest, "\\$notRef", String.class, buildContext);
+            assertThat(result)
+                    .isEqualTo(new FXMLLiteral("$notRef"));
+        }
 
-            Constructor<?> buildContextConstructor = FXMLDocumentParser.class.getDeclaredClasses()[0].getDeclaredConstructor(
-                    List.class,
-                    String.class
-            );
-            buildContextConstructor.setAccessible(true);
-            Object context = buildContextConstructor.newInstance(List.of(), "");
-            Object result = parseValueString.invoke(classUnderTest, "\\$notRef", String.class, context);
+        @Test
+        void shouldParseEventHandler() throws Exception {
+            Object result = parseValueString.invoke(classUnderTest, "myCode();", EventHandler.class, buildContext);
+            assertThat(result)
+                    .isEqualTo(new FXMLInlineScript("myCode();"));
+        }
 
-            assertThat(result).isEqualTo(new FXMLLiteral("$notRef"));
+        @Test
+        void shouldParseLiteral() throws Exception {
+            Object result = parseValueString.invoke(classUnderTest, "myValue", String.class, buildContext);
+            assertThat(result)
+                    .isEqualTo(new FXMLLiteral("myValue"));
         }
     }
 
