@@ -407,17 +407,13 @@ final class FXMLDocumentParserHelper {
         if (defaultConstructor.isEmpty()) {
             throw new IllegalArgumentException("Controller class must have a public no-arg constructor");
         }
-        List<FXMLControllerField> fields = Stream.concat(
-                        Arrays.stream(clazz.getDeclaredFields()),
-                        Arrays.stream(clazz.getFields())
-                )
+        List<FXMLControllerField> fields = Stream.of(clazz.getDeclaredFields(), clazz.getFields())
+                .flatMap(Arrays::stream)
                 .gather(Utils.unique())
                 .map(field -> createFXMLControllerField(buildContext, field))
                 .toList();
-        List<FXMLControllerMethod> methods = Stream.concat(
-                        Arrays.stream(clazz.getDeclaredMethods()),
-                        Arrays.stream(clazz.getMethods())
-                )
+        List<FXMLControllerMethod> methods = Stream.of(clazz.getDeclaredMethods(), clazz.getMethods())
+                .flatMap(Arrays::stream)
                 .gather(Utils.unique())
                 .map(method -> createFXMLControllerMethod(buildContext, method))
                 .toList();

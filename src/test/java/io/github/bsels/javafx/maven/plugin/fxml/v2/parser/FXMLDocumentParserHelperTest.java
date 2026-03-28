@@ -1,6 +1,9 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLConstants;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.Visibility;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
@@ -28,6 +31,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 /// Unit tests for [FXMLDocumentParserHelper].
 class FXMLDocumentParserHelperTest {
@@ -93,6 +97,47 @@ class FXMLDocumentParserHelperTest {
     static class AmbiguousStaticSetterClass {
         public static void setConstraint(Object node, String value) {}
         public static void setConstraint(Object node, Integer value) {}
+    }
+
+    /// A valid public controller class with various members.
+    public static class ValidController {
+        public String publicField;
+        protected String protectedField;
+        String packagePrivateField;
+        private String privateField;
+
+        public ValidController() {}
+
+        public void publicMethod() {}
+        protected void protectedMethod() {}
+        void packagePrivateMethod() {}
+        private void privateMethod() {}
+    }
+
+    /// A controller class with inherited members.
+    public static class InheritedController extends ValidController {
+        public String childField;
+        public void childMethod() {}
+    }
+
+    /// A private controller class (invalid).
+    private static class PrivateController {
+        public PrivateController() {}
+    }
+
+    /// An abstract controller class (invalid).
+    public abstract static class AbstractController {
+        public AbstractController() {}
+    }
+
+    /// A controller class without a public no-arg constructor (invalid).
+    public static class NoNoArgConstructorController {
+        public NoNoArgConstructorController(String arg) {}
+    }
+
+    /// A controller class with only a private no-arg constructor (invalid).
+    public static class PrivateConstructorController {
+        private PrivateConstructorController() {}
     }
 
     // -------------------------------------------------------------------------
@@ -755,6 +800,104 @@ class FXMLDocumentParserHelperTest {
             FXMLDocumentParserHelper helperWithLatin1 = new FXMLDocumentParserHelper(log, StandardCharsets.ISO_8859_1);
             assertThat(helperWithLatin1.getCharsetOfElement(new ParsedXMLStructure("element", Map.of(), List.of())))
                     .isEqualTo(StandardCharsets.ISO_8859_1);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // introspectControllerClass tests
+    // -------------------------------------------------------------------------
+
+    /// Tests for [FXMLDocumentParserHelper#introspectControllerClass].
+    @Nested
+    class IntrospectControllerClassTest {
+
+        /// Verifies that a null `clazz` throws [NullPointerException].
+        @Test
+        void nullClazzThrowsNullPointerException() {
+            assertThatThrownBy(() -> helper.introspectControllerClass(null, buildContext))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessageContaining("`clazz` must not be null");
+        }
+
+        /// Verifies that a null `buildContext` throws [NullPointerException].
+        @Test
+        void nullBuildContextThrowsNullPointerException() {
+            assertThatThrownBy(() -> helper.introspectControllerClass(ValidController.class, null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessageContaining("`buildContext` must not be null");
+        }
+
+        /// Verifies that a non-public class throws [IllegalArgumentException].
+        @Test
+        void nonPublicClassThrowsIllegalArgumentException() {
+            assertThatThrownBy(() -> helper.introspectControllerClass(PrivateController.class, buildContext))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("must be public and not abstract");
+        }
+
+        /// Verifies that an abstract class throws [IllegalArgumentException].
+        @Test
+        void abstractClassThrowsIllegalArgumentException() {
+            assertThatThrownBy(() -> helper.introspectControllerClass(AbstractController.class, buildContext))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("must be public and not abstract");
+        }
+
+        /// Verifies that a class without a public no-arg constructor throws [IllegalArgumentException].
+        @Test
+        void noPublicNoArgConstructorThrowsIllegalArgumentException() {
+            assertThatThrownBy(() -> helper.introspectControllerClass(NoNoArgConstructorController.class, buildContext))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Controller class must have a public no-arg constructor");
+        }
+
+        /// Verifies that a class with only a private no-arg constructor throws [IllegalArgumentException].
+        @Test
+        void privateNoArgConstructorThrowsIllegalArgumentException() {
+            assertThatThrownBy(() -> helper.introspectControllerClass(PrivateConstructorController.class, buildContext))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Controller class must have a public no-arg constructor");
+        }
+
+        /// Verifies that a valid controller class is introspected correctly, including all member visibilities.
+        @Test
+        void validControllerIntrospectedCorrectly() {
+            assertThat(helper.introspectControllerClass(ValidController.class, buildContext))
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("controllerClass", ValidController.class)
+                    .satisfies(controller -> {
+                        assertThat(controller.fields())
+                                .extracting(FXMLControllerField::name, FXMLControllerField::visibility)
+                                .containsExactlyInAnyOrder(
+                                        tuple("publicField", Visibility.PUBLIC),
+                                        tuple("protectedField", Visibility.PROTECTED),
+                                        tuple("packagePrivateField", Visibility.PACKAGE_PRIVATE),
+                                        tuple("privateField", Visibility.PRIVATE)
+                                );
+                        assertThat(controller.methods())
+                                .extracting(FXMLControllerMethod::name, FXMLControllerMethod::visibility)
+                                .contains(
+                                        tuple("publicMethod", Visibility.PUBLIC),
+                                        tuple("protectedMethod", Visibility.PROTECTED),
+                                        tuple("packagePrivateMethod", Visibility.PACKAGE_PRIVATE),
+                                        tuple("privateMethod", Visibility.PRIVATE)
+                                );
+                    });
+        }
+
+        /// Verifies that inherited members are also introspected.
+        @Test
+        void inheritedMembersAreIntrospected() {
+            assertThat(helper.introspectControllerClass(InheritedController.class, buildContext))
+                    .isNotNull()
+                    .satisfies(controller -> {
+                        assertThat(controller.fields())
+                                .extracting(FXMLControllerField::name)
+                                .contains("childField", "publicField");
+                        assertThat(controller.methods())
+                                .extracting(FXMLControllerMethod::name)
+                                .contains("childMethod", "publicMethod");
+                    });
         }
     }
 }

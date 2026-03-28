@@ -37,11 +37,12 @@ class ParsedXMLStructureTest {
         ParsedXMLStructure structure = new ParsedXMLStructure(name, properties, children, comments, textValue);
 
         // Then
-        assertThat(structure.name()).isEqualTo(name);
-        assertThat(structure.properties()).containsAllEntriesOf(properties);
-        assertThat(structure.children()).hasSameElementsAs(children);
-        assertThat(structure.comments()).containsAll(comments);
-        assertThat(structure.textValue()).isEqualTo(textValue);
+        assertThat(structure)
+                .hasFieldOrPropertyWithValue("name", name)
+                .hasFieldOrPropertyWithValue("properties", properties)
+                .hasFieldOrPropertyWithValue("children", children)
+                .hasFieldOrPropertyWithValue("comments", comments)
+                .hasFieldOrPropertyWithValue("textValue", textValue);
     }
 
     /// Tests the constructor with name, properties, children, and comments.
@@ -57,11 +58,12 @@ class ParsedXMLStructureTest {
         ParsedXMLStructure structure = new ParsedXMLStructure(name, properties, children, comments);
 
         // Then
-        assertThat(structure.name()).isEqualTo(name);
-        assertThat(structure.properties()).containsAllEntriesOf(properties);
-        assertThat(structure.children()).hasSameElementsAs(children);
-        assertThat(structure.comments()).containsAll(comments);
-        assertThat(structure.textValue()).isEmpty();
+        assertThat(structure)
+                .hasFieldOrPropertyWithValue("name", name)
+                .hasFieldOrPropertyWithValue("properties", properties)
+                .hasFieldOrPropertyWithValue("children", children)
+                .hasFieldOrPropertyWithValue("comments", comments)
+                .hasFieldOrPropertyWithValue("textValue", Optional.empty());
     }
 
     /// Tests the constructor with name, properties, and children.
@@ -76,11 +78,12 @@ class ParsedXMLStructureTest {
         ParsedXMLStructure structure = new ParsedXMLStructure(name, properties, children);
 
         // Then
-        assertThat(structure.name()).isEqualTo(name);
-        assertThat(structure.properties()).containsAllEntriesOf(properties);
-        assertThat(structure.children()).hasSameElementsAs(children);
-        assertThat(structure.comments()).isEmpty();
-        assertThat(structure.textValue()).isEmpty();
+        assertThat(structure)
+                .hasFieldOrPropertyWithValue("name", name)
+                .hasFieldOrPropertyWithValue("properties", properties)
+                .hasFieldOrPropertyWithValue("children", children)
+                .hasFieldOrPropertyWithValue("comments", List.of())
+                .hasFieldOrPropertyWithValue("textValue", Optional.empty());
     }
 
     /// Tests that the constructor throws NullPointerException for null name.
@@ -105,5 +108,36 @@ class ParsedXMLStructureTest {
     void shouldThrowNullPointerExceptionForNullCollections(Map<String, String> properties, List<ParsedXMLStructure> children, List<String> comments) {
         assertThatThrownBy(() -> new ParsedXMLStructure("name", properties, children, comments, Optional.empty()))
                 .isInstanceOf(NullPointerException.class);
+    }
+
+    /// Tests that equals and hashCode work correctly.
+    @Test
+    void shouldBeEqualAndHaveSameHashCode() {
+        // Given
+        ParsedXMLStructure structure1 = new ParsedXMLStructure("name", Map.of("key", "val"), List.of(), List.of("comment"), Optional.of("text"));
+        ParsedXMLStructure structure2 = new ParsedXMLStructure("name", Map.of("key", "val"), List.of(), List.of("comment"), Optional.of("text"));
+        ParsedXMLStructure structureDifferent = new ParsedXMLStructure("other", Map.of("key", "val"), List.of(), List.of("comment"), Optional.of("text"));
+
+        // Then
+        assertThat(structure1)
+                .isEqualTo(structure2)
+                .hasSameHashCodeAs(structure2)
+                .isNotEqualTo(structureDifferent)
+                .isNotEqualTo(null)
+                .isNotEqualTo("not a structure");
+    }
+
+    /// Tests that toString contains all expected values.
+    @Test
+    void toStringShouldContainFields() {
+        // Given
+        ParsedXMLStructure structure = new ParsedXMLStructure("name", Map.of("key", "val"), List.of(), List.of("comment"), Optional.of("text"));
+
+        // Then
+        assertThat(structure.toString())
+                .contains("name")
+                .contains("key=val")
+                .contains("comment")
+                .contains("text");
     }
 }
