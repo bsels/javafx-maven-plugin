@@ -28,16 +28,23 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.regex.MatchResult;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /// A helper class providing utility methods for parsing FXML documents.
@@ -46,6 +53,26 @@ import java.util.stream.Stream;
 /// resource path handling, and identifier extraction. It is designed to work in conjunction with
 /// [FXMLDocumentParser] to transform parsed XML structures into JavaFX-compatible FXML model representations.
 final class FXMLDocumentParserHelper {
+    /// Pattern to match generic type definitions in comments (e.g., `generic 0: java.lang.String`).
+    private static final Pattern GENERICS = Pattern.compile(
+            "^\\s*generic\\s+(?<index>\\d+)\\s*:\\s*(?<type>\\S(.*\\S)?)\\s*$");
+    /// A regular expression pattern used to match and parse nested generic type definitions.
+    ///
+    /// This pattern identifies sequences of generic type declarations that may be nested
+    /// and separated by commas. It considers fully qualified names, optional generic type
+    /// parameters enclosed in angle brackets, and allows for whitespace around elements.
+    ///
+    /// The pattern handles:
+    /// - Nested generic definitions, e.g., `List<Map<String, Integer>>`.
+    /// - Fully qualified class names with optional generics, e.g., `java.util.Map<String, Integer>`.
+    /// - Multiple generic type declarations separated by commas, e.g., `Map<String, Integer>, List<String>`.
+    /// - Arbitrary whitespace around the types and delimiters.
+    ///
+    /// It uses named groups `first` for the preceding types, `rawType` for the current class name,
+    /// and `generics` for its type arguments.
+    private static final Pattern NESTED_GENERICS = Pattern.compile(
+            "^\\s*((?<first>((((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*),\\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?)$"
+    );
     /// Provides a logger instance for recording runtime information, debugging, and error messages.
     ///
     /// This logger is immutable and initialized once via the constructor, ensuring consistent logging
@@ -461,4 +488,146 @@ final class FXMLDocumentParserHelper {
             default -> Visibility.PACKAGE_PRIVATE;
         };
     }
+
+    /// Constructs an [FXMLType] representing a generic type based on a raw class and FXML comments.
+    ///
+    /// The logic parses generic type definitions from comments (e.g., `generic 0: T`)
+    /// and ensures the number of provided generics matches the class's type parameters.
+    ///
+    /// @param rawClass     The raw class of the generic type.
+    /// @param comments     The list of comments to parse for generic definitions.
+    /// @param buildContext The build context containing imports to resolve type names in the generic definitions and to store the type mapping.
+    /// @return The constructed [FXMLType] representing the generic type.
+    /// @throws NullPointerException     if `rawClass`, `comments`, or `imports` is `null`.
+    /// @throws IllegalArgumentException if the number of generic types does not match the class's type parameters.
+    public FXMLType constructGenericType(Class<?> rawClass, List<String> comments, BuildContext buildContext)
+            throws NullPointerException, IllegalArgumentException {
+        Objects.requireNonNull(rawClass, "`rawClass` must not be null");
+        Objects.requireNonNull(comments, "`comments` must not be null");
+        Objects.requireNonNull(buildContext, "`buildContext` must not be null");
+        List<FXMLType> genericTypes = parseGenericsFromComments(comments, buildContext.imports());
+        TypeVariable<? extends Class<?>>[] typeVariables = rawClass.getTypeParameters();
+        int typeParameters = typeVariables.length;
+        int numberOfGenerics = genericTypes.size();
+        if (!genericTypes.isEmpty() && numberOfGenerics != typeParameters) {
+            throw new IllegalArgumentException(
+                    "Generic types count (%d) does not match the number of type parameters (%d).".formatted(
+                            numberOfGenerics,
+                            typeParameters
+                    )
+            );
+        }
+        if (typeParameters > 0) {
+            Map<String, FXMLType> typeMapping = buildContext.typeMapping();
+            if (genericTypes.isEmpty()) {
+                for (TypeVariable<?> typeVariable : typeVariables) {
+                    typeMapping.put(typeVariable.getName(), FXMLType.wildcard());
+                }
+            } else {
+                for (int i = 0; i < numberOfGenerics; i++) {
+                    FXMLType genericType = genericTypes.get(i);
+                    TypeVariable<?> typeVariable = typeVariables[i];
+                    typeMapping.put(typeVariable.getName(), genericType);
+                }
+            }
+        }
+        return FXMLType.of(rawClass, genericTypes);
+    }
+
+    /// Parses generic type definitions from comments and resolves them using the provided imports.
+    ///
+    /// @param comments The list of comments to parse.
+    /// @param imports  The list of imports to resolve type names.
+    /// @return A list of [FXMLType]s parsed from the comments.
+    /// @throws IllegalArgumentException if generic indices are not sequential.
+    private List<FXMLType> parseGenericsFromComments(List<String> comments, List<String> imports)
+            throws IllegalArgumentException {
+        return extractGenericsFromComments(comments)
+                .stream()
+                .map(generic -> parseGenericString(generic, imports))
+                .toList();
+    }
+
+    /// Extracts generic type strings from comments and sorts them by their index.
+    ///
+    /// @param comments The list of comments to extract from.
+    /// @return A list of generic type strings in sequential order.
+    /// @throws IllegalArgumentException if generic indices are non-sequential or missing.
+    private List<String> extractGenericsFromComments(List<String> comments)
+            throws IllegalArgumentException {
+        Map<Integer, String> genericTypes = new TreeMap<>(Comparator.naturalOrder());
+        for (String comment : comments) {
+            Matcher matcher = GENERICS.matcher(comment);
+            if (matcher.find()) {
+                genericTypes.put(Integer.parseInt(matcher.group("index")), matcher.group("type"));
+            }
+        }
+        List<Integer> sortedKeys = genericTypes.keySet().stream().sorted().toList();
+        List<String> generics = new ArrayList<>();
+        for (int i = 0; i < sortedKeys.size(); i++) {
+            if (i != sortedKeys.get(i)) {
+                throw new IllegalArgumentException("Generic types are having non-sequential indices: %s".formatted(
+                        sortedKeys));
+            }
+            generics.add(genericTypes.get(i));
+        }
+        return generics;
+    }
+
+    /// Parses a generic type string into an [FXMLType].
+    ///
+    /// The logic handles nested generics and type resolution using the provided imports.
+    ///
+    /// @param genericString The string representing the generic type.
+    /// @param imports       The list of imports for type resolution.
+    /// @return The parsed [FXMLType].
+    /// @throws IllegalArgumentException if the generic string is invalid.
+    private FXMLType parseGenericString(String genericString, List<String> imports) {
+        Matcher matcher = NESTED_GENERICS.matcher(genericString);
+        if (!matcher.find()) {
+            throw new IllegalArgumentException("Invalid generic type string: %s".formatted(genericString));
+        }
+        String rawType = matcher.group("rawType").strip();
+        String nestedGenerics = matcher.group("generics");
+        List<FXMLType> nestedTypeArgs = parseNestedGenerics(nestedGenerics, imports);
+        try {
+            Class<?> resolvedClass = Utils.findType(imports, rawType);
+            return FXMLType.of(resolvedClass, nestedTypeArgs);
+        } catch (InternalClassNotFoundException _) {
+            return FXMLType.of(rawType, nestedTypeArgs);
+        }
+    }
+
+    /// Recursively parses nested generic types from a string.
+    ///
+    /// @param nestedGenerics The string containing nested generic type definitions.
+    /// @param imports        The list of imports for type resolution.
+    /// @return A list of parsed [FXMLType]s.
+    private List<FXMLType> parseNestedGenerics(String nestedGenerics, List<String> imports) {
+        if (nestedGenerics == null) {
+            return List.of();
+        }
+        List<FXMLType> result = new LinkedList<>();
+        String remaining = nestedGenerics;
+        while (remaining != null) {
+            MatchResult matcher = NESTED_GENERICS.matcher(remaining)
+                    .results()
+                    .findFirst()
+                    .orElseThrow();
+            String rawType = matcher.group("rawType").strip();
+            String deeper = matcher.group("generics");
+            List<FXMLType> deeperArgs = parseNestedGenerics(deeper, imports);
+            FXMLType type;
+            try {
+                Class<?> resolvedClass = Utils.findType(imports, rawType);
+                type = FXMLType.of(resolvedClass, deeperArgs);
+            } catch (InternalClassNotFoundException _) {
+                type = FXMLType.of(rawType, deeperArgs);
+            }
+            result.addFirst(type);
+            remaining = matcher.group("first");
+        }
+        return List.copyOf(result);
+    }
+
 }

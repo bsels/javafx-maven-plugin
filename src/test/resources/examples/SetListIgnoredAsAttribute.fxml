@@ -1,0 +1,4 @@
+<?import javafx.scene.control.TableView?>
+<TableView items="Ignore this">
+    <!-- generic 0: java.lang.String -->
+</TableView>

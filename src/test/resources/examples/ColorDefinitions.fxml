@@ -1,4 +1,5 @@
 <?import javafx.scene.paint.Color?>
+<?import java.lang.Double?>
 <?import java.lang.Object?>
 <Object xmlns:fx="http://javafx.com/fxml">
     <fx:define>
@@ -9,5 +10,16 @@
             <blue>0.5</blue>
         </Color>
         <Color fx:id="valueOfMethod" fx:value="#f0f0f0"/>
+        <Color fx:id="values">
+            <red>
+                <Double fx:value="0.67"/>
+            </red>
+            <green>
+                <Double fx:value="0.67"/>
+            </green>
+            <blue>
+                <Double fx:value="0.0"/>
+            </blue>
+        </Color>
     </fx:define>
 </Object>

@@ -1,0 +1,14 @@
+<?import javafx.collections.FXCollections?>
+<?import javafx.scene.control.TableView?>
+<?import java.lang.String?>
+<TableView xmlns:fx="http://javafx.com/fxml">
+    <!-- generic 0: java.lang.String -->
+    <items>
+        <FXCollections fx:factory="observableArrayList">
+            <!-- generic 0: java.lang.String -->
+            <String fx:value="Item 0"/>
+            <String fx:value="Item 1"/>
+            <String fx:value="Item 2"/>
+        </FXCollections>
+    </items>
+</TableView>

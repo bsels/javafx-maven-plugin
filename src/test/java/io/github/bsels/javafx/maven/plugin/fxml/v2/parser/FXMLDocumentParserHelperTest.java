@@ -11,12 +11,14 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifie
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMethod;
 import io.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
 import javafx.beans.NamedArg;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import org.apache.maven.monitor.logging.DefaultLog;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -40,110 +42,6 @@ class FXMLDocumentParserHelperTest {
     // Helper fixtures
     // -------------------------------------------------------------------------
 
-    /// A simple class with a setter and getter.
-    static class SimpleBean {
-        private String value;
-
-        public String getValue() { return value; }
-        public void setValue(String value) { this.value = value; }
-    }
-
-    /// A class with only a getter (no setter, no constructor param).
-    static class GetterOnlyBean {
-        public String getName() { return "name"; }
-    }
-
-    /// A class with a constructor parameter annotated with [@NamedArg].
-    static class ConstructorParamBean {
-        private final String label;
-
-        public ConstructorParamBean(@NamedArg("label") String label) {
-            this.label = label;
-        }
-
-        public String getLabel() { return label; }
-    }
-
-    /// A class with multiple overloaded setters for the same property (ambiguous).
-    static class AmbiguousSetterBean {
-        public void setValue(String value) {}
-        public void setValue(Integer value) {}
-    }
-
-    /// A class with multiple constructors having the same [@NamedArg] parameter name (ambiguous).
-    static class AmbiguousConstructorBean {
-        public AmbiguousConstructorBean(@NamedArg("label") String label) {}
-        public AmbiguousConstructorBean(@NamedArg("label") Integer label) {}
-    }
-
-    /// A functional interface for testing method reference resolution.
-    @FunctionalInterface
-    interface MyEventHandler {
-        void handle(ActionEvent event);
-    }
-
-    /// A non-functional interface (two abstract methods).
-    interface NotFunctional {
-        void methodA();
-        void methodB();
-    }
-
-    /// A class with a static setter for testing [FXMLDocumentParserHelper#findStaticSetter].
-    static class StaticSetterClass {
-        public static void setConstraint(Object node, String value) {}
-    }
-
-    /// A class with multiple overloaded static setters for the same property (ambiguous).
-    static class AmbiguousStaticSetterClass {
-        public static void setConstraint(Object node, String value) {}
-        public static void setConstraint(Object node, Integer value) {}
-    }
-
-    /// A valid public controller class with various members.
-    public static class ValidController {
-        public String publicField;
-        protected String protectedField;
-        String packagePrivateField;
-        private String privateField;
-
-        public ValidController() {}
-
-        public void publicMethod() {}
-        protected void protectedMethod() {}
-        void packagePrivateMethod() {}
-        private void privateMethod() {}
-    }
-
-    /// A controller class with inherited members.
-    public static class InheritedController extends ValidController {
-        public String childField;
-        public void childMethod() {}
-    }
-
-    /// A private controller class (invalid).
-    private static class PrivateController {
-        public PrivateController() {}
-    }
-
-    /// An abstract controller class (invalid).
-    public abstract static class AbstractController {
-        public AbstractController() {}
-    }
-
-    /// A controller class without a public no-arg constructor (invalid).
-    public static class NoNoArgConstructorController {
-        public NoNoArgConstructorController(String arg) {}
-    }
-
-    /// A controller class with only a private no-arg constructor (invalid).
-    public static class PrivateConstructorController {
-        private PrivateConstructorController() {}
-    }
-
-    // -------------------------------------------------------------------------
-    // Test setup
-    // -------------------------------------------------------------------------
-
     private FXMLDocumentParserHelper helper;
     private BuildContext buildContext;
 
@@ -165,6 +63,144 @@ class FXMLDocumentParserHelperTest {
                 ),
                 "/"
         );
+    }
+
+    /// A functional interface for testing method reference resolution.
+    @FunctionalInterface
+    interface MyEventHandler {
+        void handle(ActionEvent event);
+    }
+
+    /// A non-functional interface (two abstract methods).
+    interface NotFunctional {
+        void methodA();
+
+        void methodB();
+    }
+
+    /// A simple class with a setter and getter.
+    static class SimpleBean {
+        private String value;
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
+
+    /// A class with only a getter (no setter, no constructor param).
+    static class GetterOnlyBean {
+        public String getName() {
+            return "name";
+        }
+    }
+
+    /// A class with a constructor parameter annotated with [@NamedArg].
+    static class ConstructorParamBean {
+        private final String label;
+
+        public ConstructorParamBean(@NamedArg("label") String label) {
+            this.label = label;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+    }
+
+    /// A class with multiple overloaded setters for the same property (ambiguous).
+    static class AmbiguousSetterBean {
+        public void setValue(String value) {
+        }
+
+        public void setValue(Integer value) {
+        }
+    }
+
+    /// A class with multiple constructors having the same [@NamedArg] parameter name (ambiguous).
+    static class AmbiguousConstructorBean {
+        public AmbiguousConstructorBean(@NamedArg("label") String label) {
+        }
+
+        public AmbiguousConstructorBean(@NamedArg("label") Integer label) {
+        }
+    }
+
+    /// A class with a static setter for testing [FXMLDocumentParserHelper#findStaticSetter].
+    static class StaticSetterClass {
+        public static void setConstraint(Object node, String value) {
+        }
+    }
+
+    /// A class with multiple overloaded static setters for the same property (ambiguous).
+    static class AmbiguousStaticSetterClass {
+        public static void setConstraint(Object node, String value) {
+        }
+
+        public static void setConstraint(Object node, Integer value) {
+        }
+    }
+
+    /// A valid public controller class with various members.
+    public static class ValidController {
+        public String publicField;
+        protected String protectedField;
+        String packagePrivateField;
+        private String privateField;
+
+        public ValidController() {
+        }
+
+        public void publicMethod() {
+        }
+
+        protected void protectedMethod() {
+        }
+
+        void packagePrivateMethod() {
+        }
+
+        private void privateMethod() {
+        }
+    }
+
+    /// A controller class with inherited members.
+    public static class InheritedController extends ValidController {
+        public String childField;
+
+        public void childMethod() {
+        }
+    }
+
+    /// A private controller class (invalid).
+    private static class PrivateController {
+        public PrivateController() {
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Test setup
+    // -------------------------------------------------------------------------
+
+    /// An abstract controller class (invalid).
+    public abstract static class AbstractController {
+        public AbstractController() {
+        }
+    }
+
+    /// A controller class without a public no-arg constructor (invalid).
+    public static class NoNoArgConstructorController {
+        public NoNoArgConstructorController(String arg) {
+        }
+    }
+
+    /// A controller class with only a private no-arg constructor (invalid).
+    public static class PrivateConstructorController {
+        private PrivateConstructorController() {
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -243,7 +279,9 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a [ParameterizedType] (e.g. List&lt;String&gt;) returns [FXMLGenericType] with resolved args.
         @Test
         void parameterizedTypeReturnsGenericTypeWithArgs() throws Exception {
-            class Holder { List<String> field; }
+            class Holder {
+                List<String> field;
+            }
             var paramType = Holder.class.getDeclaredField("field").getGenericType();
             assertThat(helper.buildFXMLType(paramType, buildContext))
                     .isInstanceOf(FXMLGenericType.class)
@@ -253,7 +291,9 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a [TypeVariable] not in the mapping returns a wildcard type.
         @Test
         void typeVariableNotInMappingReturnsWildcard() throws Exception {
-            class Holder<T> { List<T> field; }
+            class Holder<T> {
+                List<T> field;
+            }
             var paramType = Holder.class.getDeclaredField("field").getGenericType();
             var typeVar = ((ParameterizedType) paramType).getActualTypeArguments()[0];
             assertThat(helper.buildFXMLType(typeVar, buildContext))
@@ -263,7 +303,9 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a [TypeVariable] present in the mapping returns the mapped type.
         @Test
         void typeVariableInMappingReturnsMappedType() throws Exception {
-            class Holder<T> { List<T> field; }
+            class Holder<T> {
+                List<T> field;
+            }
             var paramType = Holder.class.getDeclaredField("field").getGenericType();
             var typeVar = ((ParameterizedType) paramType).getActualTypeArguments()[0];
             FXMLType mappedType = FXMLType.of(String.class);
@@ -275,7 +317,9 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a [WildcardType] with an upper bound (not Object) resolves to the upper bound.
         @Test
         void wildcardTypeWithUpperBoundResolvesToUpperBound() throws Exception {
-            class Holder { List<? extends String> field; }
+            class Holder {
+                List<? extends String> field;
+            }
             var wildcardType = ((ParameterizedType) Holder.class.getDeclaredField("field").getGenericType())
                     .getActualTypeArguments()[0];
             assertThat(helper.buildFXMLType(wildcardType, buildContext))
@@ -286,7 +330,9 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a [WildcardType] with a lower bound resolves to the lower bound.
         @Test
         void wildcardTypeWithLowerBoundResolvesToLowerBound() throws Exception {
-            class Holder { List<? super String> field; }
+            class Holder {
+                List<? super String> field;
+            }
             var wildcardType = ((ParameterizedType) Holder.class.getDeclaredField("field").getGenericType())
                     .getActualTypeArguments()[0];
             assertThat(helper.buildFXMLType(wildcardType, buildContext))
@@ -297,7 +343,9 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that an unbounded [WildcardType] (&lt;?&gt;) returns a wildcard type.
         @Test
         void unboundedWildcardTypeReturnsWildcard() throws Exception {
-            class Holder { List<?> field; }
+            class Holder {
+                List<?> field;
+            }
             var wildcardType = ((ParameterizedType) Holder.class.getDeclaredField("field").getGenericType())
                     .getActualTypeArguments()[0];
             assertThat(helper.buildFXMLType(wildcardType, buildContext))
@@ -308,7 +356,9 @@ class FXMLDocumentParserHelperTest {
         @Test
         void wildcardTypeWithObjectUpperBoundReturnsWildcard() throws Exception {
             // ? extends Object is equivalent to ?, upper bound is Object so it falls through to wildcard
-            class Holder { List<? extends Object> field; }
+            class Holder {
+                List<? extends Object> field;
+            }
             var wildcardType = ((ParameterizedType) Holder.class.getDeclaredField("field").getGenericType())
                     .getActualTypeArguments()[0];
             assertThat(helper.buildFXMLType(wildcardType, buildContext))
@@ -318,7 +368,9 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a [GenericArrayType] (default branch) throws [IllegalStateException] since it is unsupported.
         @Test
         void genericArrayTypeThrowsIllegalStateException() throws Exception {
-            class Holder { List<String>[] field; }
+            class Holder {
+                List<String>[] field;
+            }
             var genericArrayType = Holder.class.getDeclaredField("field").getGenericType();
             assertThatThrownBy(() -> helper.buildFXMLType(genericArrayType, buildContext))
                     .isInstanceOf(IllegalStateException.class);
@@ -898,6 +950,154 @@ class FXMLDocumentParserHelperTest {
                                 .extracting(FXMLControllerMethod::name)
                                 .contains("childMethod", "publicMethod");
                     });
+        }
+    }
+
+
+    // -------------------------------------------------------------------------
+    // constructGenericType
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class ConstructGenericTypeTest {
+
+        @Test
+        void shouldConstructGenericType() {
+            FXMLType result = helper.constructGenericType(
+                    List.class,
+                    List.of("generic 0: java.lang.String"),
+                    new BuildContext(List.of(), "/base/path")
+            );
+            assertThat(result).isEqualTo(FXMLType.of(List.class, List.of(FXMLType.of(String.class))));
+        }
+
+        @Test
+        void shouldConstructNestedGenericType() {
+            FXMLType result = helper.constructGenericType(
+                    List.class,
+                    List.of("generic 0: java.util.List<java.lang.String>"),
+                    new BuildContext(List.of(), "/base/path")
+            );
+            assertThat(result).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType gt = (FXMLGenericType) result;
+            assertThat(gt.type()).isEqualTo(List.class);
+            assertThat(gt.typeArguments().getFirst()).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType inner = (FXMLGenericType) gt.typeArguments().getFirst();
+            assertThat(inner.type()).isEqualTo(List.class);
+            assertThat(inner.typeArguments().getFirst()).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldHandleDeeplyNestedGenerics() {
+            FXMLType result = helper.constructGenericType(
+                    List.class,
+                    List.of("generic 0: java.util.List<java.util.List<java.lang.String>>"),
+                    new BuildContext(List.of(), "/base/path")
+            );
+            assertThat(result.toString()).contains("List").contains("String");
+        }
+
+        @Test
+        void shouldHandleUncompiledTypesInGenerics() {
+            FXMLType result = helper.constructGenericType(
+                    List.class,
+                    List.of("generic 0: com.example.Uncompiled<java.lang.String>"),
+                    new BuildContext(List.of(), "/base/path")
+            );
+            assertThat(result.toString()).contains("Uncompiled").contains("String");
+        }
+
+        @Test
+        void shouldReturnUncompiledTypeWhenGenericTypeNotFound() {
+            // Given
+            Class<?> rawClass = List.class;
+            List<String> comments = List.of("generic 0: com.example.DoesNotExist");
+            List<String> imports = List.of();
+            BuildContext buildContext = new BuildContext(imports, "/base/path");
+
+            // When
+            FXMLType result = helper.constructGenericType(rawClass, comments, buildContext);
+
+            // Then
+            assertThat(result).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType gt = (FXMLGenericType) result;
+            assertThat(gt.typeArguments().getFirst())
+                    .isInstanceOf(FXMLUncompiledClassType.class)
+                    .hasFieldOrPropertyWithValue("name", "com.example.DoesNotExist");
+        }
+
+        @Test
+        void shouldReturnUncompiledTypeWhenNestedGenericTypeNotFound() {
+            // Given
+            Class<?> rawClass = List.class;
+            List<String> comments = List.of("generic 0: java.util.List<com.example.DoesNotExist>");
+            List<String> imports = List.of();
+            BuildContext buildContext = new BuildContext(imports, "/base/path");
+
+            // When
+            FXMLType result = helper.constructGenericType(rawClass, comments, buildContext);
+
+            // Then
+            assertThat(result)
+                    .isInstanceOf(FXMLGenericType.class)
+                    .extracting(FXMLGenericType.class::cast)
+                    .hasFieldOrPropertyWithValue("type", List.class)
+                    .extracting(FXMLGenericType::typeArguments, InstanceOfAssertFactories.list(FXMLType.class))
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLGenericType.class)
+                    .extracting(FXMLGenericType.class::cast)
+                    .hasFieldOrPropertyWithValue("type", List.class)
+                    .extracting(FXMLGenericType::typeArguments, InstanceOfAssertFactories.list(FXMLType.class))
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLUncompiledClassType.class)
+                    .hasFieldOrPropertyWithValue("name", "com.example.DoesNotExist");
+        }
+
+        @Test
+        void shouldThrowExceptionForInvalidGenericString() {
+            assertThatThrownBy(() -> helper.constructGenericType(
+                    List.class,
+                    List.of("generic 0: invalid[String]"),
+                    new BuildContext(List.of(), "/base/path")
+            )).isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        void shouldThrowExceptionForMismatchingGenericCount() {
+            assertThatThrownBy(() -> helper.constructGenericType(
+                    List.class,
+                    List.of("generic 0: String", "generic 1: Integer"),
+                    new BuildContext(List.of(), "/base/path")
+            )).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Generic types count (2) does not match the number of type parameters (1)");
+        }
+
+        @Test
+        void shouldThrowExceptionForNonSequentialGenericIndices() {
+            assertThatThrownBy(() -> helper.constructGenericType(
+                    List.class,
+                    List.of("generic 1: String"),
+                    new BuildContext(List.of(), "/base/path")
+            )).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Generic types are having non-sequential indices");
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullArgs() {
+            assertThatThrownBy(() -> helper.constructGenericType(
+                    null,
+                    List.of(),
+                    new BuildContext(List.of(), "/base/path")
+            )).isInstanceOf(NullPointerException.class);
+            assertThatThrownBy(() -> helper.constructGenericType(
+                    List.class,
+                    null,
+                    new BuildContext(List.of(), "/base/path")
+            )).isInstanceOf(NullPointerException.class);
+            assertThatThrownBy(() -> helper.constructGenericType(List.class, List.of(), null))
+                    .isInstanceOf(NullPointerException.class);
         }
     }
 }

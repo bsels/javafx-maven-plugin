@@ -88,7 +88,7 @@ record BuildContext(
                 original.imports,
                 original.definitions,
                 original.scripts,
-                typeMapping,
+                new LinkedHashMap<>(typeMapping),
                 original.resourcePath
         );
     }

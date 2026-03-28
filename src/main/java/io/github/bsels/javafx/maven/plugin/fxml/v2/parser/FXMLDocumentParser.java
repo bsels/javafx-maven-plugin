@@ -265,15 +265,13 @@ public final class FXMLDocumentParser {
         if (factoryMethodName != null) {
             actualType = FXMLUtils.findFactoryMethodReturnType(clazz, factoryMethodName);
         }
-
-        Map<String, FXMLType> typeMapping = helper.resolveTypeMapping(Utils.getClassType(actualType), buildContext);
-        BuildContext localContext = new BuildContext(buildContext, typeMapping);
-
-        FXMLType fxmlType = FXMLUtils.constructGenericType(
+        FXMLType fxmlType = helper.constructGenericType(
                 Utils.getClassType(actualType),
                 structure.comments(),
-                buildContext.imports()
+                buildContext
         );
+        Map<String, FXMLType> typeMapping = helper.resolveTypeMapping(Utils.getClassType(actualType), buildContext);
+        BuildContext localContext = new BuildContext(buildContext, typeMapping);
         Class<?> actualClass = Utils.getClassType(actualType);
         ParseContext context = new ParseContext(structure, localContext, classAndIdentifier, fxmlType, factoryMethod);
         if (Collection.class.isAssignableFrom(actualClass)) {
@@ -669,45 +667,24 @@ public final class FXMLDocumentParser {
             return Optional.empty();
         }
         // endregion
-        // region: collection
+        // region: collection and objects
+        AbstractFXMLValue parsedValue;
         if (Collection.class.isAssignableFrom(rawType)) {
-            Class<?> collectionValueType = FXMLUtils.findRawType(FXMLUtils.findCollectionValueType(property.type()));
-            return switch (property.methodType()) {
-                case GETTER -> Optional.of(new FXMLCollectionProperties(
-                        property.name(),
-                        property.methodName().orElseThrow(),
-                        property.type(),
-                        List.of(parseValueString(value, collectionValueType, buildContext)),
-                        List.of()
-                ));
-                case SETTER, CONSTRUCTOR -> {
-                    log.debug(
-                            "Parsing string value property using setter or constructor as collection: %s is not supported.".formatted(
-                                    property.name()));
-                    yield Optional.empty();
-                }
-            };
-        }
-        // endregion
-        // region: basic property
-        return switch (property.methodType()) {
-            case GETTER -> {
-                log.debug("Parsing string value property using getter: %s is not supported for non-collections.".formatted(
-                        property.name()));
-                yield Optional.empty();
+            if (property.methodType() == ObjectProperty.MethodType.GETTER) {
+                Class<?> collectionValueType = FXMLUtils.findRawType(FXMLUtils.findCollectionValueType(property.type()));
+                parsedValue = parseValueString(value, collectionValueType, buildContext);
+            } else {
+                log.debug(
+                        "Parsing string value property using setter or constructor as collection: %s is not supported.".formatted(
+                                property.name()));
+                return Optional.empty();
             }
-            case SETTER -> Optional.of(new FXMLObjectProperty(
-                    property.name(),
-                    property.methodName().orElseThrow(),
-                    property.type(),
-                    parseValueString(value, rawType, buildContext)
-            ));
-            case CONSTRUCTOR -> Optional.of(new FXMLConstructorProperty(
-                    property.name(),
-                    property.type(),
-                    parseValueString(value, rawType, buildContext)
-            ));
-        };
+        } else {
+            parsedValue = parseValueString(value, rawType, buildContext);
+        }
+        return handleObjectPropertyOrCollectionProperties(
+                buildContext, property, Map.of(), List.of(parsedValue)
+        );
         // endregion
     }
 
