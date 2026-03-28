@@ -481,12 +481,16 @@ final class FXMLDocumentParserHelper {
     /// @param modifier the integer value representing a modifier, typically from the [Modifier] class
     /// @return the corresponding [Visibility] enum value, such as `PUBLIC`, `PROTECTED`, `PRIVATE`, or `PACKAGE_PRIVATE`
     private Visibility visibilityOfModifier(int modifier) {
-        return switch (modifier) {
-            case Modifier.PUBLIC -> Visibility.PUBLIC;
-            case Modifier.PROTECTED -> Visibility.PROTECTED;
-            case Modifier.PRIVATE -> Visibility.PRIVATE;
-            default -> Visibility.PACKAGE_PRIVATE;
-        };
+        if (Modifier.isPublic(modifier)) {
+            return Visibility.PUBLIC;
+        }
+        if (Modifier.isPrivate(modifier)) {
+            return Visibility.PRIVATE;
+        }
+        if (Modifier.isProtected(modifier)) {
+            return Visibility.PROTECTED;
+        }
+        return Visibility.PACKAGE_PRIVATE;
     }
 
     /// Constructs an [FXMLType] representing a generic type based on a raw class and FXML comments.

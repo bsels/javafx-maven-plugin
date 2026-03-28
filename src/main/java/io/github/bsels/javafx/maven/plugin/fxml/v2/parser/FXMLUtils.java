@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -52,12 +54,15 @@ public final class FXMLUtils {
     ///
     /// @param type the [FXMLType] instance whose raw type is to be identified
     /// @return the raw [Class] type corresponding to the FXMLType instance; returns `Object.class` for unsupported or wildcard types
-    public static Class<?> findRawType(FXMLType type) {
-        return switch (type) {
-            case FXMLClassType(Class<?> clazz) -> clazz;
-            case FXMLGenericType(Class<?> clazz, List<FXMLType> _) -> clazz;
-            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> Object.class;
-        };
+    /// @throws NullPointerException if `type` is null
+    public static Class<?> findRawType(FXMLType type) throws NullPointerException {
+        Objects.requireNonNull(type, "`type` must not be null");
+        return findTypeInformation(
+                type,
+                Object.class,
+                Function.identity(),
+                (clazz, _) -> clazz
+        );
     }
 
     /// Determines the element type of the given [FXMLType] when it represents a [Collection].
@@ -75,19 +80,21 @@ public final class FXMLUtils {
     ///
     /// @param type The [FXMLType] representing the collection type.
     /// @return The [FXMLType] of the collection's element type, or `FXMLType.of(Object.class)` if it cannot be determined.
-    public static FXMLType findCollectionValueType(FXMLType type) {
-        return switch (type) {
-            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ ->
-                    FXMLType.of(Object.class);
-            case FXMLClassType(Class<?> clazz) -> FXMLType.of(Utils.findCollectionValueTypeFromHierarchy(clazz));
-            case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) -> {
-                Map<String, FXMLType> mapping = buildInitialTypeMapping(clazz, generics);
-                resolveTypeMapping(clazz, mapping, new HashSet<>());
-                // Collection's type parameter is E (index 0)
-                String elementTypeParamName = Collection.class.getTypeParameters()[0].getName();
-                yield mapping.getOrDefault(elementTypeParamName, FXMLType.of(Object.class));
-            }
-        };
+    /// @throws NullPointerException if `type` is null
+    public static FXMLType findCollectionValueType(FXMLType type) throws NullPointerException {
+        Objects.requireNonNull(type, "`type` must not be null");
+        return findTypeInformation(
+                type,
+                FXMLType.of(Object.class),
+                clazz -> FXMLType.of(Utils.findCollectionValueTypeFromHierarchy(clazz)),
+                (clazz, generics) -> {
+                    Map<String, FXMLType> mapping = buildInitialTypeMapping(clazz, generics);
+                    resolveTypeMapping(clazz, mapping, new HashSet<>());
+                    // Collection's type parameter is E (index 0)
+                    String elementTypeParamName = Collection.class.getTypeParameters()[0].getName();
+                    return mapping.getOrDefault(elementTypeParamName, FXMLType.of(Object.class));
+                }
+        );
     }
 
     /// Determines the key and value types of the given [FXMLType] when it represents a [Map].
@@ -105,28 +112,30 @@ public final class FXMLUtils {
     ///    looked up in the resolved mapping.
     ///
     /// @param type The [FXMLType] representing the map type.
-    /// @return A [Map.Entry] where the key is the [FXMLType] of the map's key type and the value is the [FXMLType]
-    ///                                                                                                                                                                                                         of the map's value type, both defaulting to `FXMLType.of(Object.class)` if they cannot be determined.
-    public static Map.Entry<FXMLType, FXMLType> findMapKeyAndValueTypes(FXMLType type) {
-        return switch (type) {
-            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ ->
-                    Map.entry(FXMLType.of(Object.class), FXMLType.of(Object.class));
-            case FXMLClassType(Class<?> clazz) -> Map.entry(
-                    FXMLType.of(Utils.findMapKeyTypeFromHierarchy(clazz)),
-                    FXMLType.of(Utils.findMapValueTypeFromHierarchy(clazz))
-            );
-            case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) -> {
-                Map<String, FXMLType> mapping = buildInitialTypeMapping(clazz, generics);
-                resolveTypeMapping(clazz, mapping, new HashSet<>());
-                // Map's type parameters are K (index 0) and V (index 1)
-                String keyTypeParamName = Map.class.getTypeParameters()[0].getName();
-                String valueTypeParamName = Map.class.getTypeParameters()[1].getName();
-                yield Map.entry(
-                        mapping.getOrDefault(keyTypeParamName, FXMLType.of(Object.class)),
-                        mapping.getOrDefault(valueTypeParamName, FXMLType.of(Object.class))
-                );
-            }
-        };
+    /// @return A [Map.Entry] where the key is the [FXMLType] of the map's key type and the value is the [FXMLType] of the map's value type, both defaulting to `FXMLType.of(Object.class)` if they cannot be determined.
+    /// @throws NullPointerException if `type` is null
+    public static Map.Entry<FXMLType, FXMLType> findMapKeyAndValueTypes(FXMLType type)
+            throws NullPointerException {
+        Objects.requireNonNull(type, "`type` must not be null");
+        return findTypeInformation(
+                type,
+                Map.entry(FXMLType.of(Object.class), FXMLType.of(Object.class)),
+                clazz -> Map.entry(
+                        FXMLType.of(Utils.findMapKeyTypeFromHierarchy(clazz)),
+                        FXMLType.of(Utils.findMapValueTypeFromHierarchy(clazz))
+                ),
+                (clazz, generics) -> {
+                    Map<String, FXMLType> mapping = buildInitialTypeMapping(clazz, generics);
+                    resolveTypeMapping(clazz, mapping, new HashSet<>());
+                    // Map's type parameters are K (index 0) and V (index 1)
+                    String keyTypeParamName = Map.class.getTypeParameters()[0].getName();
+                    String valueTypeParamName = Map.class.getTypeParameters()[1].getName();
+                    return Map.entry(
+                            mapping.getOrDefault(keyTypeParamName, FXMLType.of(Object.class)),
+                            mapping.getOrDefault(valueTypeParamName, FXMLType.of(Object.class))
+                    );
+                }
+        );
     }
 
     /// Recursively resolves the type mapping for a given type and updates the mapping,
@@ -394,6 +403,29 @@ public final class FXMLUtils {
                     ), e
             );
         }
+    }
+
+    /// Resolves type information based on the provided [FXMLType].
+    /// The method determines the resolved value by applying the appropriate resolver
+    /// or returns a default value for specific type cases.
+    ///
+    /// @param <T>                 The type of the resolved value.
+    /// @param type                The [FXMLType] to analyze.
+    /// @param defaultValue        The default value to return for certain type cases.
+    /// @param simpleTypeResolver  A function to handle resolution for simple class types.
+    /// @param genericTypeResolver A function to handle resolution for generic types, provided with the raw class and its list of type arguments.
+    /// @return Resolved type information of type `T`, determined by the `type` and the corresponding resolver.
+    private static <T> T findTypeInformation(
+            FXMLType type,
+            T defaultValue,
+            Function<Class<?>, T> simpleTypeResolver,
+            BiFunction<Class<?>, List<FXMLType>, T> genericTypeResolver
+    ) {
+        return switch (type) {
+            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> defaultValue;
+            case FXMLClassType(Class<?> clazz) -> simpleTypeResolver.apply(clazz);
+            case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) -> genericTypeResolver.apply(clazz, generics);
+        };
     }
 
     /// Internal record used as a cache key, combining a class and a related string (e.g., method or field name).
