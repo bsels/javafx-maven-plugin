@@ -436,11 +436,14 @@ public final class FXMLDocumentParser {
         ParsedXMLStructure structure = context.structure();
         BuildContext buildContext = context.buildContext();
         FXMLType type = context.type();
-        Class<?> rawValueType = FXMLUtils.findRawType(FXMLUtils.findMapKeyAndValueTypes(type).getValue());
+        Map.Entry<FXMLType, FXMLType> mapKeyAndValueTypes = FXMLUtils.findMapKeyAndValueTypes(type);
+        Class<?> rawKeyClass = FXMLUtils.findRawType(mapKeyAndValueTypes.getKey());
+        Class<?> rawValueType = FXMLUtils.findRawType(mapKeyAndValueTypes.getValue());
         Map<String, AbstractFXMLValue> entries = parseMapEntries(structure, rawValueType, buildContext);
         return new FXMLMap(
                 context.classAndIdentifier().identifier(),
                 type,
+                rawKeyClass,
                 rawValueType,
                 context.factoryMethod(),
                 entries

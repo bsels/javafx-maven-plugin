@@ -1,0 +1,2 @@
+<?import io.github.bsels.javafx.maven.plugin.examples.Unsettable?>
+<Unsettable name="unknown"/>

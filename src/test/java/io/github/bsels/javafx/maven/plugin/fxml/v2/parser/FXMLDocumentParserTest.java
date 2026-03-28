@@ -1,6 +1,8 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
 import io.github.bsels.javafx.maven.plugin.TestHelpers;
+import io.github.bsels.javafx.maven.plugin.examples.MetaDataHolder;
+import io.github.bsels.javafx.maven.plugin.examples.Unsettable;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
@@ -18,7 +20,6 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLFileScript;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLSourceScript;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLWildcardType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLConstant;
@@ -73,6 +74,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -90,7 +92,7 @@ public class FXMLDocumentParserTest {
     public static final InstanceOfAssertFactory<Optional, OptionalAssert<FXMLIdentifier>> OPTIONAL_IDENTIFIER_ASSERT_FACTORY = InstanceOfAssertFactories.optional(
             FXMLIdentifier.class);
     @SuppressWarnings("rawtypes") // The factory is generic, we can't use the type parameter here
-    public static final InstanceOfAssertFactory<java.util.Map, org.assertj.core.api.MapAssert<String, AbstractFXMLValue>> MAP_PROPERTIES_ASSERT_FACTORY = InstanceOfAssertFactories.map(
+    public static final InstanceOfAssertFactory<java.util.Map, org.assertj.core.api.MapAssert<String, AbstractFXMLValue>> MAP_VALUES_ASSERT_FACTORY = InstanceOfAssertFactories.map(
             String.class,
             AbstractFXMLValue.class
     );
@@ -1386,7 +1388,7 @@ public class FXMLDocumentParserTest {
                                                     )
                                                     .hasFieldOrPropertyWithValue("rawKeyClass", Object.class)
                                                     .hasFieldOrPropertyWithValue("rawValueClass", Object.class)
-                                                    .extracting(FXMLMapProperty::value, MAP_PROPERTIES_ASSERT_FACTORY)
+                                                    .extracting(FXMLMapProperty::value, MAP_VALUES_ASSERT_FACTORY)
                                                     .hasSize(3)
                                                     .containsEntry("attribute", new FXMLLiteral("Attribute"))
                                                     .containsEntry("element", new FXMLLiteral("Element"))
@@ -1581,6 +1583,112 @@ public class FXMLDocumentParserTest {
                                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
                                     .hasFieldOrPropertyWithValue("value", "Item 2")
                     );
+        }
+
+        @Test
+        void setMap() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/SetMap.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+
+            // Assert
+            assertThat(document)
+                    // Validate document
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "SetMap")
+                    .hasFieldOrPropertyWithValue("controller", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
+                    .hasFieldOrPropertyWithValue("definitions", List.of())
+                    .hasFieldOrPropertyWithValue("scripts", List.of())
+                    .satisfies(
+                            doc -> assertThat(doc.imports())
+                                    .hasSize(2)
+                                    .containsExactlyInAnyOrder(
+                                            "io.github.bsels.javafx.maven.plugin.examples.MetaDataHolder",
+                                            "java.util.HashMap"
+                                    )
+                    )
+                    // Validate root
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(MetaDataHolder.class))
+                    // Validate root properties
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .hasOnlyElementsOfType(FXMLObjectProperty.class)
+                    .extracting(FXMLObjectProperty.class::cast)
+                    .first()
+                    .hasFieldOrPropertyWithValue("name", "metaData")
+                    .hasFieldOrPropertyWithValue("setter", "setMetaData")
+                    .hasFieldOrPropertyWithValue(
+                            "type",
+                            new FXMLGenericType(
+                                    Map.class,
+                                    new FXMLClassType(String.class),
+                                    new FXMLClassType(String.class)
+                            )
+                    )
+                    .extracting(FXMLObjectProperty::value)
+                    .isInstanceOf(FXMLMap.class)
+                    .extracting(FXMLMap.class::cast)
+                    .satisfies(
+                            collection -> assertThat(collection.identifier())
+                                    .isInstanceOf(FXMLInternalIdentifier.class)
+                    )
+                    .hasFieldOrPropertyWithValue(
+                            "type",
+                            new FXMLGenericType(
+                                    HashMap.class,
+                                    new FXMLClassType(String.class),
+                                    new FXMLClassType(String.class)
+                            )
+                    )
+                    .hasFieldOrPropertyWithValue("rawKeyClass", String.class)
+                    .hasFieldOrPropertyWithValue("rawValueClass", String.class)
+                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                    .extracting(FXMLMap::entries, MAP_VALUES_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .containsEntry("item", new FXMLLiteral("Data"));
+        }
+
+        @Test
+        void unsettableProperty() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/UnsettableProperty.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+
+            // Assert
+            assertThat(document)
+                    // Validate document
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "UnsettableProperty")
+                    .hasFieldOrPropertyWithValue("controller", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
+                    .hasFieldOrPropertyWithValue("definitions", List.of())
+                    .hasFieldOrPropertyWithValue("scripts", List.of())
+                    .hasFieldOrPropertyWithValue(
+                            "imports",
+                            List.of("io.github.bsels.javafx.maven.plugin.examples.Unsettable")
+                    )
+                    // Validate root
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Unsettable.class))
+                    // Validate root properties
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .isEmpty();
         }
     }
 
