@@ -12,6 +12,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMethod;
 import io.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
 import javafx.beans.NamedArg;
@@ -962,21 +963,38 @@ class FXMLDocumentParserHelperTest {
     class ConstructGenericTypeTest {
 
         @Test
+        void nonGenericType() {
+            BuildContext buildContext = new BuildContext(List.of(), "/base/path");
+            FXMLType result = helper.constructGenericType(
+                    String.class,
+                    List.of(),
+                    buildContext
+            );
+            assertThat(result).isEqualTo(FXMLType.of(String.class));
+            assertThat(buildContext.typeMapping()).isEmpty();
+        }
+
+        @Test
         void shouldConstructGenericType() {
+            BuildContext buildContext = new BuildContext(List.of(), "/base/path");
             FXMLType result = helper.constructGenericType(
                     List.class,
                     List.of("generic 0: java.lang.String"),
-                    new BuildContext(List.of(), "/base/path")
+                    buildContext
             );
             assertThat(result).isEqualTo(FXMLType.of(List.class, List.of(FXMLType.of(String.class))));
+            assertThat(buildContext.typeMapping())
+                    .hasSize(1)
+                    .containsEntry("E", new FXMLClassType(String.class));
         }
 
         @Test
         void shouldConstructNestedGenericType() {
+            BuildContext buildContext = new BuildContext(List.of(), "/base/path");
             FXMLType result = helper.constructGenericType(
                     List.class,
                     List.of("generic 0: java.util.List<java.lang.String>"),
-                    new BuildContext(List.of(), "/base/path")
+                    buildContext
             );
             assertThat(result).isInstanceOf(FXMLGenericType.class);
             FXMLGenericType gt = (FXMLGenericType) result;
@@ -985,26 +1003,46 @@ class FXMLDocumentParserHelperTest {
             FXMLGenericType inner = (FXMLGenericType) gt.typeArguments().getFirst();
             assertThat(inner.type()).isEqualTo(List.class);
             assertThat(inner.typeArguments().getFirst()).isEqualTo(FXMLType.of(String.class));
+            assertThat(buildContext.typeMapping())
+                    .hasSize(1)
+                    .containsEntry("E", new FXMLGenericType(List.class, new FXMLClassType(String.class)));
         }
 
         @Test
         void shouldHandleDeeplyNestedGenerics() {
+            BuildContext buildContext = new BuildContext(List.of(), "/base/path");
             FXMLType result = helper.constructGenericType(
                     List.class,
                     List.of("generic 0: java.util.List<java.util.List<java.lang.String>>"),
-                    new BuildContext(List.of(), "/base/path")
+                    buildContext
             );
             assertThat(result.toString()).contains("List").contains("String");
+            assertThat(buildContext.typeMapping())
+                    .hasSize(1)
+                    .containsEntry(
+                            "E",
+                            new FXMLGenericType(
+                                    List.class,
+                                    new FXMLGenericType(List.class, new FXMLClassType(String.class))
+                            )
+                    );
         }
 
         @Test
         void shouldHandleUncompiledTypesInGenerics() {
+            BuildContext buildContext = new BuildContext(List.of(), "/base/path");
             FXMLType result = helper.constructGenericType(
                     List.class,
                     List.of("generic 0: com.example.Uncompiled<java.lang.String>"),
-                    new BuildContext(List.of(), "/base/path")
+                    buildContext
             );
             assertThat(result.toString()).contains("Uncompiled").contains("String");
+            assertThat(buildContext.typeMapping())
+                    .hasSize(1)
+                    .containsEntry(
+                            "E",
+                            new FXMLUncompiledGenericType("com.example.Uncompiled", new FXMLClassType(String.class))
+                    );
         }
 
         @Test
@@ -1024,6 +1062,10 @@ class FXMLDocumentParserHelperTest {
             assertThat(gt.typeArguments().getFirst())
                     .isInstanceOf(FXMLUncompiledClassType.class)
                     .hasFieldOrPropertyWithValue("name", "com.example.DoesNotExist");
+
+            assertThat(buildContext.typeMapping())
+                    .hasSize(1)
+                    .containsEntry("E", new FXMLUncompiledClassType("com.example.DoesNotExist"));
         }
 
         @Test
@@ -1053,6 +1095,13 @@ class FXMLDocumentParserHelperTest {
                     .first()
                     .isInstanceOf(FXMLUncompiledClassType.class)
                     .hasFieldOrPropertyWithValue("name", "com.example.DoesNotExist");
+
+            assertThat(buildContext.typeMapping())
+                    .hasSize(1)
+                    .containsEntry(
+                            "E",
+                            new FXMLGenericType(List.class, new FXMLUncompiledClassType("com.example.DoesNotExist"))
+                    );
         }
 
         @Test

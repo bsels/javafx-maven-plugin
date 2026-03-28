@@ -141,7 +141,7 @@ class FXMLTypeTest {
 
         @Test
         void shouldHandleNullTypeArguments() {
-            FXMLUncompiledGenericType type = new FXMLUncompiledGenericType("Foo", null);
+            FXMLUncompiledGenericType type = new FXMLUncompiledGenericType("Foo", (List<FXMLType>) null);
             assertThat(type.typeArguments()).isEmpty();
         }
     }

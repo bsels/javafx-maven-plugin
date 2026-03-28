@@ -24,4 +24,16 @@ public record FXMLUncompiledGenericType(String name, List<FXMLType> typeArgument
         Objects.requireNonNull(name, "`name` must not be null");
         typeArguments = List.copyOf(Objects.requireNonNullElseGet(typeArguments, List::of));
     }
+
+    /// Compact constructor for the `FXMLUncompiledGenericType` record,
+    /// which validates that the name is provided and ensures a non-null, immutable list of type arguments.
+    ///
+    /// @param name          The name of the uncompiled generic type. Must not be `null`.
+    /// @param typeArguments The list of type arguments. Must not be `null`. The resulting list will be immutable.
+    /// @throws NullPointerException if `name` or `typeArguments` is `null`.
+    public FXMLUncompiledGenericType(String name, FXMLType... typeArguments) {
+        Objects.requireNonNull(name, "`name` must not be null");
+        Objects.requireNonNull(typeArguments, "`typeArguments` must not be null");
+        this(name, List.of(typeArguments));
+    }
 }
