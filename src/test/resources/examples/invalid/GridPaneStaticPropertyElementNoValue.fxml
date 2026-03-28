@@ -1,0 +1,13 @@
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.GridPane?>
+<?import java.lang.Integer?>
+<GridPane xmlns:fx="http://javafx.com/fxml">
+    <children>
+        <Label text="My Label">
+            <GridPane.rowIndex/>
+            <GridPane.columnIndex>
+                <Integer fx:value="0"/>
+            </GridPane.columnIndex>
+        </Label>
+    </children>
+</GridPane>

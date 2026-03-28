@@ -477,17 +477,24 @@ public final class FXMLDocumentParser {
                 NO_INLINE_FX_ELEMENTS_HANDLERS.get(childName)
                         .handle(this, child, buildContext);
             } else if (FXMLUtils.hasNonSkippablePrefix(childName)) {
-                List<AbstractFXMLValue> grandChildren = child.children()
-                        .stream()
-                        .map(grandChild -> parseMapElements(grandChild, buildContext, rawValueType))
-                        .gather(Utils.optional())
-                        .toList();
-                if (grandChildren.size() != 1) {
-                    throw new IllegalArgumentException(
-                            "Map entry element `%s` must have exactly one child element representing the value".formatted(
-                                    childName));
+                Optional<String> textContent = child.textValue();
+                AbstractFXMLValue value;
+                if (textContent.isPresent()) {
+                    value = parseValueString(textContent.get().stripTrailing(), rawValueType, buildContext);
+                } else {
+                    List<AbstractFXMLValue> grandChildren = child.children()
+                            .stream()
+                            .map(grandChild -> parseMapElements(grandChild, buildContext, rawValueType))
+                            .gather(Utils.optional())
+                            .toList();
+                    if (grandChildren.size() != 1) {
+                        throw new IllegalArgumentException(
+                                "Map entry element `%s` must have exactly one child element representing the value".formatted(
+                                        childName));
+                    }
+                    value = grandChildren.getFirst();
                 }
-                entries.put(childName, grandChildren.getFirst());
+                entries.put(childName, value);
             }
         }
         return entries;
@@ -785,27 +792,19 @@ public final class FXMLDocumentParser {
         // endregion
         Class<?> rawType = FXMLUtils.findRawType(property.type());
         // region: map
-        if (Map.class.isAssignableFrom(rawType)) {
-            return switch (property.methodType()) {
-                case GETTER -> {
-                    Class<?> rawValueType = FXMLUtils.findRawType(FXMLUtils.findMapKeyAndValueTypes(property.type()).getValue());
-                    Map<String, AbstractFXMLValue> entries = parseMapEntries(value, rawValueType, buildContext);
-                    yield Optional.of(new FXMLMapProperty(
-                            property.name(),
-                            property.methodName().orElseThrow(),
-                            property.type(),
-                            rawValueType,
-                            entries
-                    ));
-                }
-                case SETTER, CONSTRUCTOR -> {
-                    // TODO: Check for manual map construction
-                    log.debug(
-                            "Parsing child elements property using setter or constructor as map: %s is not supported.".formatted(
-                                    property.name()));
-                    yield Optional.empty();
-                }
-            };
+        if (Map.class.isAssignableFrom(rawType) && property.methodType() == ObjectProperty.MethodType.GETTER) {
+            Map.Entry<FXMLType, FXMLType> mapKeyAndValueTypes = FXMLUtils.findMapKeyAndValueTypes(property.type());
+            Class<?> rawKeyType = FXMLUtils.findRawType(mapKeyAndValueTypes.getKey());
+            Class<?> rawValueType = FXMLUtils.findRawType(mapKeyAndValueTypes.getValue());
+            Map<String, AbstractFXMLValue> entries = parseMapEntries(value, rawValueType, buildContext);
+            return Optional.of(new FXMLMapProperty(
+                    property.name(),
+                    property.methodName().orElseThrow(),
+                    property.type(),
+                    rawKeyType,
+                    rawValueType,
+                    entries
+            ));
         }
         // endregion
         List<AbstractFXMLValue> values = parseChildrenAsValues(buildContext, value);
@@ -848,21 +847,14 @@ public final class FXMLDocumentParser {
             return Optional.empty();
         }
         // region: collection
-        if (Collection.class.isAssignableFrom(rawType)) {
-            return switch (property.methodType()) {
-                case GETTER -> Optional.of(new FXMLCollectionProperties(
-                        property.name(),
-                        property.methodName().orElseThrow(),
-                        property.type(),
-                        values,
-                        parseAttributesProperties(rawType, buildContext, attributes)
-                ));
-                case SETTER, CONSTRUCTOR -> {
-                    log.debug("Parsing  collection property using setter or constructor is not supported: %s.".formatted(
-                            property.name()));
-                    yield Optional.empty();
-                }
-            };
+        if (Collection.class.isAssignableFrom(rawType) && property.methodType() == ObjectProperty.MethodType.GETTER) {
+            return Optional.of(new FXMLCollectionProperties(
+                    property.name(),
+                    property.methodName().orElseThrow(),
+                    property.type(),
+                    values,
+                    parseAttributesProperties(rawType, buildContext, attributes)
+            ));
         }
         // endregion
         if (values.size() > 1) {

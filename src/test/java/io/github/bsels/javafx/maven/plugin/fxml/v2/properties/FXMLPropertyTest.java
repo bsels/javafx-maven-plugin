@@ -49,7 +49,13 @@ class FXMLPropertyTest {
     class FXMLStaticObjectPropertyTest {
         @Test
         void shouldCreateWithValidParams() {
-            FXMLStaticObjectProperty prop = new FXMLStaticObjectProperty("name", String.class, "setProp", stringType, literalValue);
+            FXMLStaticObjectProperty prop = new FXMLStaticObjectProperty(
+                    "name",
+                    String.class,
+                    "setProp",
+                    stringType,
+                    literalValue
+            );
             assertThat(prop.name()).isEqualTo("name");
             assertThat(prop.clazz()).isEqualTo(String.class);
             assertThat(prop.setter()).isEqualTo("setProp");
@@ -81,7 +87,13 @@ class FXMLPropertyTest {
     class FXMLCollectionPropertiesTest {
         @Test
         void shouldCreateWithValidParams() {
-            FXMLCollectionProperties prop = new FXMLCollectionProperties("name", "getProp", stringType, List.of(literalValue), List.of());
+            FXMLCollectionProperties prop = new FXMLCollectionProperties(
+                    "name",
+                    "getProp",
+                    stringType,
+                    List.of(literalValue),
+                    List.of()
+            );
             assertThat(prop.name()).isEqualTo("name");
             assertThat(prop.getter()).isEqualTo("getProp");
             assertThat(prop.type()).isEqualTo(stringType);
@@ -114,32 +126,44 @@ class FXMLPropertyTest {
     class FXMLMapPropertyTest {
         @Test
         void shouldCreateWithValidParams() {
-            FXMLMapProperty prop = new FXMLMapProperty("name", "getProp", stringType, String.class, Map.of("k", literalValue));
-            assertThat(prop.name()).isEqualTo("name");
-            assertThat(prop.getter()).isEqualTo("getProp");
-            assertThat(prop.type()).isEqualTo(stringType);
-            assertThat(prop.rawValueClass()).isEqualTo(String.class);
-            assertThat(prop.value()).containsEntry("k", literalValue);
+            FXMLMapProperty prop = new FXMLMapProperty(
+                    "name",
+                    "getProp",
+                    stringType,
+                    String.class,
+                    String.class,
+                    Map.of("k", literalValue)
+            );
+            assertThat(prop)
+                    .hasFieldOrPropertyWithValue("name", "name")
+                    .hasFieldOrPropertyWithValue("getter", "getProp")
+                    .hasFieldOrPropertyWithValue("type", stringType)
+                    .hasFieldOrPropertyWithValue("rawKeyClass", String.class)
+                    .hasFieldOrPropertyWithValue("rawValueClass", String.class)
+                    .hasFieldOrPropertyWithValue("value", Map.of("k", literalValue));
         }
 
         @Test
         void shouldHandleNullMap() {
-            FXMLMapProperty prop = new FXMLMapProperty("name", "getProp", stringType, String.class, null);
+            FXMLMapProperty prop = new FXMLMapProperty("name", "getProp", stringType, String.class, String.class, null);
             assertThat(prop.value()).isEmpty();
         }
 
         @Test
         void shouldThrowNpeForNullRequired() {
-            assertThatThrownBy(() -> new FXMLMapProperty(null, "g", stringType, String.class, Map.of()))
+            assertThatThrownBy(() -> new FXMLMapProperty(null, "g", stringType, String.class, String.class, Map.of()))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`name` must not be null");
-            assertThatThrownBy(() -> new FXMLMapProperty("n", null, stringType, String.class, Map.of()))
+            assertThatThrownBy(() -> new FXMLMapProperty("n", null, stringType, String.class, String.class, Map.of()))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`getter` must not be null");
-            assertThatThrownBy(() -> new FXMLMapProperty("n", "g", null, String.class, Map.of()))
+            assertThatThrownBy(() -> new FXMLMapProperty("n", "g", null, String.class, String.class, Map.of()))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`type` must not be null");
-            assertThatThrownBy(() -> new FXMLMapProperty("n", "g", stringType, null, Map.of()))
+            assertThatThrownBy(() -> new FXMLMapProperty("n", "g", stringType, null, String.class, Map.of()))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`rawKeyClass` must not be null");
+            assertThatThrownBy(() -> new FXMLMapProperty("n", "g", stringType, String.class, null, Map.of()))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`rawValueClass` must not be null");
         }

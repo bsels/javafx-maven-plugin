@@ -11,12 +11,14 @@ import java.util.Objects;
 /// @param name          The property name.
 /// @param getter        The name of the getter method that returns the map.
 /// @param type          The property type.
+/// @param rawKeyClass   The raw key class.
 /// @param rawValueClass The raw value class.
 /// @param value         The map of values.
 public record FXMLMapProperty(
         String name,
         String getter,
         FXMLType type,
+        Class<?> rawKeyClass,
         Class<?> rawValueClass,
         Map<String, AbstractFXMLValue> value
 ) implements FXMLProperty {
@@ -26,6 +28,7 @@ public record FXMLMapProperty(
     /// @param name          The property name.
     /// @param getter        The name of the getter method.
     /// @param type          The property type.
+    /// @param rawKeyClass   The raw key class.
     /// @param rawValueClass The raw value class.
     /// @param value         The map of values.
     /// @throws NullPointerException if `name`, `getter`, or `type` is `null`.
@@ -33,6 +36,7 @@ public record FXMLMapProperty(
         Objects.requireNonNull(name, "`name` must not be null");
         Objects.requireNonNull(getter, "`getter` must not be null");
         Objects.requireNonNull(type, "`type` must not be null");
+        Objects.requireNonNull(rawKeyClass, "`rawKeyClass` must not be null");
         Objects.requireNonNull(rawValueClass, "`rawValueClass` must not be null");
         value = Map.copyOf(Objects.requireNonNullElseGet(value, Map::of));
     }

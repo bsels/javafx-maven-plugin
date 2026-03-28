@@ -10,6 +10,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIden
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticObjectProperty;
@@ -35,6 +36,7 @@ import io.github.bsels.javafx.maven.plugin.io.FXMLReader;
 import io.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.ObservableMap;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Orientation;
@@ -64,11 +66,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -87,6 +87,11 @@ public class FXMLDocumentParserTest {
     @SuppressWarnings("rawtypes") // The factory is generic, we can't use the type parameter here
     public static final InstanceOfAssertFactory<Optional, OptionalAssert<FXMLIdentifier>> OPTIONAL_IDENTIFIER_ASSERT_FACTORY = InstanceOfAssertFactories.optional(
             FXMLIdentifier.class);
+    @SuppressWarnings("rawtypes") // The factory is generic, we can't use the type parameter here
+    public static final InstanceOfAssertFactory<java.util.Map, org.assertj.core.api.MapAssert<String, AbstractFXMLValue>> MAP_PROPERTIES_ASSERT_FACTORY = InstanceOfAssertFactories.map(
+            String.class,
+            AbstractFXMLValue.class
+    );
 
     private String originalJavaHome;
     private FXMLReader fxmlReader;
@@ -1138,7 +1143,6 @@ public class FXMLDocumentParserTest {
 
         @Test
         void locationResolution() throws MojoExecutionException {
-
             // Prepare
             ParsedFXML parsedFXML = readFXML("/examples/LocationResolution.fxml");
 
@@ -1195,6 +1199,139 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("name", "url")
                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
                     .hasFieldOrPropertyWithValue("value", new FXMLResource("/examples/my_image.png"));
+        }
+
+        @Test
+        void mapProperties() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/NodeProperties.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+
+            // Assert
+            assertThat(document)
+                    // Validate document
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "NodeProperties")
+                    .hasFieldOrPropertyWithValue("controller", Optional.empty())
+                    .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
+                    .hasFieldOrPropertyWithValue("definitions", List.of())
+                    .hasFieldOrPropertyWithValue("scripts", List.of())
+                    .satisfies(
+                            doc -> assertThat(doc.imports())
+                                    .hasSize(3)
+                                    .containsExactly(
+                                            "javafx.scene.control.Button",
+                                            "javafx.scene.layout.VBox",
+                                            "java.lang.String"
+                                    )
+                    )
+                    // Validate root
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
+                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(VBox.class))
+                    // Validate root properties
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLCollectionProperties.class)
+                    .extracting(FXMLCollectionProperties.class::cast)
+                    .hasFieldOrPropertyWithValue("name", "children")
+                    .hasFieldOrPropertyWithValue("getter", "getChildren")
+                    .hasFieldOrPropertyWithValue(
+                            "type",
+                            new FXMLGenericType(ObservableList.class, new FXMLClassType(Node.class))
+                    )
+                    .hasFieldOrPropertyWithValue("properties", List.of())
+                    // Validate children values
+                    .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
+                    .hasSize(2)
+                    .hasOnlyElementsOfType(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .satisfiesExactly(
+                            first -> assertThat(first)
+                                    .satisfies(
+                                            object -> assertThat(object.identifier())
+                                                    .isInstanceOf(FXMLInternalIdentifier.class)
+                                    )
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Button.class))
+                                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                                    .hasSize(1)
+                                    .hasOnlyElementsOfType(FXMLObjectProperty.class)
+                                    .extracting(FXMLObjectProperty.class::cast)
+                                    .first()
+                                    .hasFieldOrPropertyWithValue("name", "text")
+                                    .hasFieldOrPropertyWithValue("setter", "setText")
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(String.class))
+                                    .hasFieldOrPropertyWithValue("value", new FXMLLiteral("Ignored")),
+                            second -> assertThat(second)
+                                    .satisfies(
+                                            object -> assertThat(object.identifier())
+                                                    .isInstanceOf(FXMLInternalIdentifier.class)
+                                    )
+                                    .hasFieldOrPropertyWithValue("type", new FXMLClassType(Button.class))
+                                    .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
+                                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                                    .hasSize(2)
+                                    .satisfiesExactly(
+                                            first -> assertThat(first)
+                                                    .isInstanceOf(FXMLObjectProperty.class)
+                                                    .extracting(FXMLObjectProperty.class::cast)
+                                                    .hasFieldOrPropertyWithValue("name", "text")
+                                                    .hasFieldOrPropertyWithValue("setter", "setText")
+                                                    .hasFieldOrPropertyWithValue(
+                                                            "type",
+                                                            new FXMLClassType(String.class)
+                                                    )
+                                                    .hasFieldOrPropertyWithValue(
+                                                            "value",
+                                                            new FXMLLiteral("Properties")
+                                                    ),
+                                            secondProperty -> assertThat(secondProperty)
+                                                    .isInstanceOf(FXMLMapProperty.class)
+                                                    .extracting(FXMLMapProperty.class::cast)
+                                                    .hasFieldOrPropertyWithValue("name", "properties")
+                                                    .hasFieldOrPropertyWithValue("getter", "getProperties")
+                                                    .hasFieldOrPropertyWithValue(
+                                                            "type",
+                                                            new FXMLGenericType(
+                                                                    ObservableMap.class,
+                                                                    new FXMLClassType(Object.class),
+                                                                    new FXMLClassType(Object.class)
+                                                            )
+                                                    )
+                                                    .hasFieldOrPropertyWithValue("rawKeyClass", Object.class)
+                                                    .hasFieldOrPropertyWithValue("rawValueClass", Object.class)
+                                                    .extracting(FXMLMapProperty::value, MAP_PROPERTIES_ASSERT_FACTORY)
+                                                    .hasSize(3)
+                                                    .containsEntry("attribute", new FXMLLiteral("Attribute"))
+                                                    .containsEntry("element", new FXMLLiteral("Element"))
+                                                    .hasEntrySatisfying(
+                                                            "elementValue", value -> assertThat(value)
+                                                                    .isInstanceOf(FXMLValue.class)
+                                                                    .extracting(FXMLValue.class::cast)
+                                                                    .satisfies(
+                                                                            fxmlValue -> assertThat(fxmlValue.identifier())
+                                                                                    .containsInstanceOf(
+                                                                                            FXMLInternalIdentifier.class)
+                                                                    )
+                                                                    .hasFieldOrPropertyWithValue(
+                                                                            "type",
+                                                                            new FXMLClassType(String.class)
+                                                                    )
+                                                                    .hasFieldOrPropertyWithValue(
+                                                                            "value",
+                                                                            "ElementValue"
+                                                                    )
+                                                    )
+                                    )
+                    );
         }
     }
 
@@ -1288,6 +1425,18 @@ public class FXMLDocumentParserTest {
             assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Map entry element `test` must have exactly one child element representing the value");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"GridPaneStaticPropertyElementMultipleValues", "GridPaneStaticPropertyElementNoValue"})
+        void noOrMultipleStaticPropertyValues(String file) throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/invalid/%s.fxml".formatted(file));
+
+            // Act and Assert
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Expected single value for the static property");
         }
     }
 }
