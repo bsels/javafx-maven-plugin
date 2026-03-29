@@ -1,6 +1,8 @@
 package io.github.bsels.javafx.maven.plugin.utils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Constructor;
@@ -64,5 +66,32 @@ class ObjectMapperProviderTest {
         ObjectMapper objectMapper = ObjectMapperProvider.getObjectMapper();
         assertThat(objectMapper.writeValueAsString(TypeEncoderTest.class))
                 .isEqualTo("\"class io.github.bsels.javafx.maven.plugin.utils.TypeEncoderTest\"");
+    }
+
+    private static class TestClass {
+
+        public String getButThrowsError() {
+            throw new RuntimeException("Test exception");
+        }
+    }
+
+    @Nested
+    class EncodeObjectTest {
+
+        @Test
+        void jsonSerializationFails() {
+            assertThatThrownBy(() -> ObjectMapperProvider.encodeObject(new TestClass()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Unable to escape the object value")
+                    .cause()
+                    .isInstanceOf(JsonProcessingException.class)
+                    .hasMessageStartingWith("Test exception");
+        }
+
+        @Test
+        void jsonSerializationSucceeds() {
+            assertThat(ObjectMapperProvider.encodeObject("test"))
+                    .isEqualTo("\"test\"");
+        }
     }
 }

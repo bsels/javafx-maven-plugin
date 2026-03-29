@@ -1,6 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.utils;
 
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
@@ -48,23 +49,51 @@ public final class ObjectMapperProvider {
     /// @return the shared static instance of [ObjectMapper].
     public static ObjectMapper getObjectMapper() {
         OBJECT_MAPPER = Optional.ofNullable(OBJECT_MAPPER)
-                .orElseGet(() -> new ObjectMapper()
-                        .registerModule(new Jdk8Module())
-                        .registerModule(
-                                new SimpleModule()
-                                        .addSerializer(
-                                                Type.class, new JsonSerializer<>() {
-                                                    @Override
-                                                    public void serialize(
-                                                            Type type,
-                                                            JsonGenerator jsonGenerator,
-                                                            SerializerProvider serializerProvider
-                                                    ) throws IOException {
-                                                        jsonGenerator.writeString(type.toString());
-                                                    }
-                                                }
-                                        )
-                        ));
+                .orElseGet(
+                        () -> new ObjectMapper()
+                                .registerModule(new Jdk8Module())
+                                .registerModule(new SimpleModule().addSerializer(Type.class, new TypeJsonSerializer()))
+                );
         return OBJECT_MAPPER;
+    }
+
+    /// Escapes the provided object by converting it into a JSON-compliant format.
+    ///
+    /// @param value the object to be escaped
+    /// @return the escaped string in JSON-compliant format
+    /// @throws IllegalArgumentException if the string cannot be escaped
+    public static String encodeObject(Object value) {
+        try {
+            return ObjectMapperProvider.getObjectMapper().writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Unable to escape the object value", e);
+        }
+    }
+
+    /// A custom serializer for the [Type] class used for JSON processing.
+    ///
+    /// The `TypeJsonSerializer` extends [JsonSerializer]
+    /// and provides a specific implementation for serializing [Type] objects.
+    /// This class is used in conjunction with Jackson's [ObjectMapper] to ensure that [Type] objects are correctly
+    /// serialized to their string representation in JSON format.
+    ///
+    /// Serialization logic:
+    /// - Converts a [Type] object into its string representation by calling `toString()` on the [Type] instance.
+    ///
+    /// This serializer is registered with the Jackson [ObjectMapper] in the `ObjectMapperProvider` class,
+    /// which manages a shared singleton [ObjectMapper] instance for the application.
+    private static class TypeJsonSerializer extends JsonSerializer<Type> {
+
+        /// Serializes an [Type] object into its string representation for JSON output.
+        ///
+        /// @param type               the [Type] object to be serialized; must not be null.
+        /// @param jsonGenerator      the [JsonGenerator] used to write JSON content.
+        /// @param serializerProvider the [SerializerProvider] that can provide serializers for serializing objects.
+        /// @throws IOException if an I/O error occurs during serialization.
+        @Override
+        public void serialize(Type type, JsonGenerator jsonGenerator, SerializerProvider serializerProvider)
+                throws IOException {
+            jsonGenerator.writeString(type.toString());
+        }
     }
 }

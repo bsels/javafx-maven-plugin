@@ -1,7 +1,5 @@
 package io.github.bsels.javafx.maven.plugin.utils;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -193,16 +191,14 @@ public final class TypeEncoder {
         }
     }
 
-    /// Escapes the provided string by converting it into a JSON-compliant format.
+    /// Escapes the given string by encoding it into a specific format.
+    ///
+    /// This method uses an underlying object mapping provider to encode the input string,
+    /// ensuring that any special characters or formatting are handled appropriately.
     ///
     /// @param value the string to be escaped
-    /// @return the escaped string in JSON-compliant format
-    /// @throws IllegalArgumentException if the string cannot be escaped
+    /// @return the escaped string representation of the input value
     private static String escapeString(String value) {
-        try {
-            return ObjectMapperProvider.getObjectMapper().writeValueAsString(value);
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Unable to escape the string value", e);
-        }
+        return ObjectMapperProvider.encodeObject(value);
     }
 }

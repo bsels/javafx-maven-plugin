@@ -1,20 +1,11 @@
 package io.github.bsels.javafx.maven.plugin.utils;
 
-import com.fasterxml.jackson.core.JsonGenerationException;
-import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 
-import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.GenericDeclaration;
@@ -37,6 +28,11 @@ public class TypeEncoderTest {
     // Dummy classes/enums for testing purpose
     private enum DummyEnum {
         VALUE
+    }
+
+    private static class DummyClass {
+        public DummyClass(String s) {
+        }
     }
 
     @Nested
@@ -353,8 +349,10 @@ public class TypeEncoderTest {
             String value = "test";
 
             // When & Then
-            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                    TypeEncoder.encodeTypeValue(String[].class, value));
+            IllegalArgumentException exception = assertThrows(
+                    IllegalArgumentException.class, () ->
+                            TypeEncoder.encodeTypeValue(String[].class, value)
+            );
             assertTrue(exception.getMessage().contains("Unable to encode type value"));
         }
 
@@ -448,31 +446,6 @@ public class TypeEncoderTest {
             assertThatExceptionOfType(IllegalArgumentException.class)
                     .isThrownBy(() -> TypeEncoder.encodeTypeValue(type, "test"))
                     .withMessage("Unable to encode type value: %s".formatted(type));
-        }
-
-        @Test
-        public void escapingStringFailedWithIllegalArgumentException() {
-            try (MockedStatic<ObjectMapperProvider> objectMapperProviderMockedStatic = Mockito.mockStatic(ObjectMapperProvider.class)) {
-                ObjectMapper objectMapper = new ObjectMapper();
-                JsonSerializer<String> stringJsonSerializer = new JsonSerializer<String>() {
-                    @Override
-                    public void serialize(String value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-                        throw new JsonGenerationException("Test exception", gen);
-                    }
-                };
-                objectMapper.registerModule(
-                        new SimpleModule()
-                                .addSerializer(String.class, stringJsonSerializer)
-                );
-                objectMapperProviderMockedStatic.when(ObjectMapperProvider::getObjectMapper).thenReturn(objectMapper);
-
-                assertThatThrownBy(() -> TypeEncoder.encodeTypeValue(String.class, "data"))
-                        .isInstanceOf(IllegalArgumentException.class)
-                        .hasMessage("Unable to escape the string value")
-                        .cause()
-                        .isInstanceOf(JsonProcessingException.class)
-                        .hasMessage("Test exception");
-            }
         }
     }
 
@@ -578,7 +551,8 @@ public class TypeEncoderTest {
         @Test
         public void testTypeToClassWithUnsupportedType() {
             // Given
-            Type unsupportedType = new Type() {};
+            Type unsupportedType = new Type() {
+            };
 
             // When & Then
             assertThatExceptionOfType(IllegalArgumentException.class)
@@ -631,17 +605,13 @@ public class TypeEncoderTest {
         @Test
         public void testTypeToReflectionClassStringWithUnsupportedType() {
             // Given
-            Type unsupportedType = new Type() {};
+            Type unsupportedType = new Type() {
+            };
 
             // When & Then
             assertThatExceptionOfType(IllegalArgumentException.class)
                     .isThrownBy(() -> TypeEncoder.typeToReflectionClassString(unsupportedType))
                     .withMessage("Unsupported type: " + unsupportedType);
-        }
-    }
-
-    private static class DummyClass {
-        public DummyClass(String s) {
         }
     }
 }
