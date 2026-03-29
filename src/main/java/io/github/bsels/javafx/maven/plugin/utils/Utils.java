@@ -160,14 +160,13 @@ public final class Utils {
     /// @return a new string with the common leading whitespace removed from all non-blank lines. Blank lines will remain unaltered.
     public static String stripIndentNonBlankLines(String text) {
         int firstNonWhitespace = text.lines()
-                .filter(Predicate.not(String::isBlank))
                 .mapToInt(line -> {
                     int length = line.length();
                     int i = 0;
                     while (i < length && Character.isWhitespace(line.charAt(i))) {
                         i++;
                     }
-                    return i;
+                    return i == length ? Integer.MAX_VALUE : i;
                 })
                 .min()
                 .orElse(Integer.MAX_VALUE);
@@ -175,15 +174,12 @@ public final class Utils {
         return text.lines()
                 .dropWhile(String::isBlank)
                 .map(line -> {
-                    if (line.isBlank()) {
-                        return "";
-                    } else {
-                        int lastNonWhitespace = line.length() - 1;
-                        while (lastNonWhitespace >= 0 && Character.isWhitespace(line.charAt(lastNonWhitespace))) {
-                            lastNonWhitespace--;
-                        }
-                        return line.substring(firstNonWhitespace, lastNonWhitespace + 1);
+                    int lastNonWhitespace = line.length() - 1;
+                    while (lastNonWhitespace >= 0 && Character.isWhitespace(line.charAt(lastNonWhitespace))) {
+                        lastNonWhitespace--;
                     }
+                    lastNonWhitespace++;
+                    return line.substring(Math.min(firstNonWhitespace, lastNonWhitespace), lastNonWhitespace);
                 })
                 .gather(Utils.dropBlankLinesAtEnd())
                 .collect(Collectors.joining("\n", "", "\n"));
@@ -464,8 +460,10 @@ public final class Utils {
     /// type argument at the given index.
     ///
     /// The logic:
-    /// 1. If the class itself is the target interface, returns [Object] since no type arguments are available for a raw type.
-    /// 2. Searches all generic interfaces of the class; if one is a [ParameterizedType] with raw type of the target interface,
+    /// 1. If the class itself is the target,
+    ///    the interface returns [Object] since no type arguments are available for a raw type.
+    /// 2. Searches all generic interfaces of the class;
+    ///    if one is a [ParameterizedType] with a raw type of the target interface,
     ///    extracts the type argument at the specified index and returns its raw class.
     /// 3. Recursively searches superclass and non-parameterized interfaces.
     /// 4. Returns [Object] if the target interface is not found in the hierarchy.
@@ -475,10 +473,7 @@ public final class Utils {
     /// @param typeArgumentIndex the index of the type argument to extract
     /// @return the raw [Class] of the extracted type argument, or [Object] if it cannot be determined
     private static Class<?> findGenericTypeFromHierarchy(Class<?> clazz, Class<?> targetInterface, int typeArgumentIndex) {
-        if (clazz == null || clazz == Object.class) {
-            return Object.class;
-        }
-        if (clazz == targetInterface) {
+        if (clazz == null || clazz == Object.class || clazz == targetInterface) {
             return Object.class;
         }
         for (Type genericInterface : clazz.getGenericInterfaces()) {
