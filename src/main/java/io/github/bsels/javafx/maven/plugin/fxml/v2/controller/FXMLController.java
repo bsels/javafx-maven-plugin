@@ -1,5 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.controller;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
+
 import java.util.List;
 import java.util.Objects;
 
@@ -12,7 +14,7 @@ import java.util.Objects;
 /// @param fields          The list of fields in the controller class that are relevant to FXML.
 /// @param methods         The list of methods in the controller class that are relevant to FXML.
 public record FXMLController(
-        Class<?> controllerClass,
+        FXMLClassType controllerClass,
         List<FXMLControllerField> fields,
         List<FXMLControllerMethod> methods
 ) {

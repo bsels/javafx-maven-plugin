@@ -1,5 +1,6 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.properties;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLLiteral;
@@ -51,33 +52,58 @@ class FXMLPropertyTest {
         void shouldCreateWithValidParams() {
             FXMLStaticObjectProperty prop = new FXMLStaticObjectProperty(
                     "name",
-                    String.class,
+                    new FXMLClassType(String.class),
                     "setProp",
                     stringType,
                     literalValue
             );
-            assertThat(prop.name()).isEqualTo("name");
-            assertThat(prop.clazz()).isEqualTo(String.class);
-            assertThat(prop.setter()).isEqualTo("setProp");
-            assertThat(prop.type()).isEqualTo(stringType);
-            assertThat(prop.value()).isEqualTo(literalValue);
+            assertThat(prop)
+                    .hasFieldOrPropertyWithValue("name", "name")
+                    .hasFieldOrPropertyWithValue("clazz", new FXMLClassType(String.class))
+                    .hasFieldOrPropertyWithValue("setter", "setProp")
+                    .hasFieldOrPropertyWithValue("type", stringType)
+                    .hasFieldOrPropertyWithValue("value", literalValue);
         }
 
         @Test
         void shouldThrowNpeForNull() {
-            assertThatThrownBy(() -> new FXMLStaticObjectProperty(null, String.class, "s", stringType, literalValue))
+            assertThatThrownBy(() -> new FXMLStaticObjectProperty(
+                    null,
+                    new FXMLClassType(String.class),
+                    "s",
+                    stringType,
+                    literalValue
+            ))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`name` must not be null");
             assertThatThrownBy(() -> new FXMLStaticObjectProperty("n", null, "s", stringType, literalValue))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`clazz` must not be null");
-            assertThatThrownBy(() -> new FXMLStaticObjectProperty("n", String.class, null, stringType, literalValue))
+            assertThatThrownBy(() -> new FXMLStaticObjectProperty(
+                    "n",
+                    new FXMLClassType(String.class),
+                    null,
+                    stringType,
+                    literalValue
+            ))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`setter` must not be null");
-            assertThatThrownBy(() -> new FXMLStaticObjectProperty("n", String.class, "s", null, literalValue))
+            assertThatThrownBy(() -> new FXMLStaticObjectProperty(
+                    "n",
+                    new FXMLClassType(String.class),
+                    "s",
+                    null,
+                    literalValue
+            ))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`type` must not be null");
-            assertThatThrownBy(() -> new FXMLStaticObjectProperty("n", String.class, "s", stringType, null))
+            assertThatThrownBy(() -> new FXMLStaticObjectProperty(
+                    "n",
+                    new FXMLClassType(String.class),
+                    "s",
+                    stringType,
+                    null
+            ))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`value` must not be null");
         }

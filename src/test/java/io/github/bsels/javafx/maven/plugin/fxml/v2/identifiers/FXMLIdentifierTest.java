@@ -1,5 +1,6 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -109,9 +110,10 @@ class FXMLIdentifierTest {
     class FXMLFactoryMethodTest {
         @Test
         void shouldCreateWithValidParams() {
-            FXMLFactoryMethod fm = new FXMLFactoryMethod(String.class, "valueOf");
-            assertThat(fm.clazz()).isEqualTo(String.class);
-            assertThat(fm.method()).isEqualTo("valueOf");
+            FXMLFactoryMethod fm = new FXMLFactoryMethod(new FXMLClassType(String.class), "valueOf");
+            assertThat(fm)
+                    .hasFieldOrPropertyWithValue("clazz", new FXMLClassType(String.class))
+                    .hasFieldOrPropertyWithValue("method", "valueOf");
         }
 
         @Test
@@ -119,7 +121,7 @@ class FXMLIdentifierTest {
             assertThatThrownBy(() -> new FXMLFactoryMethod(null, "method"))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`clazz` cannot be null");
-            assertThatThrownBy(() -> new FXMLFactoryMethod(String.class, null))
+            assertThatThrownBy(() -> new FXMLFactoryMethod(new FXMLClassType(String.class), null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`method` cannot be null");
         }
@@ -127,7 +129,7 @@ class FXMLIdentifierTest {
         @ParameterizedTest
         @ValueSource(strings = {"", "1invalid", "invalid-name"})
         void shouldThrowIaeForInvalidMethodName(String method) {
-            assertThatThrownBy(() -> new FXMLFactoryMethod(String.class, method))
+            assertThatThrownBy(() -> new FXMLFactoryMethod(new FXMLClassType(String.class), method))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("must be a valid Java identifier");
         }

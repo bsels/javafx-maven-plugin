@@ -1,6 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLUtils;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 
 import java.util.Objects;
 
@@ -11,7 +12,7 @@ import java.util.Objects;
 ///
 /// @param clazz  The class that defines the factory method.
 /// @param method The name of the factory method.
-public record FXMLFactoryMethod(Class<?> clazz, String method) {
+public record FXMLFactoryMethod(FXMLClassType clazz, String method) {
     /// Constructs an [FXMLFactoryMethod] instance.
     ///
     /// The constructor validates that both [#clazz] and [#method] are non-null and that

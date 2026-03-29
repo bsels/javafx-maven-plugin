@@ -1,6 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLUtils;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 
 import java.util.Objects;
@@ -10,7 +11,7 @@ import java.util.Objects;
 /// @param clazz        The class defining the constant.
 /// @param identifier   The constant identifier.
 /// @param constantType The type of the constant.
-public record FXMLConstant(Class<?> clazz, String identifier, FXMLType constantType) implements AbstractFXMLValue {
+public record FXMLConstant(FXMLClassType clazz, String identifier, FXMLType constantType) implements AbstractFXMLValue {
     /// Compact constructor to validate the constant components.
     ///
     /// @param clazz        The class defining the constant.

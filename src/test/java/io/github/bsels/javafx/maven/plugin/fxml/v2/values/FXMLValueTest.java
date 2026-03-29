@@ -3,6 +3,7 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.values;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -180,7 +181,14 @@ class FXMLValueTest {
         @Test
         void shouldThrowIaeForNonMapGenericType() {
             FXMLType genericStringType = FXMLType.of(String.class, List.of(FXMLType.of(Integer.class)));
-            assertThatThrownBy(() -> new FXMLMap(id, genericStringType, String.class, String.class, noFactory, Map.of()))
+            assertThatThrownBy(() -> new FXMLMap(
+                    id,
+                    genericStringType,
+                    String.class,
+                    String.class,
+                    noFactory,
+                    Map.of()
+            ))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("must be a Map");
         }
@@ -190,11 +198,26 @@ class FXMLValueTest {
             FXMLType uncompiledClass = FXMLType.of("com.example.MyMap", List.of());
             FXMLType uncompiledGeneric = FXMLType.of("com.example.MyMap", List.of(FXMLType.of(String.class)));
             FXMLType wildcard = FXMLType.wildcard();
-            assertThat(new FXMLMap(id, uncompiledClass, Object.class, String.class, noFactory, Map.of()).type()).isEqualTo(
+            assertThat(new FXMLMap(
+                    id,
+                    uncompiledClass,
+                    Object.class,
+                    String.class,
+                    noFactory,
+                    Map.of()
+            ).type()).isEqualTo(
                     uncompiledClass);
-            assertThat(new FXMLMap(id, uncompiledGeneric, Object.class, String.class, noFactory, Map.of()).type()).isEqualTo(
+            assertThat(new FXMLMap(
+                    id,
+                    uncompiledGeneric,
+                    Object.class,
+                    String.class,
+                    noFactory,
+                    Map.of()
+            ).type()).isEqualTo(
                     uncompiledGeneric);
-            assertThat(new FXMLMap(id, wildcard, Object.class, String.class, noFactory, Map.of()).type()).isEqualTo(wildcard);
+            assertThat(new FXMLMap(id, wildcard, Object.class, String.class, noFactory, Map.of()).type()).isEqualTo(
+                    wildcard);
         }
     }
 
@@ -242,10 +265,11 @@ class FXMLValueTest {
     class FXMLConstantTest {
         @Test
         void shouldCreateWithValidParams() {
-            FXMLConstant con = new FXMLConstant(String.class, "id", stringType);
-            assertThat(con.clazz()).isEqualTo(String.class);
-            assertThat(con.identifier()).isEqualTo("id");
-            assertThat(con.constantType()).isEqualTo(stringType);
+            FXMLConstant con = new FXMLConstant(new FXMLClassType(String.class), "id", stringType);
+            assertThat(con)
+                    .hasFieldOrPropertyWithValue("clazz", new FXMLClassType(String.class))
+                    .hasFieldOrPropertyWithValue("identifier", "id")
+                    .hasFieldOrPropertyWithValue("constantType", stringType);
         }
 
         @Test
@@ -253,17 +277,17 @@ class FXMLValueTest {
             assertThatThrownBy(() -> new FXMLConstant(null, "id", stringType))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`clazz` must not be null");
-            assertThatThrownBy(() -> new FXMLConstant(String.class, null, stringType))
+            assertThatThrownBy(() -> new FXMLConstant(new FXMLClassType(String.class), null, stringType))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`identifier` must not be null");
-            assertThatThrownBy(() -> new FXMLConstant(String.class, "id", null))
+            assertThatThrownBy(() -> new FXMLConstant(new FXMLClassType(String.class), "id", null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`constantType` must not be null");
         }
 
         @Test
         void shouldThrowIaeForInvalidIdentifier() {
-            assertThatThrownBy(() -> new FXMLConstant(String.class, "1invalid", stringType))
+            assertThatThrownBy(() -> new FXMLConstant(new FXMLClassType(String.class), "1invalid", stringType))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("`identifier` must be a valid Java identifier");
         }

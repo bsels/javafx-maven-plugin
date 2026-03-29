@@ -971,7 +971,7 @@ class FXMLDocumentParserHelperTest {
         void validControllerIntrospectedCorrectly() {
             assertThat(helper.introspectControllerClass(ValidController.class, buildContext))
                     .isNotNull()
-                    .hasFieldOrPropertyWithValue("controllerClass", ValidController.class)
+                    .hasFieldOrPropertyWithValue("controllerClass", new FXMLClassType(ValidController.class))
                     .satisfies(controller -> {
                         assertThat(controller.fields())
                                 .extracting(FXMLControllerField::name, FXMLControllerField::visibility)

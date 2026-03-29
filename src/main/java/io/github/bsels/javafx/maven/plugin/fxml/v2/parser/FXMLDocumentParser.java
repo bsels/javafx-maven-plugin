@@ -17,6 +17,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticObjectPr
 import io.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLFileScript;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLScript;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLSourceScript;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
@@ -172,7 +173,6 @@ public final class FXMLDocumentParser {
                 root,
                 controller,
                 parsedFXML.scriptNamespace(),
-                buildContext.imports(),
                 buildContext.definitions(),
                 buildContext.scripts()
         );
@@ -259,7 +259,7 @@ public final class FXMLDocumentParser {
         Class<?> clazz = classAndIdentifier.clazz();
         String factoryMethodName = properties.get(FXMLConstants.FX_FACTORY_ATTRIBUTE);
         Optional<FXMLFactoryMethod> factoryMethod = Optional.ofNullable(factoryMethodName)
-                .map(method -> new FXMLFactoryMethod(clazz, method));
+                .map(method -> new FXMLFactoryMethod(new FXMLClassType(clazz), method));
 
         Type actualType = clazz;
         if (factoryMethodName != null) {
@@ -555,7 +555,7 @@ public final class FXMLDocumentParser {
                     FXMLUtils.resolveConstantType(clazz, constantName),
                     buildContext
             );
-            return Optional.of(new FXMLConstant(clazz, constantName, constantType));
+            return Optional.of(new FXMLConstant(new FXMLClassType(clazz), constantName, constantType));
         }
         if (properties.containsKey(FXMLConstants.FX_VALUE_ATTRIBUTE)) {
             String value = properties.get(FXMLConstants.FX_VALUE_ATTRIBUTE);
@@ -891,7 +891,7 @@ public final class FXMLDocumentParser {
             return helper.findStaticSetter(buildContext, name)
                     .map(staticSetter -> new FXMLStaticObjectProperty(
                             staticSetter.name(),
-                            staticSetter.staticClass(),
+                            new FXMLClassType(staticSetter.staticClass()),
                             staticSetter.setter(),
                             staticSetter.fxmlType(),
                             valueProcessor.apply(staticSetter.fxmlType(), value)

@@ -444,7 +444,7 @@ final class FXMLDocumentParserHelper {
                 .gather(Utils.unique())
                 .map(method -> createFXMLControllerMethod(buildContext, method))
                 .toList();
-        return new FXMLController(clazz, fields, methods);
+        return new FXMLController(new FXMLClassType(clazz), fields, methods);
     }
 
     /// Creates an instance of [FXMLControllerMethod] based on the provided build context and method.

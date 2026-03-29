@@ -259,10 +259,7 @@ public class FXMLDocumentParserTest {
                                                                     }
                                                                     """
                                                     )
-                                    ),
-                            doc -> assertThat(doc.imports())
-                                    .hasSize(2)
-                                    .containsExactly("javafx.scene.control.*", "javafx.scene.layout.*")
+                                    )
                     )
                     // Validate root
                     .extracting(FXMLDocument::root)
@@ -349,10 +346,7 @@ public class FXMLDocumentParserTest {
                                                     .isInstanceOf(FXMLFileScript.class)
                                                     .hasFieldOrPropertyWithValue("path", "/examples/example.js")
                                                     .hasFieldOrPropertyWithValue("charset", StandardCharsets.UTF_8)
-                                    ),
-                            doc -> assertThat(doc.imports())
-                                    .hasSize(2)
-                                    .containsExactly("javafx.scene.control.Button", "javafx.scene.layout.VBox")
+                                    )
                     )
                     // Validate root
                     .extracting(FXMLDocument::root)
@@ -433,15 +427,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
-                    .satisfies(
-                            doc -> assertThat(doc.imports())
-                                    .hasSize(3)
-                                    .containsExactly(
-                                            "javafx.scene.control.Button",
-                                            "javafx.scene.control.Separator",
-                                            "javafx.scene.layout.VBox"
-                                    )
-                    )
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLObject.class)
@@ -530,11 +515,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
-                    .satisfies(
-                            doc -> assertThat(doc.imports())
-                                    .hasSize(2)
-                                    .containsExactly("java.lang.String", "java.util.HashMap")
-                    )
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLMap.class)
@@ -615,13 +595,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
                     .satisfies(
-                            doc -> assertThat(doc.imports())
-                                    .hasSize(3)
-                                    .containsExactly(
-                                            "javafx.collections.FXCollections",
-                                            "java.lang.Object",
-                                            "java.lang.String"
-                                    ),
                             doc -> assertThat(doc.root())
                                     .isInstanceOf(FXMLObject.class)
                                     .extracting(FXMLObject.class::cast)
@@ -643,7 +616,7 @@ public class FXMLDocumentParserTest {
                                     .hasFieldOrPropertyWithValue(
                                             "factoryMethod",
                                             Optional.of(new FXMLFactoryMethod(
-                                                    FXCollections.class,
+                                                    new FXMLClassType(FXCollections.class),
                                                     "observableArrayList"
                                             ))
                                     )
@@ -706,13 +679,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
                     .satisfies(
-                            doc -> assertThat(doc.imports())
-                                    .hasSize(3)
-                                    .containsExactlyInAnyOrder(
-                                            "javafx.scene.paint.Color",
-                                            "java.lang.Object",
-                                            "java.lang.Double"
-                                    ),
                             doc -> assertThat(doc.root())
                                     .isInstanceOf(FXMLObject.class)
                                     .extracting(FXMLObject.class::cast)
@@ -914,7 +880,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
-                    .hasFieldOrPropertyWithValue("imports", List.of("javafx.scene.layout.VBox"))
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLObject.class)
@@ -965,7 +930,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
-                    .hasFieldOrPropertyWithValue("imports", List.of("javafx.scene.layout.BorderPane"))
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLObject.class)
@@ -1000,11 +964,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
-                    .satisfies(
-                            doc -> assertThat(doc.imports())
-                                    .hasSize(2)
-                                    .containsExactlyInAnyOrder("javafx.scene.control.Button", "java.lang.Double")
-                    )
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLObject.class)
@@ -1022,7 +981,7 @@ public class FXMLDocumentParserTest {
                     .extracting("value")
                     .isInstanceOf(FXMLConstant.class)
                     .extracting(FXMLConstant.class::cast)
-                    .hasFieldOrPropertyWithValue("clazz", Double.class)
+                    .hasFieldOrPropertyWithValue("clazz", new FXMLClassType(Double.class))
                     .hasFieldOrPropertyWithValue("identifier", "NEGATIVE_INFINITY")
                     .hasFieldOrPropertyWithValue("constantType", new FXMLClassType(double.class));
         }
@@ -1045,14 +1004,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
-                    .satisfies(
-                            doc -> assertThat(doc.imports())
-                                    .hasSize(2)
-                                    .containsExactly(
-                                            "javafx.scene.control.Label",
-                                            "javafx.scene.layout.GridPane"
-                                    )
-                    )
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLObject.class)
@@ -1101,14 +1052,14 @@ public class FXMLDocumentParserTest {
                             second -> assertThat(second)
                                     .isInstanceOf(FXMLStaticObjectProperty.class)
                                     .hasFieldOrPropertyWithValue("name", "rowIndex")
-                                    .hasFieldOrPropertyWithValue("clazz", GridPane.class)
+                                    .hasFieldOrPropertyWithValue("clazz", new FXMLClassType(GridPane.class))
                                     .hasFieldOrPropertyWithValue("setter", "setRowIndex")
                                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(Integer.class))
                                     .hasFieldOrPropertyWithValue("value", new FXMLLiteral("0")),
                             third -> assertThat(third)
                                     .isInstanceOf(FXMLStaticObjectProperty.class)
                                     .hasFieldOrPropertyWithValue("name", "columnIndex")
-                                    .hasFieldOrPropertyWithValue("clazz", GridPane.class)
+                                    .hasFieldOrPropertyWithValue("clazz", new FXMLClassType(GridPane.class))
                                     .hasFieldOrPropertyWithValue("setter", "setColumnIndex")
                                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(Integer.class))
                                     .hasFieldOrPropertyWithValue("value", new FXMLLiteral("0"))
@@ -1132,15 +1083,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
-                    .satisfies(
-                            doc -> assertThat(doc.imports())
-                                    .hasSize(3)
-                                    .containsExactly(
-                                            "javafx.scene.control.Label",
-                                            "javafx.scene.layout.GridPane",
-                                            "java.lang.Integer"
-                                    )
-                    )
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLObject.class)
@@ -1190,7 +1132,7 @@ public class FXMLDocumentParserTest {
                                     .isInstanceOf(FXMLStaticObjectProperty.class)
                                     .extracting(FXMLStaticObjectProperty.class::cast)
                                     .hasFieldOrPropertyWithValue("name", "rowIndex")
-                                    .hasFieldOrPropertyWithValue("clazz", GridPane.class)
+                                    .hasFieldOrPropertyWithValue("clazz", new FXMLClassType(GridPane.class))
                                     .hasFieldOrPropertyWithValue("setter", "setRowIndex")
                                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(Integer.class))
                                     .extracting(FXMLStaticObjectProperty::value)
@@ -1206,7 +1148,7 @@ public class FXMLDocumentParserTest {
                                     .isInstanceOf(FXMLStaticObjectProperty.class)
                                     .extracting(FXMLStaticObjectProperty.class::cast)
                                     .hasFieldOrPropertyWithValue("name", "columnIndex")
-                                    .hasFieldOrPropertyWithValue("clazz", GridPane.class)
+                                    .hasFieldOrPropertyWithValue("clazz", new FXMLClassType(GridPane.class))
                                     .hasFieldOrPropertyWithValue("setter", "setColumnIndex")
                                     .hasFieldOrPropertyWithValue("type", new FXMLClassType(Integer.class))
                                     .extracting(FXMLStaticObjectProperty::value)
@@ -1238,14 +1180,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
-                    .satisfies(
-                            doc -> assertThat(doc.imports())
-                                    .hasSize(2)
-                                    .containsExactly(
-                                            "javafx.scene.image.Image",
-                                            "javafx.scene.image.ImageView"
-                                    )
-                    )
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLObject.class)
@@ -1298,15 +1232,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
-                    .satisfies(
-                            doc -> assertThat(doc.imports())
-                                    .hasSize(3)
-                                    .containsExactly(
-                                            "javafx.scene.control.Button",
-                                            "javafx.scene.layout.VBox",
-                                            "java.lang.String"
-                                    )
-                    )
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLObject.class)
@@ -1431,7 +1356,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
-                    .hasFieldOrPropertyWithValue("imports", List.of("javafx.scene.control.Button"))
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLObject.class)
@@ -1474,7 +1398,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
-                    .hasFieldOrPropertyWithValue("imports", List.of("javafx.scene.control.TableView"))
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLObject.class)
@@ -1508,15 +1431,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
-                    .satisfies(
-                            doc -> assertThat(doc.imports())
-                                    .hasSize(3)
-                                    .containsExactlyInAnyOrder(
-                                            "javafx.scene.control.TableView",
-                                            "javafx.collections.FXCollections",
-                                            "java.lang.String"
-                                    )
-                    )
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLObject.class)
@@ -1553,7 +1467,7 @@ public class FXMLDocumentParserTest {
                     )
                     .hasFieldOrPropertyWithValue(
                             "factoryMethod", Optional.of(
-                                    new FXMLFactoryMethod(FXCollections.class, "observableArrayList")
+                                    new FXMLFactoryMethod(new FXMLClassType(FXCollections.class), "observableArrayList")
                             )
                     )
                     .extracting(FXMLCollection::values, LIST_VALUE_ASSERT_FACTORY)
@@ -1602,14 +1516,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
-                    .satisfies(
-                            doc -> assertThat(doc.imports())
-                                    .hasSize(2)
-                                    .containsExactlyInAnyOrder(
-                                            "io.github.bsels.javafx.maven.plugin.examples.MetaDataHolder",
-                                            "java.util.HashMap"
-                                    )
-                    )
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLObject.class)
@@ -1674,10 +1580,6 @@ public class FXMLDocumentParserTest {
                     .hasFieldOrPropertyWithValue("scriptEngine", Optional.empty())
                     .hasFieldOrPropertyWithValue("definitions", List.of())
                     .hasFieldOrPropertyWithValue("scripts", List.of())
-                    .hasFieldOrPropertyWithValue(
-                            "imports",
-                            List.of("io.github.bsels.javafx.maven.plugin.examples.Unsettable")
-                    )
                     // Validate root
                     .extracting(FXMLDocument::root)
                     .isInstanceOf(FXMLObject.class)

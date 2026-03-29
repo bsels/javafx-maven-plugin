@@ -4,6 +4,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLScript;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import io.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
@@ -169,7 +170,12 @@ class FXMLParserRecordsTest {
         @Test
         @DisplayName("Record should store values correctly")
         void recordShouldStoreValuesCorrectly() {
-            InternalStaticSetterProperty prop = new InternalStaticSetterProperty("prop", Object.class, "setProp", dummyType);
+            InternalStaticSetterProperty prop = new InternalStaticSetterProperty(
+                    "prop",
+                    Object.class,
+                    "setProp",
+                    dummyType
+            );
 
             assertThat(prop)
                     .hasFieldOrPropertyWithValue("name", "prop")
@@ -201,7 +207,12 @@ class FXMLParserRecordsTest {
         @Test
         @DisplayName("Record should store values correctly")
         void recordShouldStoreValuesCorrectly() {
-            ObjectProperty prop = new ObjectProperty(dummyType, "prop", Optional.of("getProp"), ObjectProperty.MethodType.GETTER);
+            ObjectProperty prop = new ObjectProperty(
+                    dummyType,
+                    "prop",
+                    Optional.of("getProp"),
+                    ObjectProperty.MethodType.GETTER
+            );
 
             assertThat(prop)
                     .hasFieldOrPropertyWithValue("type", dummyType)
@@ -240,7 +251,10 @@ class FXMLParserRecordsTest {
             ParsedXMLStructure structure = Mockito.mock(ParsedXMLStructure.class);
             BuildContext buildContext = new BuildContext(Collections.emptyList(), "/");
             ClassAndIdentifier ci = new ClassAndIdentifier(Object.class, dummyId);
-            Optional<FXMLFactoryMethod> factoryMethod = Optional.of(new FXMLFactoryMethod(Object.class, "valueOf"));
+            Optional<FXMLFactoryMethod> factoryMethod = Optional.of(new FXMLFactoryMethod(
+                    new FXMLClassType(Object.class),
+                    "valueOf"
+            ));
 
             ParseContext context = new ParseContext(structure, buildContext, ci, dummyType, factoryMethod);
 

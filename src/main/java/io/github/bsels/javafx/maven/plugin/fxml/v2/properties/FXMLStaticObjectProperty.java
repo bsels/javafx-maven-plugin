@@ -1,5 +1,6 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.properties;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 
@@ -14,7 +15,7 @@ import java.util.Objects;
 /// @param value  The property value.
 public record FXMLStaticObjectProperty(
         String name,
-        Class<?> clazz,
+        FXMLClassType clazz,
         String setter,
         FXMLType type,
         AbstractFXMLValue value
