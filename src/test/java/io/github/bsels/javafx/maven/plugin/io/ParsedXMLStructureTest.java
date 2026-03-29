@@ -29,7 +29,13 @@ class ParsedXMLStructureTest {
         // Given
         String name = "root";
         Map<String, String> properties = Map.of("attr", "val");
-        List<ParsedXMLStructure> children = List.of(new ParsedXMLStructure("child", Map.of(), List.of()));
+        List<ParsedXMLStructure> children = List.of(new ParsedXMLStructure(
+                "child",
+                Map.of(),
+                List.of(),
+                List.of(),
+                Optional.empty()
+        ));
         List<String> comments = List.of("comment");
         Optional<String> textValue = Optional.of("text");
 
@@ -51,11 +57,17 @@ class ParsedXMLStructureTest {
         // Given
         String name = "root";
         Map<String, String> properties = Map.of("attr", "val");
-        List<ParsedXMLStructure> children = List.of(new ParsedXMLStructure("child", Map.of(), List.of()));
+        List<ParsedXMLStructure> children = List.of(new ParsedXMLStructure(
+                "child",
+                Map.of(),
+                List.of(),
+                List.of(),
+                Optional.empty()
+        ));
         List<String> comments = List.of("comment");
 
         // When
-        ParsedXMLStructure structure = new ParsedXMLStructure(name, properties, children, comments);
+        ParsedXMLStructure structure = new ParsedXMLStructure(name, properties, children, comments, Optional.empty());
 
         // Then
         assertThat(structure)
@@ -72,10 +84,16 @@ class ParsedXMLStructureTest {
         // Given
         String name = "root";
         Map<String, String> properties = Map.of("attr", "val");
-        List<ParsedXMLStructure> children = List.of(new ParsedXMLStructure("child", Map.of(), List.of()));
+        List<ParsedXMLStructure> children = List.of(new ParsedXMLStructure(
+                "child",
+                Map.of(),
+                List.of(),
+                List.of(),
+                Optional.empty()
+        ));
 
         // When
-        ParsedXMLStructure structure = new ParsedXMLStructure(name, properties, children);
+        ParsedXMLStructure structure = new ParsedXMLStructure(name, properties, children, List.of(), Optional.empty());
 
         // Then
         assertThat(structure)
@@ -114,9 +132,27 @@ class ParsedXMLStructureTest {
     @Test
     void shouldBeEqualAndHaveSameHashCode() {
         // Given
-        ParsedXMLStructure structure1 = new ParsedXMLStructure("name", Map.of("key", "val"), List.of(), List.of("comment"), Optional.of("text"));
-        ParsedXMLStructure structure2 = new ParsedXMLStructure("name", Map.of("key", "val"), List.of(), List.of("comment"), Optional.of("text"));
-        ParsedXMLStructure structureDifferent = new ParsedXMLStructure("other", Map.of("key", "val"), List.of(), List.of("comment"), Optional.of("text"));
+        ParsedXMLStructure structure1 = new ParsedXMLStructure(
+                "name",
+                Map.of("key", "val"),
+                List.of(),
+                List.of("comment"),
+                Optional.of("text")
+        );
+        ParsedXMLStructure structure2 = new ParsedXMLStructure(
+                "name",
+                Map.of("key", "val"),
+                List.of(),
+                List.of("comment"),
+                Optional.of("text")
+        );
+        ParsedXMLStructure structureDifferent = new ParsedXMLStructure(
+                "other",
+                Map.of("key", "val"),
+                List.of(),
+                List.of("comment"),
+                Optional.of("text")
+        );
 
         // Then
         assertThat(structure1)
@@ -131,7 +167,13 @@ class ParsedXMLStructureTest {
     @Test
     void toStringShouldContainFields() {
         // Given
-        ParsedXMLStructure structure = new ParsedXMLStructure("name", Map.of("key", "val"), List.of(), List.of("comment"), Optional.of("text"));
+        ParsedXMLStructure structure = new ParsedXMLStructure(
+                "name",
+                Map.of("key", "val"),
+                List.of(),
+                List.of("comment"),
+                Optional.of("text")
+        );
 
         // Then
         assertThat(structure.toString())

@@ -759,7 +759,13 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a null `buildContext` throws [NullPointerException].
         @Test
         void nullBuildContextThrowsNullPointerException() {
-            ParsedXMLStructure structure = new ParsedXMLStructure("String", Map.of(), List.of());
+            ParsedXMLStructure structure = new ParsedXMLStructure(
+                    "String",
+                    Map.of(),
+                    List.of(),
+                    List.of(),
+                    Optional.empty()
+            );
             assertThatThrownBy(() -> helper.resolveClassAndIdentifier(structure, null, true))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("`buildContext` must not be null");
@@ -768,7 +774,13 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a root node without `fx:id` gets [FXMLRootIdentifier].
         @Test
         void rootNodeWithoutFxIdGetsRootIdentifier() {
-            ParsedXMLStructure structure = new ParsedXMLStructure("String", Map.of(), List.of());
+            ParsedXMLStructure structure = new ParsedXMLStructure(
+                    "String",
+                    Map.of(),
+                    List.of(),
+                    List.of(),
+                    Optional.empty()
+            );
             assertThat(helper.resolveClassAndIdentifier(structure, buildContext, true))
                     .hasFieldOrPropertyWithValue("identifier", FXMLRootIdentifier.INSTANCE)
                     .hasFieldOrPropertyWithValue("clazz", String.class);
@@ -779,7 +791,13 @@ class FXMLDocumentParserHelperTest {
         void rootNodeWithFxIdGetsNamedRootIdentifier() {
             Map<String, String> attrs = new HashMap<>();
             attrs.put(FXMLConstants.FX_ID_ATTRIBUTE, "rootId");
-            ParsedXMLStructure structure = new ParsedXMLStructure("String", attrs, List.of());
+            ParsedXMLStructure structure = new ParsedXMLStructure(
+                    "String",
+                    attrs,
+                    List.of(),
+                    List.of(),
+                    Optional.empty()
+            );
             assertThat(helper.resolveClassAndIdentifier(structure, buildContext, true))
                     .extracting(ClassAndIdentifier::identifier)
                     .isInstanceOf(FXMLNamedRootIdentifier.class);
@@ -790,7 +808,13 @@ class FXMLDocumentParserHelperTest {
         void nonRootNodeWithFxIdGetsExposedIdentifier() {
             Map<String, String> attrs = new HashMap<>();
             attrs.put(FXMLConstants.FX_ID_ATTRIBUTE, "myId");
-            ParsedXMLStructure structure = new ParsedXMLStructure("String", attrs, List.of());
+            ParsedXMLStructure structure = new ParsedXMLStructure(
+                    "String",
+                    attrs,
+                    List.of(),
+                    List.of(),
+                    Optional.empty()
+            );
             assertThat(helper.resolveClassAndIdentifier(structure, buildContext, false))
                     .extracting(ClassAndIdentifier::identifier)
                     .isInstanceOf(FXMLExposedIdentifier.class);
@@ -799,7 +823,13 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a non-root node without `fx:id` gets [FXMLInternalIdentifier].
         @Test
         void nonRootNodeWithoutFxIdGetsInternalIdentifier() {
-            ParsedXMLStructure structure = new ParsedXMLStructure("String", Map.of(), List.of());
+            ParsedXMLStructure structure = new ParsedXMLStructure(
+                    "String",
+                    Map.of(),
+                    List.of(),
+                    List.of(),
+                    Optional.empty()
+            );
             assertThat(helper.resolveClassAndIdentifier(structure, buildContext, false))
                     .extracting(ClassAndIdentifier::identifier)
                     .isInstanceOf(FXMLInternalIdentifier.class);
@@ -808,7 +838,13 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that an unresolvable class name throws an exception.
         @Test
         void unresolvableClassNameThrowsException() {
-            ParsedXMLStructure structure = new ParsedXMLStructure("UnknownClass", Map.of(), List.of());
+            ParsedXMLStructure structure = new ParsedXMLStructure(
+                    "UnknownClass",
+                    Map.of(),
+                    List.of(),
+                    List.of(),
+                    Optional.empty()
+            );
             assertThatThrownBy(() -> helper.resolveClassAndIdentifier(structure, buildContext, false))
                     .isInstanceOf(Exception.class);
         }
@@ -833,7 +869,13 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a structure without a charset attribute returns the default charset.
         @Test
         void structureWithoutCharsetReturnsDefaultCharset() {
-            assertThat(helper.getCharsetOfElement(new ParsedXMLStructure("element", Map.of(), List.of())))
+            assertThat(helper.getCharsetOfElement(new ParsedXMLStructure(
+                    "element",
+                    Map.of(),
+                    List.of(),
+                    List.of(),
+                    Optional.empty()
+            )))
                     .isEqualTo(StandardCharsets.UTF_8);
         }
 
@@ -842,7 +884,13 @@ class FXMLDocumentParserHelperTest {
         void structureWithCharsetAttributeReturnsSpecifiedCharset() {
             Map<String, String> props = new HashMap<>();
             props.put(FXMLConstants.CHARSET_ATTRIBUTE, "ISO-8859-1");
-            assertThat(helper.getCharsetOfElement(new ParsedXMLStructure("element", props, List.of())))
+            assertThat(helper.getCharsetOfElement(new ParsedXMLStructure(
+                    "element",
+                    props,
+                    List.of(),
+                    List.of(),
+                    Optional.empty()
+            )))
                     .isEqualTo(StandardCharsets.ISO_8859_1);
         }
 
@@ -851,7 +899,13 @@ class FXMLDocumentParserHelperTest {
         void defaultCharsetFromConstructorIsUsedWhenNoCharsetAttribute() {
             DefaultLog log = new DefaultLog(new ConsoleLogger());
             FXMLDocumentParserHelper helperWithLatin1 = new FXMLDocumentParserHelper(log, StandardCharsets.ISO_8859_1);
-            assertThat(helperWithLatin1.getCharsetOfElement(new ParsedXMLStructure("element", Map.of(), List.of())))
+            assertThat(helperWithLatin1.getCharsetOfElement(new ParsedXMLStructure(
+                    "element",
+                    Map.of(),
+                    List.of(),
+                    List.of(),
+                    Optional.empty()
+            )))
                     .isEqualTo(StandardCharsets.ISO_8859_1);
         }
     }
