@@ -2,7 +2,6 @@ package io.github.bsels.javafx.maven.plugin.utils;
 
 import javafx.beans.NamedArg;
 import javafx.scene.Node;
-import org.apache.maven.plugin.logging.Log;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -10,8 +9,6 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
-import java.lang.reflect.WildcardType;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -114,48 +111,6 @@ public final class Utils {
         return clazz;
     }
 
-    /// Searches for a method in the specified class by name and parameter type.
-    /// If the method is not found, the search continues recursively in the superclass of the parameter type.
-    ///
-    /// @param clazz         the class in which to search for the method
-    /// @param name          the name of the method to search for
-    /// @param parameterType the parameter type of the method to search for
-    /// @return an [Optional] containing the found method if present, or an empty [Optional] if no method is found
-    public static Optional<Method> findMethod(Class<?> clazz, String name, Class<?> parameterType) {
-        if (parameterType == null) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(clazz.getMethod(name, parameterType));
-        } catch (NoSuchMethodException _) {
-            return findMethod(clazz, name, parameterType.getSuperclass())
-                    .or(
-                            () -> Stream.of(clazz.getInterfaces())
-                                    .map(interfaceClass -> findMethod(clazz, name, interfaceClass))
-                                    .filter(Optional::isPresent)
-                                    .findFirst()
-                                    .flatMap(Function.identity())
-                    );
-        }
-    }
-
-    /// Checks if a static method with the specified name and parameter types exists in the given class.
-    ///
-    /// This method searches through all the public methods in the given class and verifies if a static
-    /// method matches the provided name, has the specified number and types of parameters.
-    ///
-    /// @param clazz          the class in which to search for the static method
-    /// @param methodName     the name of the method to search for
-    /// @param parameterTypes a list of parameter types expected for the method
-    /// @return true if a matching static method exists in the class, false otherwise
-    public static boolean checkIfStaticMethodExists(Class<?> clazz, String methodName, List<Class<?>> parameterTypes) {
-        return Stream.of(clazz.getMethods())
-                .filter(method -> methodName.equals(method.getName()))
-                .filter(method -> Modifier.isStatic(method.getModifiers()))
-                .filter(method -> method.getParameterCount() == parameterTypes.size())
-                .anyMatch(method -> validateParameters(parameterTypes, method));
-    }
-
     /// Returns a [Gatherer] instance that works with [Optional] values.
     /// This method is designed to handle Optional instances by facilitating operations on their contained
     /// values in a generic and type-safe manner.
@@ -187,10 +142,11 @@ public final class Utils {
     }
 
     /// Creates a Gatherer that collects unique items from a stream of input.
-    /// <t> represents the type of items being processed.
+    /// `<T>` represents the type of items being processed.
     /// The method uses a [HashSet] to ensure that each item is included only once pushed to the downstream.
     /// Duplicate items are discarded and downstream processing continues.
     ///
+    /// @param <T> the type of items to be processed
     /// @return a [Gatherer] instance that pushes unique items from the input stream to the downstream.
     public static <T> Gatherer<T, Set<T>, T> unique() {
         return Gatherer.ofSequential(
@@ -324,69 +280,6 @@ public final class Utils {
         return findTypeForName("java.lang.%s".formatted(typeName));
     }
 
-    /// Finds a getter method in the specified class that returns a list and determines the element type of the list.
-    ///
-    /// @param clazz          the class to inspect for the specified getter method
-    /// @param listGetterName the name of the getter method that returns a collection
-    /// @return the element type of the collection returned by the getter method
-    /// @throws NoSuchMethodException if the specified method does not exist, or if the method does not return a collection
-    public static Type findGetterListAndReturnElementType(Class<?> clazz, String listGetterName) throws NoSuchMethodException {
-        Method method = clazz.getMethod(listGetterName);
-        if (!Collection.class.isAssignableFrom(method.getReturnType())) {
-            throw new NoSuchMethodException("Not a collection getter: %s".formatted(listGetterName));
-        }
-        Type parameterType = method.getGenericReturnType();
-        if (parameterType instanceof ParameterizedType parameterizedType) {
-            if (parameterizedType.getActualTypeArguments().length == 1) {
-                Type type = parameterizedType.getActualTypeArguments()[0];
-                if (type instanceof WildcardType wildcardType) {
-                    return Stream.of(wildcardType.getLowerBounds())
-                            .findFirst()
-                            .or(() -> Stream.of(wildcardType.getUpperBounds()).findFirst())
-                            .orElse(type);
-                }
-                return type;
-            }
-        }
-        return Object.class;
-    }
-
-    /// Finds a getter method in the specified class that returns a map and determines the value type of the map.
-    ///
-    /// @param clazz         the class to inspect for the specified getter method
-    /// @param mapGetterName the name of the getter method that returns a map
-    /// @return the value type of the map returned by the getter method
-    /// @throws NoSuchMethodException if the specified method does not exist, or if the method does not return a map
-    public static Type findGetterMapAndReturnValueType(Class<?> clazz, String mapGetterName) throws NoSuchMethodException {
-        Method method = clazz.getMethod(mapGetterName);
-        if (!Map.class.isAssignableFrom(method.getReturnType())) {
-            throw new NoSuchMethodException("Not a map getter: %s".formatted(mapGetterName));
-        }
-        Type returnType = method.getGenericReturnType();
-        if (returnType instanceof ParameterizedType parameterizedType) {
-            Type[] typeArgs = parameterizedType.getActualTypeArguments();
-            if (typeArgs.length == 2) {
-                Type valueType = typeArgs[1];
-                if (valueType instanceof WildcardType wildcardType) {
-                    return Stream.of(wildcardType.getLowerBounds())
-                            .findFirst()
-                            .or(() -> Stream.of(wildcardType.getUpperBounds()).findFirst())
-                            .orElse(valueType);
-                }
-                return valueType;
-            }
-        }
-        return Object.class;
-    }
-
-    /// Returns a binary operator that always selects the first argument, ignoring the second argument.
-    ///
-    /// @param <T> the type of the operands and result of the operator
-    /// @return a binary operator that returns the first of its input arguments
-    public static <T> BinaryOperator<T> getFirstLambda() {
-        return (a, _) -> a;
-    }
-
     /// Returns a [BinaryOperator] that throws an [IllegalStateException] in case of duplicates.
     /// This method can be used as a merge function in collectors
     /// or other operations where duplicates are not permitted.
@@ -502,93 +395,6 @@ public final class Utils {
                 || variable.isAssignableFrom(expression);
     }
 
-    /// Searches and validates a getter method in the specified class that matches the provided identifier,
-    /// returns an allowed type, and is assignable from the given parameter type.
-    ///
-    /// @param clazz          the class to search within for the getter method
-    /// @param identifier     a descriptive identifier to be included in exception messages
-    /// @param listGetterName the name of the getter method to find
-    /// @param paramType      the parameter type to verify against the collection's generic type
-    /// @return the return type of the validated getter method
-    /// @throws NoSuchMethodException if the specified getter method does not exist in the class
-    /// @throws IllegalStateException if the method's return type is not a collection, or its generic type is incompatible with the given parameter type
-    public static Class<?> findCollectionGetterWithAllowedReturnType(
-            Class<?> clazz,
-            String identifier,
-            String listGetterName,
-            Class<?> paramType
-    ) throws NoSuchMethodException {
-        Method method = clazz.getMethod(listGetterName);
-        Class<?> returnType = method.getReturnType();
-        if (!Collection.class.isAssignableFrom(returnType)) {
-            throw new IllegalStateException("Unable to find list getter for %s".formatted(identifier));
-        }
-        Type listType = method.getGenericReturnType();
-        if (!(listType instanceof ParameterizedType parameterizedType)) {
-            throw new IllegalStateException("Unable to find list getter for %s".formatted(identifier));
-        }
-        Type listItemType = parameterizedType.getActualTypeArguments()[0];
-        if (
-                !(listItemType instanceof Class<?> listItemClass && listItemClass.isAssignableFrom(paramType)) &&
-                        !(listItemType instanceof ParameterizedType parameterizedType1
-                                && parameterizedType1.getRawType() instanceof Class<?> listItemClass1
-                                && listItemClass1.isAssignableFrom(paramType))
-        ) {
-            throw new IllegalStateException("Unable to find list getter for %s".formatted(identifier));
-        }
-        return returnType;
-    }
-
-    /// Enhances the import statements based on the provided parameter list by streamlining or
-    /// modifying the imports used in the context.
-    ///
-    /// @param parameters a list of fully qualified class names representing parameters that influence the imports; the contents of this list will be modified
-    /// @param imports    a collection of fully qualified class names representing the current imports to be updated and maintained based on the parameters
-    public static void improveImportsForParameters(List<String> parameters, Collection<String> imports) {
-        parameters.replaceAll(s -> improveImportForParameter(imports, s));
-    }
-
-    /// Improves the import management for a given parameter by modifying the import set and
-    /// potentially simplifying the parameter's representation.
-    ///
-    /// @param imports   a collection of fully qualified class names representing the current imports
-    /// @param parameter the fully qualified class name of the parameter to be processed
-    /// @return a simplified class name if the parameter can be reduced using the import set, otherwise the original fully qualified class name of the parameter
-    public static String improveImportForParameter(Collection<String> imports, String parameter) {
-        String simpleName = parameter.substring(parameter.lastIndexOf('.') + 1);
-        if (imports.contains(parameter)) {
-            return simpleName;
-        } else {
-            String classSuffix = "." + simpleName;
-            if (imports.stream().noneMatch(importClass -> importClass.endsWith(classSuffix))) {
-                imports.add(parameter);
-                return simpleName;
-            }
-        }
-        return parameter;
-    }
-
-    /// Returns a function mapping a [Type] to another [Type] based on the provided mapping of type parameter names to
-    /// types.
-    /// If the provided [Type] is a [TypeVariable], the function attempts to resolve it to a corresponding [Type] using
-    /// the given map.
-    /// For unresolvable or non-variable types, the original [Type] or [Object] is returned as a fallback.
-    ///
-    /// @param log                     a logging instance used for debugging and tracing type resolution
-    /// @param typeParameterNameToType a map containing type parameter names as keys and their corresponding [Type] objects as values
-    /// @return a [Function] that maps a [Type] to another [Type] based on the provided type mappings
-    public static Function<Type, Type> getTypeMapperFunction(Log log, Map<String, Type> typeParameterNameToType) {
-        return parameterType -> {
-            log.debug("Found parameter type %s of class %s".formatted(parameterType, parameterType.getClass()));
-            if (parameterType instanceof TypeVariable<?> typeVariable) {
-                log.debug("Found type variable %s".formatted(List.of(typeVariable.getAnnotatedBounds())));
-                return typeParameterNameToType.getOrDefault(typeVariable.getName(), Object.class);
-            } else {
-                return parameterType;
-            }
-        };
-    }
-
     /// Converts the path of a given [URL] into an OS-specific file path string.
     ///
     /// @param url the [URL] whose path is to be converted to an OS-specific file path string
@@ -638,6 +444,100 @@ public final class Utils {
         };
     }
 
+    /// Traverses the class hierarchy of the given class to find the [Collection] interface and extract its element type.
+    ///
+    /// The logic:
+    /// 1. If the class itself is [Collection], returns [Object] since no type arguments are available for a raw type.
+    /// 2. Searches all generic interfaces of the class; if one is a [ParameterizedType] with raw type [Collection],
+    ///    extracts the first type argument (`E`) and returns its raw class.
+    /// 3. Recursively searches superclass and non-parameterized interfaces.
+    /// 4. Returns [Object] if [Collection] is not found in the hierarchy.
+    ///
+    /// @param clazz The class to search.
+    /// @return The raw [Class] of the collection's element type, or [Object] if it cannot be determined.
+    public static Class<?> findCollectionValueTypeFromHierarchy(Class<?> clazz) {
+        return findGenericTypeFromHierarchy(clazz, Collection.class, 0);
+    }
+
+    /// Traverses the class hierarchy of the given class to find the [Map] interface and extract its key type.
+    ///
+    /// The logic:
+    /// 1. If the class itself is [Map], returns [Object] since no type arguments are available for a raw type.
+    /// 2. Searches all generic interfaces of the class; if one is a [ParameterizedType] with raw type [Map],
+    ///    extracts the first type argument (`K`) and returns its raw class.
+    /// 3. Recursively searches superclass and non-parameterized interfaces.
+    /// 4. Returns [Object] if [Map] is not found in the hierarchy.
+    ///
+    /// @param clazz The class to search.
+    /// @return The raw [Class] of the map's key type, or [Object] if it cannot be determined.
+    public static Class<?> findMapKeyTypeFromHierarchy(Class<?> clazz) {
+        return findGenericTypeFromHierarchy(clazz, Map.class, 0);
+    }
+
+    /// Traverses the class hierarchy of the given class to find the [Map] interface and extract its value type.
+    ///
+    /// The logic:
+    /// 1. If the class itself is [Map], returns [Object] since no type arguments are available for a raw type.
+    /// 2. Searches all generic interfaces of the class; if one is a [ParameterizedType] with raw type [Map],
+    ///    extracts the second type argument (`V`) and returns its raw class.
+    /// 3. Recursively searches superclass and non-parameterized interfaces.
+    /// 4. Returns [Object] if [Map] is not found in the hierarchy.
+    ///
+    /// @param clazz The class to search.
+    /// @return The raw [Class] of the map's value type, or [Object] if it cannot be determined.
+    public static Class<?> findMapValueTypeFromHierarchy(Class<?> clazz) {
+        return findGenericTypeFromHierarchy(clazz, Map.class, 1);
+    }
+
+    /// Traverses the class hierarchy of the given class to find the specified target interface and extract its
+    /// type argument at the given index.
+    ///
+    /// The logic:
+    /// 1. If the class itself is the target interface, returns [Object] since no type arguments are available for a raw type.
+    /// 2. Searches all generic interfaces of the class; if one is a [ParameterizedType] with raw type of the target interface,
+    ///    extracts the type argument at the specified index and returns its raw class.
+    /// 3. Recursively searches superclass and non-parameterized interfaces.
+    /// 4. Returns [Object] if the target interface is not found in the hierarchy.
+    ///
+    /// @param clazz             the class to search
+    /// @param targetInterface   the interface to look for in the hierarchy
+    /// @param typeArgumentIndex the index of the type argument to extract
+    /// @return the raw [Class] of the extracted type argument, or [Object] if it cannot be determined
+    private static Class<?> findGenericTypeFromHierarchy(Class<?> clazz, Class<?> targetInterface, int typeArgumentIndex) {
+        if (clazz == null || clazz == Object.class) {
+            return Object.class;
+        }
+        if (clazz == targetInterface) {
+            return Object.class;
+        }
+        for (Type genericInterface : clazz.getGenericInterfaces()) {
+            if (genericInterface instanceof ParameterizedType pt && pt.getRawType() == targetInterface) {
+                Type typeArg = pt.getActualTypeArguments()[typeArgumentIndex];
+                if (typeArg instanceof Class<?> typeClass) {
+                    return typeClass;
+                }
+                return Object.class;
+            }
+        }
+        Class<?> superclass = clazz.getSuperclass();
+        if (superclass != null) {
+            Class<?> result = findGenericTypeFromHierarchy(superclass, targetInterface, typeArgumentIndex);
+            if (result != Object.class) {
+                return result;
+            }
+        }
+        for (Type genericInterface : clazz.getGenericInterfaces()) {
+            Class<?> ifaceClass = genericInterface instanceof ParameterizedType pt
+                    ? (Class<?>) pt.getRawType()
+                    : (Class<?>) genericInterface;
+            Class<?> result = findGenericTypeFromHierarchy(ifaceClass, targetInterface, typeArgumentIndex);
+            if (result != Object.class) {
+                return result;
+            }
+        }
+        return Object.class;
+    }
+
     /// Creates a [BiConsumer] that collects matches of a given [Pattern] from strings into a list.
     ///
     /// @param pattern the regular expression pattern to match against input strings; must not be null
@@ -665,164 +565,11 @@ public final class Utils {
                 .and(method -> Modifier.isAbstract(method.getModifiers()));
     }
 
-    /// Validates whether the parameter types of the given method match the specified list of parameter types.
-    ///
-    /// @param parameterTypes the list of expected parameter types
-    /// @param method         the method whose parameter types are to be validated
-    /// @return true if the parameter types of the method match the specified list of parameter types, false otherwise
-    private static boolean validateParameters(List<Class<?>> parameterTypes, Method method) {
-        for (int i = 0; i < parameterTypes.size(); i++) {
-            Class<?> parameterType = method.getParameterTypes()[i];
-            if (!isAssignableFrom(parameterType, parameterTypes.get(i))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     /// Checks if the downstream is accepting items by evaluating whether it is not rejecting.
     ///
     /// @param downstream the downstream consumer whose acceptance status is to be checked
     /// @return a supplier that returns true if the downstream is accepting items, false otherwise
     private static Supplier<Boolean> isDownstreamAccepting(Gatherer.Downstream<?> downstream) {
         return () -> !downstream.isRejecting();
-    }
-
-    /// Traverses the class hierarchy of the given class to find the [Collection] interface and extract its element type.
-    ///
-    /// The logic:
-    /// 1. If the class itself is [Collection], returns [Object] since no type arguments are available for a raw type.
-    /// 2. Searches all generic interfaces of the class; if one is a [ParameterizedType] with raw type [Collection],
-    ///    extracts the first type argument (`E`) and returns its raw class.
-    /// 3. Recursively searches superclass and non-parameterized interfaces.
-    /// 4. Returns [Object] if [Collection] is not found in the hierarchy.
-    ///
-    /// @param clazz The class to search.
-    /// @return The raw [Class] of the collection's element type, or [Object] if it cannot be determined.
-    public static Class<?> findCollectionValueTypeFromHierarchy(Class<?> clazz) {
-        if (clazz == null || clazz == Object.class) {
-            return Object.class;
-        }
-        if (clazz == Collection.class) {
-            return Object.class;
-        }
-        for (Type genericInterface : clazz.getGenericInterfaces()) {
-            if (genericInterface instanceof ParameterizedType pt && pt.getRawType() == Collection.class) {
-                Type elementArg = pt.getActualTypeArguments()[0];
-                if (elementArg instanceof Class<?> elementClass) {
-                    return elementClass;
-                }
-                return Object.class;
-            }
-        }
-        Class<?> superclass = clazz.getSuperclass();
-        if (superclass != null) {
-            Class<?> result = findCollectionValueTypeFromHierarchy(superclass);
-            if (result != Object.class) {
-                return result;
-            }
-        }
-        for (Type genericInterface : clazz.getGenericInterfaces()) {
-            Class<?> ifaceClass = genericInterface instanceof ParameterizedType pt
-                    ? (Class<?>) pt.getRawType()
-                    : (Class<?>) genericInterface;
-            Class<?> result = findCollectionValueTypeFromHierarchy(ifaceClass);
-            if (result != Object.class) {
-                return result;
-            }
-        }
-        return Object.class;
-    }
-
-    /// Traverses the class hierarchy of the given class to find the [Map] interface and extract its key type.
-    ///
-    /// The logic:
-    /// 1. If the class itself is [Map], returns [Object] since no type arguments are available for a raw type.
-    /// 2. Searches all generic interfaces of the class; if one is a [ParameterizedType] with raw type [Map],
-    ///    extracts the first type argument (`K`) and returns its raw class.
-    /// 3. Recursively searches superclass and non-parameterized interfaces.
-    /// 4. Returns [Object] if [Map] is not found in the hierarchy.
-    ///
-    /// @param clazz The class to search.
-    /// @return The raw [Class] of the map's key type, or [Object] if it cannot be determined.
-    public static Class<?> findMapKeyTypeFromHierarchy(Class<?> clazz) {
-        if (clazz == null || clazz == Object.class) {
-            return Object.class;
-        }
-        if (clazz == Map.class) {
-            return Object.class;
-        }
-        for (Type genericInterface : clazz.getGenericInterfaces()) {
-            if (genericInterface instanceof ParameterizedType pt && pt.getRawType() == Map.class) {
-                Type keyArg = pt.getActualTypeArguments()[0];
-                if (keyArg instanceof Class<?> keyClass) {
-                    return keyClass;
-                }
-                return Object.class;
-            }
-        }
-        Class<?> superclass = clazz.getSuperclass();
-        if (superclass != null) {
-            Class<?> result = findMapKeyTypeFromHierarchy(superclass);
-            if (result != Object.class) {
-                return result;
-            }
-        }
-        for (Type genericInterface : clazz.getGenericInterfaces()) {
-            Class<?> ifaceClass = genericInterface instanceof ParameterizedType pt
-                    ? (Class<?>) pt.getRawType()
-                    : (Class<?>) genericInterface;
-            Class<?> result = findMapKeyTypeFromHierarchy(ifaceClass);
-            if (result != Object.class) {
-                return result;
-            }
-        }
-        return Object.class;
-    }
-
-    /// Traverses the class hierarchy of the given class to find the [Map] interface and extract its value type.
-    ///
-    /// The logic:
-    /// 1. If the class itself is [Map], returns [Object] since no type arguments are available for a raw type.
-    /// 2. Searches all generic interfaces of the class; if one is a [ParameterizedType] with raw type [Map],
-    ///    extracts the second type argument (`V`) and returns its raw class.
-    /// 3. Recursively searches superclass and non-parameterized interfaces.
-    /// 4. Returns [Object] if [Map] is not found in the hierarchy.
-    ///
-    /// @param clazz The class to search.
-    /// @return The raw [Class] of the map's value type, or [Object] if it cannot be determined.
-    public static Class<?> findMapValueTypeFromHierarchy(Class<?> clazz) {
-        if (clazz == null || clazz == Object.class) {
-            return Object.class;
-        }
-        if (clazz == Map.class) {
-            return Object.class;
-        }
-        for (Type genericInterface : clazz.getGenericInterfaces()) {
-            if (genericInterface instanceof ParameterizedType pt && pt.getRawType() == Map.class) {
-                Type valueArg = pt.getActualTypeArguments()[1];
-                if (valueArg instanceof Class<?> valueClass) {
-                    return valueClass;
-                }
-                return Object.class;
-            }
-        }
-        Class<?> superclass = clazz.getSuperclass();
-        if (superclass != null) {
-            Class<?> result = findMapValueTypeFromHierarchy(superclass);
-            if (result != Object.class) {
-                return result;
-            }
-        }
-        for (Type genericInterface : clazz.getGenericInterfaces()) {
-            Class<?> ifaceClass = genericInterface instanceof ParameterizedType pt
-                    ? (Class<?>) pt.getRawType()
-                    : (Class<?>) genericInterface;
-            Class<?> result = findMapValueTypeFromHierarchy(ifaceClass);
-            if (result != Object.class) {
-                return result;
-            }
-        }
-        return Object.class;
     }
 }
