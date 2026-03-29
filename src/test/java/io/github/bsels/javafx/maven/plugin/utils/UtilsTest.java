@@ -4,8 +4,6 @@ import javafx.beans.NamedArg;
 import javafx.scene.Node;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mockito;
 
 import java.lang.reflect.Method;
@@ -18,19 +16,12 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.AbstractList;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Predicate;
 import java.util.stream.Gatherer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -605,376 +596,6 @@ class UtilsTest {
     }
 
     @Nested
-    class IsAssignableFromTest {
-
-        @ParameterizedTest
-        @CsvSource({
-                // Primitive to wrapper (happy paths)
-                "int, java.lang.Integer",
-                "long, java.lang.Long",
-                "short, java.lang.Short",
-                "byte, java.lang.Byte",
-                "float, java.lang.Float",
-                "double, java.lang.Double",
-                "boolean, java.lang.Boolean",
-                "char, java.lang.Character",
-                // Wrapper to primitive (happy paths)
-                "java.lang.Integer, int",
-                "java.lang.Long, long",
-                "java.lang.Short, short",
-                "java.lang.Byte, byte",
-                "java.lang.Float, float",
-                "java.lang.Double, double",
-                "java.lang.Boolean, boolean",
-                "java.lang.Character, char",
-                // Primitive to primitive (same type)
-                "int, int",
-                "long, long",
-                "short, short",
-                "byte, byte",
-                "float, float",
-                "double, double",
-                "boolean, boolean",
-                "char, char",
-                // Wrapper to wrapper (same type)
-                "java.lang.Integer, java.lang.Integer",
-                "java.lang.Long, java.lang.Long",
-                "java.lang.Short, java.lang.Short",
-                "java.lang.Byte, java.lang.Byte",
-                "java.lang.Float, java.lang.Float",
-                "java.lang.Double, java.lang.Double",
-                "java.lang.Boolean, java.lang.Boolean",
-                "java.lang.Character, java.lang.Character",
-                // Standard class hierarchy (happy paths)
-                "java.lang.Object, java.lang.String",
-                "java.lang.Number, java.lang.Integer",
-                "java.lang.Number, java.lang.Double",
-                "java.util.Collection, java.util.List",
-                "java.util.List, java.util.ArrayList",
-                "java.lang.CharSequence, java.lang.String"
-        })
-        void shouldReturnTrueForAssignableTypes(String variableClassName, String expressionClassName) throws ClassNotFoundException {
-            // Given
-            Class<?> variable = getClassForName(variableClassName);
-            Class<?> expression = getClassForName(expressionClassName);
-
-            // When
-            boolean result = Utils.isAssignableFrom(variable, expression);
-
-            // Then
-            assertThat(result).isTrue();
-        }
-
-        @ParameterizedTest
-        @CsvSource({
-                // Primitive to different primitive (unhappy paths)
-                "int, long",
-                "int, short",
-                "int, byte",
-                "long, int",
-                "short, int",
-                "byte, int",
-                "float, double",
-                "double, float",
-                "boolean, int",
-                "int, boolean",
-                "char, int",
-                "int, char",
-                // Primitive to different wrapper (unhappy paths)
-                "int, java.lang.Long",
-                "int, java.lang.Short",
-                "int, java.lang.Byte",
-                "long, java.lang.Integer",
-                "short, java.lang.Integer",
-                "byte, java.lang.Integer",
-                "float, java.lang.Double",
-                "double, java.lang.Float",
-                "boolean, java.lang.Integer",
-                "char, java.lang.Integer",
-                // Wrapper to different primitive (unhappy paths)
-                "java.lang.Integer, long",
-                "java.lang.Integer, short",
-                "java.lang.Integer, byte",
-                "java.lang.Long, int",
-                "java.lang.Short, int",
-                "java.lang.Byte, int",
-                "java.lang.Float, double",
-                "java.lang.Double, float",
-                "java.lang.Boolean, int",
-                "java.lang.Character, int",
-                // Wrapper to different wrapper (unhappy paths)
-                "java.lang.Integer, java.lang.Long",
-                "java.lang.Integer, java.lang.Short",
-                "java.lang.Integer, java.lang.Byte",
-                "java.lang.Long, java.lang.Integer",
-                "java.lang.Short, java.lang.Integer",
-                "java.lang.Byte, java.lang.Integer",
-                "java.lang.Float, java.lang.Double",
-                "java.lang.Double, java.lang.Float",
-                "java.lang.Boolean, java.lang.Integer",
-                "java.lang.Character, java.lang.Integer",
-                // Incompatible class hierarchies (unhappy paths)
-                "java.lang.String, java.lang.Integer",
-                "java.lang.Integer, java.lang.String",
-                "java.util.List, java.util.Set",
-                "java.util.ArrayList, java.util.LinkedList",
-                "java.lang.Number, java.lang.String",
-                "java.lang.String, java.lang.Number"
-        })
-        void shouldReturnFalseForNonAssignableTypes(String variableClassName, String expressionClassName) throws ClassNotFoundException {
-            // Given
-            Class<?> variable = getClassForName(variableClassName);
-            Class<?> expression = getClassForName(expressionClassName);
-
-            // When
-            boolean result = Utils.isAssignableFrom(variable, expression);
-
-            // Then
-            assertThat(result).isFalse();
-        }
-
-        private Class<?> getClassForName(String className) throws ClassNotFoundException {
-            return switch (className) {
-                case "int" -> int.class;
-                case "long" -> long.class;
-                case "short" -> short.class;
-                case "byte" -> byte.class;
-                case "float" -> float.class;
-                case "double" -> double.class;
-                case "boolean" -> boolean.class;
-                case "char" -> char.class;
-                default -> Class.forName(className);
-            };
-        }
-    }
-
-    @Nested
-    class IsAssignableToTest {
-
-        @Test
-        void shouldReturnTrueWhenClassIsExactMatch() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(String.class);
-
-            // When
-            boolean result = predicate.test(String.class);
-
-            // Then
-            assertThat(result).isTrue();
-        }
-
-        @Test
-        void shouldReturnTrueWhenClassIsSubclass() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(Number.class);
-
-            // When
-            boolean result = predicate.test(Integer.class);
-
-            // Then
-            assertThat(result).isTrue();
-        }
-
-        @Test
-        void shouldReturnTrueWhenClassImplementsInterface() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(List.class);
-
-            // When
-            boolean result = predicate.test(ArrayList.class);
-
-            // Then
-            assertThat(result).isTrue();
-        }
-
-        @Test
-        void shouldReturnFalseWhenClassIsNotAssignable() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(String.class);
-
-            // When
-            boolean result = predicate.test(Integer.class);
-
-            // Then
-            assertThat(result).isFalse();
-        }
-
-        @Test
-        void shouldReturnTrueWhenClassMatchesAnyOfMultipleTargets() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(String.class, Number.class, List.class);
-
-            // When & Then
-            assertThat(predicate.test(String.class)).isTrue();
-            assertThat(predicate.test(Integer.class)).isTrue();  // Integer extends Number
-            assertThat(predicate.test(ArrayList.class)).isTrue(); // ArrayList implements List
-        }
-
-        @Test
-        void shouldReturnFalseWhenClassMatchesNoneOfMultipleTargets() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(String.class, Number.class);
-
-            // When
-            boolean result = predicate.test(Boolean.class);
-
-            // Then
-            assertThat(result).isFalse();
-        }
-
-        @Test
-        void shouldHandleInterfaceHierarchy() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(Collection.class);
-
-            // When & Then
-            assertThat(predicate.test(List.class)).isTrue();     // List extends Collection
-            assertThat(predicate.test(Set.class)).isTrue();      // Set extends Collection
-            assertThat(predicate.test(ArrayList.class)).isTrue(); // ArrayList implements List -> Collection
-            assertThat(predicate.test(HashSet.class)).isTrue();   // HashSet implements Set -> Collection
-        }
-
-        @Test
-        void shouldHandleClassHierarchy() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(Object.class);
-
-            // When & Then
-            assertThat(predicate.test(String.class)).isTrue();
-            assertThat(predicate.test(Integer.class)).isTrue();
-            assertThat(predicate.test(ArrayList.class)).isTrue();
-            assertThat(predicate.test(Object.class)).isTrue();
-        }
-
-        @Test
-        void shouldHandlePrimitiveTypes() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(int.class);
-
-            // When & Then
-            assertThat(predicate.test(int.class)).isTrue();
-            assertThat(predicate.test(Integer.class)).isTrue();
-        }
-
-        @Test
-        void shouldHandleWrapperTypes() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(Integer.class);
-
-            // When & Then
-            assertThat(predicate.test(Integer.class)).isTrue();
-            assertThat(predicate.test(Integer.class)).isTrue();
-        }
-
-        @Test
-        void shouldReturnFalseWhenNoTargetClassesProvided() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo();
-
-            // When
-            boolean result = predicate.test(String.class);
-
-            // Then
-            assertThat(result).isFalse();
-        }
-
-        @Test
-        void shouldHandleArrayTypes() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(Object[].class);
-
-            // When & Then
-            assertThat(predicate.test(String[].class)).isTrue();  // String[] is assignable to Object[]
-            assertThat(predicate.test(Integer[].class)).isTrue(); // Integer[] is assignable to Object[]
-            assertThat(predicate.test(int[].class)).isFalse();    // int[] is not assignable to Object[]
-        }
-
-        @Test
-        void shouldHandleComplexInheritanceChain() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(AbstractList.class);
-
-            // When & Then
-            assertThat(predicate.test(ArrayList.class)).isTrue();   // ArrayList extends AbstractList
-            assertThat(predicate.test(LinkedList.class)).isTrue();  // LinkedList extends AbstractList
-            assertThat(predicate.test(HashSet.class)).isFalse();    // HashSet does not extend AbstractList
-        }
-
-        @Test
-        void shouldWorkWithCustomInterfacesAndClasses() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(TestInterface.class, TestBaseClass.class);
-
-            // When & Then
-            assertThat(predicate.test(TestImplementation.class)).isTrue();   // Implements TestInterface
-            assertThat(predicate.test(TestSubClass.class)).isTrue();         // Extends TestBaseClass
-            assertThat(predicate.test(TestMultipleInheritance.class)).isTrue(); // Extends TestBaseClass and implements TestInterface
-            assertThat(predicate.test(String.class)).isFalse();              // Neither implements nor extends
-        }
-
-        @Test
-        void shouldHandleGenericTypes() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(Map.class);
-
-            // When & Then
-            assertThat(predicate.test(HashMap.class)).isTrue();
-            assertThat(predicate.test(TreeMap.class)).isTrue();
-            assertThat(predicate.test(ConcurrentHashMap.class)).isTrue();
-            assertThat(predicate.test(ArrayList.class)).isFalse();
-        }
-
-        @Test
-        void shouldBeReusableAndStateless() {
-            // Given
-            Predicate<Class<?>> predicate = Utils.isAssignableTo(Collection.class);
-
-            // When - Multiple uses of the same predicate
-            boolean result1 = predicate.test(ArrayList.class);
-            boolean result2 = predicate.test(String.class);
-            boolean result3 = predicate.test(HashSet.class);
-
-            // Then - Results should be consistent
-            assertThat(result1).isTrue();
-            assertThat(result2).isFalse();
-            assertThat(result3).isTrue();
-
-            // And using it again should give same results
-            assertThat(predicate.test(ArrayList.class)).isTrue();
-            assertThat(predicate.test(String.class)).isFalse();
-        }
-
-        // Helper interfaces and classes for testing
-        interface TestInterface {
-            void testMethod();
-        }
-
-        static class TestBaseClass {
-            protected String value;
-        }
-
-        static class TestImplementation implements TestInterface {
-            @Override
-            public void testMethod() {
-                // Implementation
-            }
-        }
-
-        static class TestSubClass extends TestBaseClass {
-            public TestSubClass() {
-                this.value = "subclass";
-            }
-        }
-
-        static class TestMultipleInheritance extends TestBaseClass implements TestInterface {
-            @Override
-            public void testMethod() {
-                // Implementation
-            }
-        }
-    }
-
-    @Nested
     class FindObjectSettersTest {
 
         @Test
@@ -1450,7 +1071,7 @@ class UtilsTest {
 
             // Then
             assertThat(result).hasSize(1);
-            Method method = result.get(0);
+            Method method = result.getFirst();
             assertThat(method.getParameterTypes()[1]).isEqualTo(List.class);
         }
 
@@ -1465,7 +1086,7 @@ class UtilsTest {
 
             // Then
             assertThat(result).hasSize(1);
-            Method method = result.get(0);
+            Method method = result.getFirst();
             assertThat(method.getParameterTypes()[1]).isEqualTo(int.class);
         }
 
@@ -1480,7 +1101,7 @@ class UtilsTest {
 
             // Then
             assertThat(result).hasSize(1);
-            Method method = result.get(0);
+            Method method = result.getFirst();
             assertThat(method.getParameterTypes()[1]).isEqualTo(String[].class);
         }
 
@@ -1495,7 +1116,7 @@ class UtilsTest {
 
             // Then
             assertThat(result).hasSize(1);
-            Method method = result.get(0);
+            Method method = result.getFirst();
             assertThat(method.getDeclaringClass()).isEqualTo(TestParentClassWithStaticSetters.class);
         }
 
@@ -1549,7 +1170,7 @@ class UtilsTest {
 
             // Then
             assertThat(result).hasSize(1);
-            Method method = result.get(0);
+            Method method = result.getFirst();
             assertThat(method.getName()).isEqualTo("setRowIndex");
             assertThat(method.getParameterCount()).isEqualTo(2);
             assertThat(Node.class.isAssignableFrom(method.getParameterTypes()[0])).isTrue();
@@ -1567,7 +1188,7 @@ class UtilsTest {
 
             // Then
             assertThat(result).hasSize(1);
-            Method method = result.get(0);
+            Method method = result.getFirst();
             assertThat(method.getName()).isEqualTo("setColumnIndex");
             assertThat(method.getParameterTypes()[1]).isEqualTo(Integer.class);
         }

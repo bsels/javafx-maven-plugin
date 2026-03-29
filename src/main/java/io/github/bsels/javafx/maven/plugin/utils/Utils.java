@@ -16,10 +16,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -47,19 +49,6 @@ public final class Utils {
             (_, typeName, downstream) -> findTypeForName(typeName)
                     .map(downstream::push)
                     .orElseGet(isDownstreamAccepting(downstream))
-    );
-    /// A constant list containing sets of primitive types and their corresponding wrapper classes.
-    /// Each set within the list groups a primitive type with its wrapper equivalent, facilitating lookups
-    /// or type comparisons where both primitive and wrapper representations are relevant.
-    private static final List<Set<Class<?>>> PRIMITIVE_TYPE_AND_WRAPPER = List.of(
-            Set.of(boolean.class, Boolean.class),
-            Set.of(byte.class, Byte.class),
-            Set.of(short.class, Short.class),
-            Set.of(int.class, Integer.class),
-            Set.of(long.class, Long.class),
-            Set.of(float.class, Float.class),
-            Set.of(double.class, Double.class),
-            Set.of(char.class, Character.class)
     );
 
     /// Utility class providing helper methods for generating method names based on field names.
@@ -124,18 +113,23 @@ public final class Utils {
         );
     }
 
-    /// Creates sequential [Gatherer] that collects elements into a list and then processes them in reverse order.
+    /// Creates a [Gatherer] that processes lines sequentially and removes blank lines at the end of a stream.
+    /// Blank lines in the middle of the stream are preserved.
     ///
-    /// @param <T> the type of elements to be processed
-    /// @return a [Gatherer] that accumulates elements into a list and outputs them in reverse order during downstream processing
-    public static <T> Gatherer<T, List<T>, T> reverse() {
+    /// @return a [Gatherer] that collects input strings into a queue, removing trailing blank lines at the end.
+    public static Gatherer<String, Queue<String>, String> dropBlankLinesAtEnd() {
         return Gatherer.ofSequential(
-                ArrayList::new,
-                (state, line, _) -> state.add(line),
-                (state, downstream) -> {
-                    int i = state.size() - 1;
-                    while (i >= 0 && downstream.push(state.get(i))) {
-                        i--;
+                LinkedList::new,
+                (state, line, downstream) -> {
+                    if (line == null || line.isBlank()) {
+                        return state.add(line);
+                    } else {
+                        while (!state.isEmpty()) {
+                            if (!downstream.push(state.remove())) {
+                                return false;
+                            }
+                        }
+                        return downstream.push(line);
                     }
                 }
         );
@@ -191,9 +185,7 @@ public final class Utils {
                         return line.substring(firstNonWhitespace, lastNonWhitespace + 1);
                     }
                 })
-                .gather(Utils.reverse())
-                .dropWhile(String::isBlank)
-                .gather(Utils.reverse())
+                .gather(Utils.dropBlankLinesAtEnd())
                 .collect(Collectors.joining("\n", "", "\n"));
     }
 
@@ -372,27 +364,6 @@ public final class Utils {
                 .filter(method -> getterName.equals(method.getName()))
                 .filter(method -> method.getParameterCount() == 0)
                 .findFirst();
-    }
-
-    /// Creates a predicate that checks if a given class is assignable to any of the specified target classes.
-    ///
-    /// @param classes the target classes to check assignability against
-    /// @return a predicate that evaluates whether a class is assignable to any of the given target classes
-    public static Predicate<Class<?>> isAssignableTo(Class<?>... classes) {
-        return predicateClass -> Stream.of(classes).anyMatch(clazz -> isAssignableFrom(clazz, predicateClass));
-    }
-
-    /// Checks if a class or interface represented by the `variable` parameter is either the same as or is a superclass
-    /// or superinterface of the class or interface represented by the `expression` parameter.
-    /// Additionally, it handles primitive and wrapper class compatibility.
-    ///
-    /// @param variable   the class or interface to be checked as the potential assignable target
-    /// @param expression the class or interface to be checked for assignability to `variable`
-    /// @return `true` if `expression` is assignable to `variable`, or if both belong to compatible primitive-wrapper pairs; otherwise `false`
-    public static boolean isAssignableFrom(Class<?> variable, Class<?> expression) {
-        return PRIMITIVE_TYPE_AND_WRAPPER.stream()
-                .anyMatch(classes -> classes.contains(variable) && classes.contains(expression))
-                || variable.isAssignableFrom(expression);
     }
 
     /// Converts the path of a given [URL] into an OS-specific file path string.
