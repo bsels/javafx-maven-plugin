@@ -33,21 +33,22 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLResource;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLTranslation;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.stream.Gatherer;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-/**
- * A helper class designed to assist in counting and managing FXML-related classes.
- * This class serves as a utility for performing operations related to FXML class counting.
- * It provides functionality for FXML class analysis and handling, such as analyzing FXML
- * documents, controller methods, and various FXML-related components.
- */
-final class FXMLClassCounterHelper {
+/// A helper class designed to assist in counting and managing FXML-related classes.
+/// This class serves as a utility for performing operations related to FXML class counting.
+/// It does not accept parameters in its constructor and provides functionality related to FXML class analysi
+///  and handling.
+final class FXMLSourceCodeBuilderImportHelper {
     /// Creates and returns a gatherer for aggregating class counts into a map and producing [ClassCount] objects
     /// for downstream processing.
     ///
@@ -67,7 +68,7 @@ final class FXMLClassCounterHelper {
     /// A helper class designed to assist in counting and managing FXML-related classes.
     /// This class serves as a utility for performing operations related to FXML class counting.
     /// It does not accept parameters in its constructor and provides functionality related to FXML class analysis and handling.
-    FXMLClassCounterHelper() {
+    FXMLSourceCodeBuilderImportHelper() {
     }
 
     /// Finds and returns a list of class counts derived from the provided FXML document.
@@ -75,9 +76,9 @@ final class FXMLClassCounterHelper {
     /// and definitions in the FXML document, sorts them in descending order of count, and then by class name.
     ///
     /// @param document the [FXMLDocument] to analyze; must not be null
-    /// @return a sorted list of [ClassCount] objects representing the count of occurrences for each class within the provided [FXMLDocument]
+    /// @return a list of [ClassCount] objects representing the count of occurrences for each class within the provided [FXMLDocument]
     /// @throws NullPointerException if the provided document is null
-    public List<ClassCount> findClassCounts(FXMLDocument document) {
+    public List<ClassCount> findClassCounts(FXMLDocument document) throws NullPointerException {
         Objects.requireNonNull(document, "`document` must not be null");
         return Stream.concat(
                         Stream.concat(
@@ -89,13 +90,110 @@ final class FXMLClassCounterHelper {
                         document.definitions()
                                 .stream()
                                 .flatMap(this::findAbstractFXMLValueClassCount)
-                ).gather(CLASS_COUNT_MERGER)
-                .sorted(
-                        Comparator.comparingInt(ClassCount::count)
-                                .reversed()
-                                .thenComparing(ClassCount::fullClassName)
                 )
+                .gather(CLASS_COUNT_MERGER)
                 .toList();
+    }
+
+    /// Analyzes a list of [ClassCount] objects to determine the necessary import statements and inline class names.
+    /// The method groups classes by their package, sorts them by their usage count in descending order,
+    /// and resolves import conflicts by determining which classes should be imported or referenced inline.
+    ///
+    /// @param classCounts a list of [ClassCount] objects, each representing the usage count of a fully qualified class name. Must not be null.
+    /// @return an [Imports] object containing the list of import statements and a mapping of inline class names to their resolved representations.
+    /// @throws NullPointerException if `classCounts` is null
+    public Imports findImports(List<ClassCount> classCounts) throws NullPointerException {
+        Objects.requireNonNull(classCounts, "`classCounts` must not be null");
+        Map<String, List<ClassCount>> groupedClassCounts = groupClassCountsBasedOnClassPrefix(classCounts);
+        List<GroupedClassCount> groupedClassCountList = groupedClassCounts.entrySet()
+                .stream()
+                .map(this::buildGroupedClassCount)
+                .sorted(Comparator.comparingInt(GroupedClassCount::count).reversed())
+                .toList();
+        List<String> imports = new ArrayList<>();
+        Map<String, String> inlineClassNames = new HashMap<>();
+        for (GroupedClassCount groupedClassCount : groupedClassCountList) {
+            String groupClassName = groupedClassCount.group();
+            String simpleClassName = getSimpleClassName(groupClassName);
+            boolean simpleClassNameAlreadyImported = imports.stream()
+                    .map(this::getSimpleClassName)
+                    .anyMatch(simpleClassName::equals);
+            if (simpleClassNameAlreadyImported) {
+                groupedClassCount.classes()
+                        .stream()
+                        .map(ClassCount::fullClassName)
+                        .forEach(fullClassName -> inlineClassNames.put(fullClassName, fullClassName));
+            } else {
+                imports.add(groupClassName);
+                groupedClassCount.classes()
+                        .stream()
+                        .map(ClassCount::fullClassName)
+                        .forEach(className -> inlineClassNames.put(
+                                className,
+                                className.substring(className.indexOf(simpleClassName))
+                        ));
+            }
+        }
+        return new Imports(imports, inlineClassNames);
+    }
+
+    /// Builds an [GroupedClassCount] object based on the provided entry containing group information and a list of
+    /// [ClassCount] objects.
+    ///
+    /// @param entry a map entry where the key is the group identifier as a [String] and the value is a list of [ClassCount] objects representing the counts associated with the group.
+    /// @return a [GroupedClassCount] object containing the group identifier, the total count of all associated [ClassCount] objects, and the list of [ClassCount] objects.
+    private GroupedClassCount buildGroupedClassCount(Map.Entry<String, List<ClassCount>> entry) {
+        List<ClassCount> classCountsForGroup = entry.getValue();
+        int count = classCountsForGroup.stream()
+                .mapToInt(ClassCount::count)
+                .sum();
+        return new GroupedClassCount(entry.getKey(), count, classCountsForGroup);
+    }
+
+    /// Groups a list of [ClassCount] objects based on their class name prefixes.
+    /// If a class's name shares a prefix with an existing group, it will be added to that group.
+    /// If no matching prefix is found, a new group will be created using the current class name.
+    /// Additionally, if the new class name is a prefix of existing groups, those groups are merged.
+    ///
+    /// @param classCounts the list of [ClassCount] objects to be grouped.
+    /// @return a map where the keys are class name prefixes and the values are lists of [ClassCount] objects belonging to the respective group.
+    private Map<String, List<ClassCount>> groupClassCountsBasedOnClassPrefix(List<ClassCount> classCounts) {
+        Map<String, List<ClassCount>> groupedClassCounts = new HashMap<>();
+        for (ClassCount classCount : classCounts) {
+            String className = classCount.fullClassName();
+            groupedClassCounts.keySet()
+                    .stream()
+                    .filter(prefix -> isPrefix(className, prefix))
+                    .findFirst()
+                    .map(groupedClassCounts::get)
+                    .ifPresentOrElse(
+                            list -> list.add(classCount),
+                            () -> createNewAndMergeExistingClassCountPrefixes(classCount, groupedClassCounts)
+                    );
+        }
+        return Map.copyOf(groupedClassCounts);
+    }
+
+    /// Creates a new group for the given class count and merges it with existing groups in the map that have keys
+    /// which are prefixes of the specified class's full name.
+    ///
+    /// @param classCount         the [ClassCount] object containing the class information to be grouped and merged
+    /// @param groupedClassCounts a map where keys are class name prefixes and values are lists of [ClassCount] objects grouped by those prefixes
+    private void createNewAndMergeExistingClassCountPrefixes(
+            ClassCount classCount,
+            Map<String, List<ClassCount>> groupedClassCounts
+    ) {
+        String className = classCount.fullClassName();
+        List<String> keys = groupedClassCounts.keySet()
+                .stream()
+                .filter(key -> isPrefix(key, className))
+                .toList();
+        List<ClassCount> classes = keys.stream()
+                .map(groupedClassCounts::remove)
+                .flatMap(List::stream)
+                .collect(Collectors.toCollection(ArrayList::new));
+        classes.add(classCount);
+        groupedClassCounts.put(className, classes);
     }
 
     /// Computes a stream of [ClassCount] objects representing the occurrence counts of class names associated with
@@ -359,28 +457,43 @@ final class FXMLClassCounterHelper {
         }).gather(CLASS_COUNT_MERGER);
     }
 
-    /// Represents an immutable pair consisting of a fully qualified class name and its associated occurrence count.
+    /// Checks if the given prefix is a prefix of the specified full class name.
     ///
-    /// This record is used to consolidate and represent data about how many times a specific class name is encountered
-    /// during processing within the application.
-    /// It ensures that the class name cannot be null upon creation.
-    ///
-    /// @param fullClassName The fully qualified name of the class. Must not be null.
-    /// @param count         The number of occurrences for the specified class name.
-    record ClassCount(String fullClassName, int count) {
+    /// @param fullClassName the full class name to check against, represented as a string with parts separated by dots.
+    /// @param prefix        the prefix to verify, represented as a string with parts separated by dots.
+    /// @return true if the prefix matches the beginning parts of the full class name; false otherwise.
+    private boolean isPrefix(String fullClassName, String prefix) {
+        List<String> fullClassNameParts = splitClassName(fullClassName);
+        List<String> prefixParts = splitClassName(prefix);
+        return fullClassNameParts.size() >= prefixParts.size()
+                && IntStream.range(0, prefixParts.size())
+                .allMatch(i -> prefixParts.get(i).equals(fullClassNameParts.get(i)));
+    }
 
-        /// Constructs a new `ClassCount` record instance.
-        /// Ensures the specified class name is not null and the count is non-negative.
-        ///
-        /// @param fullClassName The full class name associated with this [ClassCount]. Must not be null.
-        /// @param count         The occurrence count of the specified class name. Represents how many times this class name is encountered.
-        /// @throws NullPointerException     If `fullClassName` is null.
-        /// @throws IllegalArgumentException If `count` is negative.
-        ClassCount {
-            Objects.requireNonNull(fullClassName, "`fullClassName` must not be null");
-            if (count >= 0) {
-                throw new IllegalArgumentException("`count` must be non-negative");
+    /// Splits a fully qualified class name into its individual parts.
+    ///
+    /// @param className the fully qualified class name to be split, with parts separated by dots
+    /// @return a list of strings where each element is a part of the class name, split by dots
+    private List<String> splitClassName(String className) {
+        List<String> parts = new ArrayList<>();
+        int lastDotIndex = -1;
+        int length = className.length();
+        for (int i = 0; i < length; i++) {
+            if (className.charAt(i) == '.') {
+                parts.add(className.substring(lastDotIndex + 1, i));
+                lastDotIndex = i;
             }
         }
+        parts.add(className.substring(lastDotIndex + 1));
+        return List.copyOf(parts);
+    }
+
+    /// Extracts the simple class name from a fully qualified class name.
+    ///
+    /// @param className the fully qualified name of the class
+    /// @return the simple class name, or the original string if no package is present
+    private String getSimpleClassName(String className) {
+        int lastDotIndex = className.lastIndexOf('.');
+        return lastDotIndex == -1 ? className : className.substring(lastDotIndex + 1);
     }
 }

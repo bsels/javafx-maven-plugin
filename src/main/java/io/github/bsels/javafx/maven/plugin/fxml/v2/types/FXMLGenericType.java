@@ -16,9 +16,13 @@ public record FXMLGenericType(Class<?> type, List<FXMLType> typeArguments) imple
     /// @param type          The base class type.
     /// @param typeArguments The list of type arguments.
     /// @throws NullPointerException if `type` is `null`.
+    /// @throws IllegalArgumentException if `typeArguments` is empty
     public FXMLGenericType {
         Objects.requireNonNull(type, "`type` must not be null");
         typeArguments = List.copyOf(Objects.requireNonNullElseGet(typeArguments, List::of));
+        if (typeArguments.isEmpty()) {
+            throw new IllegalArgumentException("`typeArguments` must not be empty");
+        }
     }
 
     /// Constructs an instance of `FXMLGenericType` using a base class type
@@ -26,7 +30,8 @@ public record FXMLGenericType(Class<?> type, List<FXMLType> typeArguments) imple
     ///
     /// @param type          The base class type. Must not be `null`.
     /// @param typeArguments The type arguments for the generic type. If no arguments are provided, an empty list is used.
-    /// @throws NullPointerException if `type` is `null`.
+    /// @throws NullPointerException if `type` or `typeArguments` is `null`.
+    /// @throws IllegalArgumentException if `typeArguments` is empty
     public FXMLGenericType(Class<?> type, FXMLType... typeArguments) {
         this(type, List.of(typeArguments));
     }
