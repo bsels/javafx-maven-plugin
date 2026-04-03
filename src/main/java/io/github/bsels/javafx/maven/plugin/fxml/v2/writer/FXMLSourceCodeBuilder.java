@@ -53,6 +53,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 public final class FXMLSourceCodeBuilder {
     private static final String INTERNAL_RESOURCE_BUNDLE = "$INTERNAL$RESOURCE$BUNDLE$";
@@ -60,6 +61,12 @@ public final class FXMLSourceCodeBuilder {
     private static final String INTERNAL_STRING_TO_PATH_METHOD = "$internalMethod$stringToPath$";
     private static final String INTERNAL_STRING_TO_URI_METHOD = "$internalMethod$stringToURI$";
     private static final String INTERNAL_STRING_TO_URL_METHOD = "$internalMethod$stringToURL$";
+    private static final FXMLClassType OBJECT_TYPE = new FXMLClassType(Object.class);
+    private static final FXMLClassType STRING_TYPE = new FXMLClassType(String.class);
+    private static final FXMLClassType BOOLEAN_TYPE = new FXMLClassType(Boolean.class);
+    private static final Set<String> PRIMITIVE_TYPES = Set.of(
+            "boolean", "byte", "char", "short", "int", "long", "float", "double"
+    );
     private final Log log;
     private final FXMLSourceCodeBuilderImportHelper builderImportHelper;
     private final boolean addGeneratedAnnotation;
@@ -97,15 +104,21 @@ public final class FXMLSourceCodeBuilder {
         if (addGeneratedAnnotation) {
             sourceCode.append('@')
                     .append(typeToSourceCode(context, FXMLType.of(Generated.class)))
-                    .append("(value=\"")
+                    .append("(\n    value=\"")
                     .append(FXMLSourceCodeBuilder.class.getName())
-                    .append("\", date=\"")
-                    .append(buildTime.toString())
-                    .append("\")\n");
+                    .append("\",\n    date=\"")
+                    .append(buildTime)
+                    .append("\"\n)\n");
         }
 
-        sourceCode.append(context.sourceCode(SourcePart.CLASS_DECLARATION)).append(" {\n")
-                .append(context.sourceCode(SourcePart.FIELDS).toString().indent(4));
+        sourceCode.append(context.sourceCode(SourcePart.CLASS_DECLARATION)).append(" {\n");
+        if (context.hasFeature(Feature.RESOURCE_BUNDLE)) {
+            // TODO: Assign the resource bundle
+            sourceCode.append("private static final java.util.ResourceBundle ")
+                    .append(INTERNAL_RESOURCE_BUNDLE)
+                    .append(" = null;\n\n");
+        }
+        sourceCode.append(context.sourceCode(SourcePart.FIELDS).toString().indent(4));
 
         if (context.hasFeature(Feature.ABSTRACT_CLASS)) {
             sourceCode.append("protected".indent(4).stripTrailing());
@@ -127,6 +140,7 @@ public final class FXMLSourceCodeBuilder {
         List<String> importList = context.imports()
                 .imports()
                 .stream()
+                .filter(Predicate.not(PRIMITIVE_TYPES::contains))
                 .sorted()
                 .toList();
         StringBuilder sourceCode = context.sourceCode(SourcePart.IMPORTS);
@@ -157,7 +171,7 @@ public final class FXMLSourceCodeBuilder {
     private String createBaseTypeSourceCode(SourceCodeGeneratorContext context, String className) {
         return context.imports()
                 .inlineClassNames()
-                .get(className);
+                .getOrDefault(className, className);
     }
 
     private String createGenericTypeSourceCode(
@@ -182,9 +196,6 @@ public final class FXMLSourceCodeBuilder {
 
     private void addFields(SourceCodeGeneratorContext context, FXMLDocument document) {
         StringBuilder sourceCode = context.sourceCode(SourcePart.FIELDS);
-        // TODO: Assign the resource bundle
-        sourceCode.append("private static final ResourceBundle %s = null;\n".formatted(INTERNAL_RESOURCE_BUNDLE));
-
         document.controller()
                 .ifPresent(c -> sourceCode
                         .append("private final ")
@@ -301,9 +312,9 @@ public final class FXMLSourceCodeBuilder {
             ) -> {
                 entries.forEach((k, v) -> sourceCode.append(identifier.toString())
                         .append(".put(")
-                        .append(encodeFXMLValue(context, k, keyType))
+                        .append(encodeFXMLValue(context, k, getTypeForMapEntry(keyType)))
                         .append(", ")
-                        .append(encodeFXMLValue(context, v, valueType))
+                        .append(encodeFXMLValue(context, v, getTypeForMapEntry(valueType)))
                         .append(");\n"));
                 entries.values().forEach(v -> addConstructorEpilogue(context, v));
             }
@@ -353,10 +364,10 @@ public final class FXMLSourceCodeBuilder {
                 value.forEach((k, v) -> sourceCode.append(identifier)
                         .append('.')
                         .append(getter)
-                        .append(".put(")
-                        .append(encodeFXMLValue(context, k, rawKeyClass))
+                        .append("().put(")
+                        .append(encodeFXMLValue(context, k, getTypeForMapEntry(rawKeyClass)))
                         .append(", ")
-                        .append(encodeFXMLValue(context, v, rawValueClass))
+                        .append(encodeFXMLValue(context, v, getTypeForMapEntry(rawValueClass)))
                         .append(");\n"));
                 value.values().forEach(v -> addConstructorEpilogue(context, v));
             }
@@ -394,6 +405,10 @@ public final class FXMLSourceCodeBuilder {
         }
     }
 
+    private FXMLClassType getTypeForMapEntry(FXMLClassType type) {
+        return OBJECT_TYPE.equals(type) ? STRING_TYPE : type;
+    }
+
     private String encodeFXMLValue(SourceCodeGeneratorContext context, AbstractFXMLValue value, FXMLType type) {
         return switch (value) {
             case AbstractFXMLObject object -> object.identifier().toString();
@@ -405,7 +420,7 @@ public final class FXMLSourceCodeBuilder {
             case FXMLInclude(FXMLIdentifier identifier, _, _, _) -> identifier.toString();
             case FXMLInlineScript fxmlInlineScript ->
                     throw new UnsupportedOperationException("Inline script values are not supported yet");
-            case FXMLLiteral(String literal) -> encodeLiteral(literal, type);
+            case FXMLLiteral(String literal) -> encodeLiteral(context, literal, type);
             case FXMLMethod(String name, _, _) -> "this::%s".formatted(name);
             case FXMLReference(String name) -> name;
             case FXMLResource(String resource) -> {
@@ -430,17 +445,77 @@ public final class FXMLSourceCodeBuilder {
                 throw new IllegalArgumentException(
                         "Resources can only be used with `java.lang.String`, `java.nio.file.Path`, `java.net.URI`, or `java.net.URL`");
             }
-            case FXMLTranslation(String translationKey) -> "%s.getString(%s)".formatted(
-                    INTERNAL_RESOURCE_BUNDLE,
-                    encodeString(translationKey)
-            );
+            case FXMLTranslation(String translationKey) -> {
+                context.addFeature(Feature.RESOURCE_BUNDLE);
+                yield "%s.getString(%s)".formatted(
+                        INTERNAL_RESOURCE_BUNDLE,
+                        encodeString(translationKey)
+                );
+            }
             case FXMLValue(Optional<FXMLIdentifier> identifier, FXMLType t, String v) ->
-                    identifier.map(FXMLIdentifier::toString).orElseGet(() -> encodeLiteral(v, t));
+                    identifier.map(FXMLIdentifier::toString).orElseGet(() -> encodeLiteral(context, v, t));
         };
     }
 
-    private String encodeLiteral(String value, FXMLType type) {
-        return null; // TODO: Implement
+    private String encodeLiteral(SourceCodeGeneratorContext context, String value, FXMLType type) {
+        if (type instanceof FXMLClassType(Class<?> clazz)) {
+            if (clazz.isAssignableFrom(String.class)) {
+                return encodeString(value);
+            }
+            if (clazz.isEnum()) {
+                return "%s.%s".formatted(typeToSourceCode(context, type), value);
+            }
+            if (char.class.equals(clazz) || Character.class.equals(clazz)) {
+                String valueString = value.strip();
+                if (valueString.length() == 3) {
+                    return "'%s'".formatted(valueString.charAt(1));
+                }
+                throw new IllegalArgumentException("Character literals must be exactly 1 character long");
+            }
+            if (double.class.equals(clazz) || Double.class.equals(clazz)) {
+                if ("-Infinity".equalsIgnoreCase(value)) {
+                    return "Double.NEGATIVE_INFINITY";
+                }
+                if ("Infinity".equalsIgnoreCase(value)) {
+                    return "Double.POSITIVE_INFINITY";
+                }
+                if ("NaN".equalsIgnoreCase(value)) {
+                    return "Double.NaN";
+                }
+                return value;
+            }
+            if (float.class.equals(clazz) || Float.class.equals(clazz)) {
+                if ("-Infinity".equalsIgnoreCase(value)) {
+                    return "Float.NEGATIVE_INFINITY";
+                }
+                if ("Infinity".equalsIgnoreCase(value)) {
+                    return "Float.POSITIVE_INFINITY";
+                }
+                if ("NaN".equalsIgnoreCase(value)) {
+                    return "Float.NaN";
+                }
+                return "%sf".formatted(value);
+            }
+            if (boolean.class.equals(clazz) || Boolean.class.equals(clazz)) {
+                if ("true".equalsIgnoreCase(value)) {
+                    return "true";
+                }
+                return "false";
+            }
+            if (byte.class.equals(clazz) || Byte.class.equals(clazz)) {
+                return "(byte) %s".formatted(value);
+            }
+            if (short.class.equals(clazz) || Short.class.equals(clazz)) {
+                return "(short) %s".formatted(value);
+            }
+            if (int.class.equals(clazz) || Integer.class.equals(clazz)) {
+                return value;
+            }
+            if (long.class.equals(clazz) || Long.class.equals(clazz)) {
+                return "%sL".formatted(value);
+            }
+        }
+        return "%s.valueOf(%s)".formatted(typeToSourceCode(context, type), encodeString(value));
     }
 
     private String encodeString(String translationKey) {
@@ -459,6 +534,7 @@ public final class FXMLSourceCodeBuilder {
 
     private enum Feature {
         ABSTRACT_CLASS,
+        RESOURCE_BUNDLE,
         STRING_TO_URL_METHOD,
         STRING_TO_URI_METHOD,
         STRING_TO_PATH_METHOD,
