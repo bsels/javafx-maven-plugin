@@ -18,9 +18,9 @@ public record FXMLMapProperty(
         String name,
         String getter,
         FXMLType type,
-        Class<?> rawKeyClass,
-        Class<?> rawValueClass,
-        Map<String, AbstractFXMLValue> value
+        Class<?> rawKeyClass, // TODO: Improve this to use FXMLClassType
+        Class<?> rawValueClass, // TODO: Improve this to use FXMLClassType
+        Map<String, AbstractFXMLValue> value // TODO: Use FXMLLiteral as key
 ) implements FXMLProperty {
 
     /// Compact constructor to validate the property components.

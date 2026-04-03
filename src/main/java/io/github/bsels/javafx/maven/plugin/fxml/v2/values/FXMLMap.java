@@ -25,10 +25,10 @@ import java.util.Optional;
 public record FXMLMap(
         FXMLIdentifier identifier,
         FXMLType type,
-        Class<?> rawKeyClass,
-        Class<?> rawValueClass,
+        Class<?> rawKeyClass, // TODO: Improve this to use FXMLClassType
+        Class<?> rawValueClass, // TODO: Improve this to use FXMLClassType
         Optional<FXMLFactoryMethod> factoryMethod,
-        Map<String, AbstractFXMLValue> entries
+        Map<String, AbstractFXMLValue> entries // TODO: Use FXMLLiteral as key
 ) implements AbstractFXMLValue, AbstractFXMLObject {
 
     /// Compact constructor to validate the map components.

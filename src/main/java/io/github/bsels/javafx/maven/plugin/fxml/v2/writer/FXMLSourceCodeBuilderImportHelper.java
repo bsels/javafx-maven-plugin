@@ -33,6 +33,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLResource;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLTranslation;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
 
+import javax.annotation.processing.Generated;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -75,11 +76,19 @@ final class FXMLSourceCodeBuilderImportHelper {
     /// The method aggregates and processes class counts from the root element, controller elements,
     /// and definitions in the FXML document, sorts them in descending order of count, and then by class name.
     ///
-    /// @param document the [FXMLDocument] to analyze; must not be null
+    /// @param document               the [FXMLDocument] to analyze; must not be null
+    /// @param addGeneratedAnnotation whether to include generated annotation in class counts
     /// @return a list of [ClassCount] objects representing the count of occurrences for each class within the provided [FXMLDocument]
     /// @throws NullPointerException if the provided document is null
-    public List<ClassCount> findClassCounts(FXMLDocument document) throws NullPointerException {
+    public List<ClassCount> findClassCounts(FXMLDocument document, boolean addGeneratedAnnotation)
+            throws NullPointerException {
         Objects.requireNonNull(document, "`document` must not be null");
+        final Stream<ClassCount> generationAnnotation;
+        if (addGeneratedAnnotation) {
+            generationAnnotation = Stream.of(new ClassCount(Generated.class.getName(), 1));
+        } else {
+            generationAnnotation = Stream.empty();
+        }
         return Stream.concat(
                         Stream.concat(
                                 findAbstractFXMLValueClassCount(document.root()),
@@ -87,9 +96,12 @@ final class FXMLSourceCodeBuilderImportHelper {
                                         .stream()
                                         .flatMap(this::findControllerClassCounts)
                         ),
-                        document.definitions()
-                                .stream()
-                                .flatMap(this::findAbstractFXMLValueClassCount)
+                        Stream.concat(
+                                document.definitions()
+                                        .stream()
+                                        .flatMap(this::findAbstractFXMLValueClassCount),
+                                generationAnnotation
+                        )
                 )
                 .gather(CLASS_COUNT_MERGER)
                 .toList();
@@ -99,11 +111,13 @@ final class FXMLSourceCodeBuilderImportHelper {
     /// The method groups classes by their package, sorts them by their usage count in descending order,
     /// and resolves import conflicts by determining which classes should be imported or referenced inline.
     ///
-    /// @param classCounts a list of [ClassCount] objects, each representing the usage count of a fully qualified class name. Must not be null.
+    /// @param classCounts  a list of [ClassCount] objects, each representing the usage count of a fully qualified class name. Must not be null.
+    /// @param ownClassName the name of the class that is currently being analyzed. Must not be null.
     /// @return an [Imports] object containing the list of import statements and a mapping of inline class names to their resolved representations.
     /// @throws NullPointerException if `classCounts` is null
-    public Imports findImports(List<ClassCount> classCounts) throws NullPointerException {
+    public Imports findImports(List<ClassCount> classCounts, String ownClassName) throws NullPointerException {
         Objects.requireNonNull(classCounts, "`classCounts` must not be null");
+        Objects.requireNonNull(ownClassName, "`ownClassName` must not be null");
         Map<String, List<ClassCount>> groupedClassCounts = groupClassCountsBasedOnClassPrefix(classCounts);
         List<GroupedClassCount> groupedClassCountList = groupedClassCounts.entrySet()
                 .stream()
@@ -118,7 +132,7 @@ final class FXMLSourceCodeBuilderImportHelper {
             boolean simpleClassNameAlreadyImported = imports.stream()
                     .map(this::getSimpleClassName)
                     .anyMatch(simpleClassName::equals);
-            if (simpleClassNameAlreadyImported) {
+            if (simpleClassNameAlreadyImported && ownClassName.endsWith(simpleClassName)) {
                 groupedClassCount.classes()
                         .stream()
                         .map(ClassCount::fullClassName)

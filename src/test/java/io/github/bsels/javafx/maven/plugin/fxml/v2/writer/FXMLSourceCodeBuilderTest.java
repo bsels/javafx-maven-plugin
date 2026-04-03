@@ -11,7 +11,8 @@ import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -61,9 +62,15 @@ public class FXMLSourceCodeBuilderTest {
     @Nested
     class GenerateSourceCodeTest {
 
-        @Test
-        void setListGenerateSourceCode() throws MojoExecutionException {
-            FXMLDocument document = parse("/examples/SetList.fxml");
+        @ParameterizedTest
+        @ValueSource(strings = {
+                "/examples/ColorDefinitions.fxml",
+                "/examples/SetList.fxml",
+                "/examples/MapWithReferences.fxml",
+                "/examples/GridPaneStaticPropertyElementExplicitValue.fxml"
+        })
+        void dummy(String file) throws MojoExecutionException {
+            FXMLDocument document = parse(file);
             String sourceCode = classUnderTest.generateSourceCode(document, "com.example");
             assertThat(sourceCode)
                     .isNotNull()
