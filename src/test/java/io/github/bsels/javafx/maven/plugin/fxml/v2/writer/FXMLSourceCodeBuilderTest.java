@@ -11,33 +11,48 @@ import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@ExtendWith(MockitoExtension.class)
 public class FXMLSourceCodeBuilderTest {
-
+    private static final ZonedDateTime ZONED_DATE_TIME_NOW_MOCK = ZonedDateTime.of(
+            2026, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC
+    );
 
     private String originalJavaHome;
     private FXMLReader fxmlReader;
     private FXMLDocumentParser documentParser;
     private FXMLSourceCodeBuilder classUnderTest;
 
+    private MockedStatic<ZonedDateTime> zonedDateTimeMock;
+
     @BeforeEach
     void setUp() {
         DefaultLog log = new DefaultLog(new ConsoleLogger());
         fxmlReader = new FXMLReader(log);
         documentParser = new FXMLDocumentParser(log, StandardCharsets.UTF_8);
-        classUnderTest = new FXMLSourceCodeBuilder(log, true);
         originalJavaHome = System.getProperty("java.home");
         System.setProperty("java.home", "/java/home");
         assertThat(fxmlReader.toString())
                 .isNotNull()
                 .startsWith("FXMLReader[log=");
+
+        zonedDateTimeMock = Mockito.mockStatic(ZonedDateTime.class);
+        zonedDateTimeMock.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(ZONED_DATE_TIME_NOW_MOCK);
+        classUnderTest = new FXMLSourceCodeBuilder(log, true);
+        zonedDateTimeMock.close();
     }
 
     @AfterEach
@@ -67,7 +82,12 @@ public class FXMLSourceCodeBuilderTest {
                 "/examples/ColorDefinitions.fxml",
                 "/examples/SetList.fxml",
                 "/examples/MapWithReferences.fxml",
-                "/examples/GridPaneStaticPropertyElementExplicitValue.fxml"
+                "/examples/GridPaneStaticPropertyElement.fxml",
+                "/examples/GridPaneStaticPropertyAttribute.fxml",
+                "/examples/GridPaneStaticPropertyElementExplicitValue.fxml",
+                "/examples/MyButtonWithConstants.fxml",
+                "/examples/MyHashMap.fxml",
+                "/examples/NodeProperties.fxml"
         })
         void dummy(String file) throws MojoExecutionException {
             FXMLDocument document = parse(file);
