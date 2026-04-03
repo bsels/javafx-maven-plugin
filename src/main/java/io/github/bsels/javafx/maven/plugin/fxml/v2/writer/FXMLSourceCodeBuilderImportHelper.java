@@ -262,7 +262,7 @@ final class FXMLSourceCodeBuilderImportHelper {
                     findFXMLTypeClassCounts(type),
                     findAbstractFXMLValueClassCount(value)
             );
-            case FXMLMapProperty(_, _, FXMLType type, _, _, Map<String, AbstractFXMLValue> value) -> Stream.concat(
+            case FXMLMapProperty(_, _, FXMLType type, _, _, Map<FXMLLiteral, AbstractFXMLValue> value) -> Stream.concat(
                     findFXMLTypeClassCounts(type),
                     value.values()
                             .stream()

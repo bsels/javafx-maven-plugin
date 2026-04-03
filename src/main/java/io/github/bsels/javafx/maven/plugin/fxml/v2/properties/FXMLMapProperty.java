@@ -1,7 +1,9 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.properties;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLLiteral;
 
 import java.util.Map;
 import java.util.Objects;
@@ -18,9 +20,9 @@ public record FXMLMapProperty(
         String name,
         String getter,
         FXMLType type,
-        Class<?> rawKeyClass, // TODO: Improve this to use FXMLClassType
-        Class<?> rawValueClass, // TODO: Improve this to use FXMLClassType
-        Map<String, AbstractFXMLValue> value // TODO: Use FXMLLiteral as key
+        FXMLClassType rawKeyClass,
+        FXMLClassType rawValueClass,
+        Map<FXMLLiteral, AbstractFXMLValue> value
 ) implements FXMLProperty {
 
     /// Compact constructor to validate the property components.
@@ -31,7 +33,7 @@ public record FXMLMapProperty(
     /// @param rawKeyClass   The raw key class.
     /// @param rawValueClass The raw value class.
     /// @param value         The map of values.
-    /// @throws NullPointerException if `name`, `getter`, or `type` is `null`.
+    /// @throws NullPointerException if `name`, `getter`, `type`, `rawKeyClass`, or `rawValueClass` is `null`.
     public FXMLMapProperty {
         Objects.requireNonNull(name, "`name` must not be null");
         Objects.requireNonNull(getter, "`getter` must not be null");

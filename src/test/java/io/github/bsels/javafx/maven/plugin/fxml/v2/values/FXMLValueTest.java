@@ -127,43 +127,43 @@ class FXMLValueTest {
     class FXMLMapTest {
         @Test
         void shouldCreateWithValidParams() {
-            FXMLMap map = new FXMLMap(id, mapType, String.class, String.class, noFactory, Map.of());
+            FXMLMap map = new FXMLMap(id, mapType, new FXMLClassType(String.class), new FXMLClassType(String.class), noFactory, Map.of());
             assertThat(map)
                     .hasFieldOrPropertyWithValue("identifier", id)
-                    .hasFieldOrPropertyWithValue("rawKeyClass", String.class)
-                    .hasFieldOrPropertyWithValue("rawValueClass", String.class)
+                    .hasFieldOrPropertyWithValue("rawKeyClass", new FXMLClassType(String.class))
+                    .hasFieldOrPropertyWithValue("rawValueClass", new FXMLClassType(String.class))
                     .hasFieldOrPropertyWithValue("factoryMethod", noFactory)
                     .hasFieldOrPropertyWithValue("entries", Map.of());
         }
 
         @Test
         void shouldHandleNullEntries() {
-            FXMLMap map = new FXMLMap(id, mapType, String.class, String.class, noFactory, null);
+            FXMLMap map = new FXMLMap(id, mapType, new FXMLClassType(String.class), new FXMLClassType(String.class), noFactory, null);
             assertThat(map.entries()).isEmpty();
         }
 
         @Test
         void shouldThrowNpeWithMessages() {
-            assertThatThrownBy(() -> new FXMLMap(null, mapType, String.class, String.class, noFactory, Map.of()))
+            assertThatThrownBy(() -> new FXMLMap(null, mapType, new FXMLClassType(String.class), new FXMLClassType(String.class), noFactory, Map.of()))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`identifier` must not be null");
-            assertThatThrownBy(() -> new FXMLMap(id, null, String.class, String.class, noFactory, Map.of()))
+            assertThatThrownBy(() -> new FXMLMap(id, null, new FXMLClassType(String.class), new FXMLClassType(String.class), noFactory, Map.of()))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`type` must not be null");
-            assertThatThrownBy(() -> new FXMLMap(id, mapType, null, String.class, noFactory, Map.of()))
+            assertThatThrownBy(() -> new FXMLMap(id, mapType, null, new FXMLClassType(String.class), noFactory, Map.of()))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`rawKeyClass` must not be null");
-            assertThatThrownBy(() -> new FXMLMap(id, mapType, String.class, null, noFactory, Map.of()))
+            assertThatThrownBy(() -> new FXMLMap(id, mapType, new FXMLClassType(String.class), null, noFactory, Map.of()))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`rawValueClass` must not be null");
-            assertThatThrownBy(() -> new FXMLMap(id, mapType, String.class, String.class, null, Map.of()))
+            assertThatThrownBy(() -> new FXMLMap(id, mapType, new FXMLClassType(String.class), new FXMLClassType(String.class), null, Map.of()))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`factoryMethod` must not be null");
         }
 
         @Test
         void shouldThrowIaeForNonMapType() {
-            assertThatThrownBy(() -> new FXMLMap(id, stringType, String.class, String.class, noFactory, Map.of()))
+            assertThatThrownBy(() -> new FXMLMap(id, stringType, new FXMLClassType(String.class), new FXMLClassType(String.class), noFactory, Map.of()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("must be a Map");
         }
@@ -174,7 +174,7 @@ class FXMLValueTest {
                     HashMap.class,
                     List.of(FXMLType.of(String.class), FXMLType.of(Integer.class))
             );
-            FXMLMap map = new FXMLMap(id, genericMapType, String.class, Integer.class, noFactory, Map.of());
+            FXMLMap map = new FXMLMap(id, genericMapType, new FXMLClassType(String.class), new FXMLClassType(Integer.class), noFactory, Map.of());
             assertThat(map.type()).isEqualTo(genericMapType);
         }
 
@@ -184,8 +184,8 @@ class FXMLValueTest {
             assertThatThrownBy(() -> new FXMLMap(
                     id,
                     genericStringType,
-                    String.class,
-                    String.class,
+                    new FXMLClassType(String.class),
+                    new FXMLClassType(String.class),
                     noFactory,
                     Map.of()
             ))
@@ -201,8 +201,8 @@ class FXMLValueTest {
             assertThat(new FXMLMap(
                     id,
                     uncompiledClass,
-                    Object.class,
-                    String.class,
+                    new FXMLClassType(Object.class),
+                    new FXMLClassType(String.class),
                     noFactory,
                     Map.of()
             ).type()).isEqualTo(
@@ -210,13 +210,13 @@ class FXMLValueTest {
             assertThat(new FXMLMap(
                     id,
                     uncompiledGeneric,
-                    Object.class,
-                    String.class,
+                    new FXMLClassType(Object.class),
+                    new FXMLClassType(String.class),
                     noFactory,
                     Map.of()
             ).type()).isEqualTo(
                     uncompiledGeneric);
-            assertThat(new FXMLMap(id, wildcard, Object.class, String.class, noFactory, Map.of()).type()).isEqualTo(
+            assertThat(new FXMLMap(id, wildcard, new FXMLClassType(Object.class), new FXMLClassType(String.class), noFactory, Map.of()).type()).isEqualTo(
                     wildcard);
         }
     }

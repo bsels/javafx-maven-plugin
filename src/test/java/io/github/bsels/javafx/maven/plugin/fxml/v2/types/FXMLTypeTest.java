@@ -107,9 +107,10 @@ class FXMLTypeTest {
         }
 
         @Test
-        void shouldHandleNullTypeArguments() {
-            FXMLGenericType type = new FXMLGenericType(List.class, (List<FXMLType>) null);
-            assertThat(type.typeArguments()).isEmpty();
+        void throwsIllegalArgumentExceptionForNullTypeArguments() {
+            assertThatThrownBy(() -> new  FXMLGenericType(List.class, (List<FXMLType>) null))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("`typeArguments` must not be empty");
         }
 
         @Test

@@ -92,8 +92,8 @@ public class FXMLDocumentParserTest {
     public static final InstanceOfAssertFactory<Optional, OptionalAssert<FXMLIdentifier>> OPTIONAL_IDENTIFIER_ASSERT_FACTORY = InstanceOfAssertFactories.optional(
             FXMLIdentifier.class);
     @SuppressWarnings("rawtypes") // The factory is generic, we can't use the type parameter here
-    public static final InstanceOfAssertFactory<java.util.Map, org.assertj.core.api.MapAssert<String, AbstractFXMLValue>> MAP_VALUES_ASSERT_FACTORY = InstanceOfAssertFactories.map(
-            String.class,
+    public static final InstanceOfAssertFactory<java.util.Map, org.assertj.core.api.MapAssert<FXMLLiteral, AbstractFXMLValue>> MAP_VALUES_ASSERT_FACTORY = InstanceOfAssertFactories.map(
+            FXMLLiteral.class,
             AbstractFXMLValue.class
     );
 
@@ -531,10 +531,10 @@ public class FXMLDocumentParserTest {
                     .satisfies(
                             map -> assertThat(map.entries())
                                     .hasSize(3)
-                                    .containsEntry("foo", new FXMLLiteral("123"))
-                                    .containsEntry("bar", new FXMLLiteral("456"))
+                                    .containsEntry(new FXMLLiteral("foo"), new FXMLLiteral("123"))
+                                    .containsEntry(new FXMLLiteral("bar"), new FXMLLiteral("456"))
                                     .satisfies(
-                                            entries -> assertThat(entries.get("test"))
+                                            entries -> assertThat(entries.get(new FXMLLiteral("test")))
                                                     .isInstanceOf(FXMLValue.class)
                                                     .hasFieldOrPropertyWithValue("value", "Dummy")
                                                     .hasFieldOrPropertyWithValue(
@@ -567,9 +567,9 @@ public class FXMLDocumentParserTest {
                     .satisfies(
                             map -> assertThat(map.entries())
                                     .hasSize(2)
-                                    .containsEntry("refEntry", new FXMLReference("myButton"))
+                                    .containsEntry(new FXMLLiteral("refEntry"), new FXMLReference("myButton"))
                                     .satisfies(
-                                            entries -> assertThat(entries.get("copyEntry"))
+                                            entries -> assertThat(entries.get(new FXMLLiteral("copyEntry")))
                                                     .isInstanceOf(FXMLCopy.class)
                                                     .extracting(FXMLCopy.class::cast)
                                                     .hasFieldOrPropertyWithValue("name", "myButton")
@@ -1311,14 +1311,14 @@ public class FXMLDocumentParserTest {
                                                                     new FXMLClassType(Object.class)
                                                             )
                                                     )
-                                                    .hasFieldOrPropertyWithValue("rawKeyClass", Object.class)
-                                                    .hasFieldOrPropertyWithValue("rawValueClass", Object.class)
+                                                    .hasFieldOrPropertyWithValue("rawKeyClass", new FXMLClassType(Object.class))
+                                                    .hasFieldOrPropertyWithValue("rawValueClass", new FXMLClassType(Object.class))
                                                     .extracting(FXMLMapProperty::value, MAP_VALUES_ASSERT_FACTORY)
                                                     .hasSize(3)
-                                                    .containsEntry("attribute", new FXMLLiteral("Attribute"))
-                                                    .containsEntry("element", new FXMLLiteral("Element"))
+                                                    .containsEntry(new FXMLLiteral("attribute"), new FXMLLiteral("Attribute"))
+                                                    .containsEntry(new FXMLLiteral("element"), new FXMLLiteral("Element"))
                                                     .hasEntrySatisfying(
-                                                            "elementValue", value -> assertThat(value)
+                                                            new FXMLLiteral("elementValue"), value -> assertThat(value)
                                                                     .isInstanceOf(FXMLValue.class)
                                                                     .extracting(FXMLValue.class::cast)
                                                                     .satisfies(
@@ -1555,12 +1555,12 @@ public class FXMLDocumentParserTest {
                                     new FXMLClassType(String.class)
                             )
                     )
-                    .hasFieldOrPropertyWithValue("rawKeyClass", String.class)
-                    .hasFieldOrPropertyWithValue("rawValueClass", String.class)
+                    .hasFieldOrPropertyWithValue("rawKeyClass", new FXMLClassType(String.class))
+                    .hasFieldOrPropertyWithValue("rawValueClass", new FXMLClassType(String.class))
                     .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
                     .extracting(FXMLMap::entries, MAP_VALUES_ASSERT_FACTORY)
                     .hasSize(1)
-                    .containsEntry("item", new FXMLLiteral("Data"));
+                    .containsEntry(new FXMLLiteral("item"), new FXMLLiteral("Data"));
         }
 
         @Test

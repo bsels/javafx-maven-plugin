@@ -25,10 +25,10 @@ import java.util.Optional;
 public record FXMLMap(
         FXMLIdentifier identifier,
         FXMLType type,
-        Class<?> rawKeyClass, // TODO: Improve this to use FXMLClassType
-        Class<?> rawValueClass, // TODO: Improve this to use FXMLClassType
+        FXMLClassType rawKeyClass,
+        FXMLClassType rawValueClass,
         Optional<FXMLFactoryMethod> factoryMethod,
-        Map<String, AbstractFXMLValue> entries // TODO: Use FXMLLiteral as key
+        Map<FXMLLiteral, AbstractFXMLValue> entries
 ) implements AbstractFXMLValue, AbstractFXMLObject {
 
     /// Compact constructor to validate the map components.
@@ -39,7 +39,7 @@ public record FXMLMap(
     /// @param rawValueClass The raw value class of the map.
     /// @param factoryMethod The optional factory method name.
     /// @param entries       The collection of entries.
-    /// @throws NullPointerException if `identifier`, `type`, `rawKeyClass`, `rawValueClass`, `factoryMethod`, or `entries` is `null`.
+    /// @throws NullPointerException if `identifier`, `type`, `rawKeyClass`, `rawValueClass`, or `factoryMethod` is `null`.
     public FXMLMap {
         Objects.requireNonNull(identifier, "`identifier` must not be null");
         Objects.requireNonNull(type, "`type` must not be null");

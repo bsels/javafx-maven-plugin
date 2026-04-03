@@ -211,7 +211,7 @@ public final class FXMLSourceCodeBuilder {
                 // TODO: Check for linked controller
             }
             case FXMLMap(
-                    FXMLIdentifier identifier, FXMLType type, _, _, _, Map<String, AbstractFXMLValue> entries
+                    FXMLIdentifier identifier, FXMLType type, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> entries
             ) -> {
                 identifierToField(context, identifier, type);
                 entries.values().forEach(v -> addFields(context, v));
@@ -234,7 +234,7 @@ public final class FXMLSourceCodeBuilder {
                 properties.forEach(p -> addFields(context, p));
             }
             case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> addFields(context, value);
-            case FXMLMapProperty(_, _, _, _, _, Map<String, AbstractFXMLValue> value) ->
+            case FXMLMapProperty(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> value) ->
                     value.values().forEach(v -> addFields(context, v));
             case FXMLObjectProperty(_, _, _, AbstractFXMLValue value) -> addFields(context, value);
             case FXMLStaticObjectProperty(_, _, _, _, AbstractFXMLValue value) -> addFields(context, value);
@@ -294,16 +294,16 @@ public final class FXMLSourceCodeBuilder {
             case FXMLMap(
                     FXMLIdentifier identifier,
                     _,
-                    Class<?> keyType,
-                    Class<?> valueType,
+                    FXMLClassType keyType,
+                    FXMLClassType valueType,
                     _,
-                    Map<String, AbstractFXMLValue> entries
+                    Map<FXMLLiteral, AbstractFXMLValue> entries
             ) -> {
                 entries.forEach((k, v) -> sourceCode.append(identifier.toString())
                         .append(".put(")
-                        .append(encodeFXMLValue(context, new FXMLLiteral(k), FXMLType.of(keyType)))
+                        .append(encodeFXMLValue(context, k, keyType))
                         .append(", ")
-                        .append(encodeFXMLValue(context, v, FXMLType.of(valueType)))
+                        .append(encodeFXMLValue(context, v, valueType))
                         .append(");\n"));
                 entries.values().forEach(v -> addConstructorEpilogue(context, v));
             }
@@ -346,17 +346,17 @@ public final class FXMLSourceCodeBuilder {
                     _,
                     String getter,
                     _,
-                    Class<?> rawKeyClass,
-                    Class<?> rawValueClass,
-                    Map<String, AbstractFXMLValue> value
+                    FXMLClassType rawKeyClass,
+                    FXMLClassType rawValueClass,
+                    Map<FXMLLiteral, AbstractFXMLValue> value
             ) -> {
                 value.forEach((k, v) -> sourceCode.append(identifier)
                         .append('.')
                         .append(getter)
                         .append(".put(")
-                        .append(encodeFXMLValue(context, new FXMLLiteral(k), FXMLType.of(rawKeyClass)))
+                        .append(encodeFXMLValue(context, k, rawKeyClass))
                         .append(", ")
-                        .append(encodeFXMLValue(context, v, FXMLType.of(rawValueClass)))
+                        .append(encodeFXMLValue(context, v, rawValueClass))
                         .append(");\n"));
                 value.values().forEach(v -> addConstructorEpilogue(context, v));
             }
