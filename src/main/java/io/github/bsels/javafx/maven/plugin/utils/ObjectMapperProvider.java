@@ -84,6 +84,18 @@ public final class ObjectMapperProvider {
     /// which manages a shared singleton [ObjectMapper] instance for the application.
     private static class TypeJsonSerializer extends JsonSerializer<Type> {
 
+        /// Private constructor to prevent instantiation of the `TypeJsonSerializer` class.
+        ///
+        /// This class serves as a custom serializer for the [Type] class used with JSON processing.
+        /// It is designed to be used exclusively within its enclosing class and is registered as part of
+        /// the JSON serialization logic with the ObjectMapper.
+        ///
+        /// By making the constructor private,
+        /// it ensures that this serializer can only be instantiated and used by the containing class,
+        /// enforcing proper encapsulation.
+        private TypeJsonSerializer() {
+        }
+
         /// Serializes an [Type] object into its string representation for JSON output.
         ///
         /// @param type               the [Type] object to be serialized; must not be null.

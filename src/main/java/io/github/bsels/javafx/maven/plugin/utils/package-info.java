@@ -8,7 +8,6 @@
 ///   resolution issues within the plugin
 /// - [io.github.bsels.javafx.maven.plugin.utils.ObjectMapperProvider]: Provides mapping and conversion utilities
 ///   for objects
-/// - [io.github.bsels.javafx.maven.plugin.utils.TypeEncoder]: Offers encoding and type conversion mechanisms
 /// - [io.github.bsels.javafx.maven.plugin.utils.Utils]: General-purpose utility methods for common operations
 ///
 /// ## Package Responsibilities
