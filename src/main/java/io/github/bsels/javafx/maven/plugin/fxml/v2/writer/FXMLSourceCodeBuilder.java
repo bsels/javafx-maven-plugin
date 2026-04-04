@@ -276,6 +276,14 @@ public final class FXMLSourceCodeBuilder {
                 .toString();
     }
 
+    /// Checks if a given Java type is a primitive type.
+    ///
+    /// @param type the type to check.
+    /// @return `true` if the type is primitive, `false` otherwise.
+    private boolean isPrimitive(String type) {
+        return PRIMITIVE_TYPES.contains(type);
+    }
+
     /// Adds import statements to the source code context.
     ///
     /// @param context The current [SourceCodeGeneratorContext].
@@ -283,7 +291,7 @@ public final class FXMLSourceCodeBuilder {
         List<String> importList = context.imports()
                 .imports()
                 .stream()
-                .filter(Predicate.not(PRIMITIVE_TYPES::contains))
+                .filter(Predicate.not(this::isPrimitive))
                 .sorted()
                 .toList();
         StringBuilder sourceCode = context.sourceCode(SourcePart.IMPORTS);
@@ -328,10 +336,10 @@ public final class FXMLSourceCodeBuilder {
                 .append("\n");
     }
 
-    /// Generates a stream of field declaration strings for a given FXML value.
+    /// Adds a field declaration to the current source code context for an FXML value.
     ///
-    /// @param value   The [AbstractFXMLValue] to process.
     /// @param context The current [SourceCodeGeneratorContext].
+    /// @param value   The [AbstractFXMLValue] to process for fields.
     /// @return A stream of field declaration strings.
     private Stream<String> addFields(AbstractFXMLValue value, SourceCodeGeneratorContext context) {
         return switch (value) {

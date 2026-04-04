@@ -546,10 +546,10 @@ final class FXMLSourceCodeBuilderImportHelper {
                 .allMatch(i -> prefixParts.get(i).equals(fullClassNameParts.get(i)));
     }
 
-    /// Splits a fully qualified class name into its individual parts.
+    /// Splits a fully qualified class name into its individual parts (packages and class name).
     ///
-    /// @param className the fully qualified class name to be split, with parts separated by dots
-    /// @return a list of strings where each element is a part of the class name, split by dots
+    /// @param className the fully qualified class name to be split, with parts separated by dots.
+    /// @return a list of strings where each element is a part of the class name, split by dots.
     private List<String> splitClassName(String className) {
         List<String> parts = new ArrayList<>();
         int lastDotIndex = -1;
