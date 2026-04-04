@@ -36,13 +36,16 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLReference;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLResource;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLTranslation;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
+import io.github.bsels.javafx.maven.plugin.io.FXMLReader;
 import io.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import io.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
 import io.github.bsels.javafx.maven.plugin.utils.Utils;
+import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.logging.Log;
 
 import java.lang.reflect.Type;
 import java.nio.charset.Charset;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -119,6 +122,9 @@ public final class FXMLDocumentParser {
     /// This helper provides methods and functionality specific to processing and interpreting FXML content within
     /// the application.
     private final FXMLDocumentParserHelper helper;
+    /// An instance of FXMLReader that handles the loading and parsing of FXML files.
+    /// This variable is immutable and ensures reliable access to FXML processing functionality within the application.
+    private final FXMLReader reader;
 
     /// Compact constructor to validate the log dependency.
     ///
@@ -131,6 +137,7 @@ public final class FXMLDocumentParser {
         this.log = Objects.requireNonNull(log, "`log` must not be null");
         Objects.requireNonNull(defaultCharset, "`defaultCharset` must not be null");
         this.helper = new FXMLDocumentParserHelper(log, defaultCharset);
+        this.reader = new FXMLReader(log);
     }
 
     /// Parses the provided [ParsedFXML] instance and constructs an [FXMLDocument].
@@ -146,12 +153,14 @@ public final class FXMLDocumentParser {
     ///
     /// @param parsedFXML   The [ParsedFXML] object to be parsed.
     /// @param resourcePath The path of the FXML file relative to the resources folder root. A single `/` denotes the root of the resource directory.
+    /// @param rootPath     The absolute path to the root of the resource directory.
     /// @return An [FXMLDocument] that represents the parsed structure of the given [ParsedFXML].
-    /// @throws NullPointerException  if `parsedFXML` or `resourcePath` is `null`.
+    /// @throws NullPointerException  if `parsedFXML`, `resourcePath` or `rootPath` is `null`.
     /// @throws IllegalStateException if the root element does not parse to an [AbstractFXMLObject].
-    public FXMLDocument parse(ParsedFXML parsedFXML, String resourcePath) {
+    public FXMLDocument parse(ParsedFXML parsedFXML, String resourcePath, Path rootPath) {
         Objects.requireNonNull(parsedFXML, "`parsedFXML` must not be null");
         Objects.requireNonNull(resourcePath, "`resourcePath` must not be null");
+        Objects.requireNonNull(rootPath, "`rootPath` must not be null");
         ParsedXMLStructure rootStructure = parsedFXML.root();
         BuildContext buildContext = new BuildContext(parsedFXML.imports(), resourcePath);
 
@@ -169,7 +178,7 @@ public final class FXMLDocumentParser {
             );
         }
 
-        return new FXMLDocument(
+        FXMLDocument fxmlDocument = new FXMLDocument(
                 parsedFXML.className(),
                 root,
                 controller,
@@ -177,6 +186,8 @@ public final class FXMLDocumentParser {
                 buildContext.definitions(),
                 buildContext.scripts()
         );
+        loadIncludeFXMLDocuments(fxmlDocument, resourcePath, rootPath);
+        return fxmlDocument;
     }
 
     /// Parses an XML structure into an FXML value.
@@ -966,5 +977,70 @@ public final class FXMLDocumentParser {
             return new FXMLInlineScript(value);
         }
         return new FXMLLiteral(value);
+    }
+
+    /// Loads and processes the included FXML documents associated with the given [FXMLDocument].
+    /// The method recursively processes the root FXML document and its dependent definitions.
+    ///
+    /// @param document     the [FXMLDocument] object containing the root node and definitions to be loaded
+    /// @param resourcePath The base resource path used for resolving relative paths within included FXML documents.
+    /// @param rootPath     The root path of the project, used for resolving relative paths.
+    private void loadIncludeFXMLDocuments(FXMLDocument document, String resourcePath, Path rootPath) {
+        loadIncludeFXMLDocuments(document.root(), resourcePath, rootPath);
+        document.definitions()
+                .forEach(definition -> loadIncludeFXMLDocuments(definition, resourcePath, rootPath));
+    }
+
+    /// Loads and processes FXML include documents based on the provided value and resource path.
+    /// Depending on the type of [AbstractFXMLValue] passed, this method recursively processes collections, maps,
+    /// and object properties, or directly handles specific FXML value types.
+    ///
+    /// @param value        The [AbstractFXMLValue] representing the structure or value node to be processed.
+    /// @param resourcePath The base resource path to resolve relative FXML files or resources.
+    /// @param rootPath     The root path of the project, used for resolving relative paths.
+    private void loadIncludeFXMLDocuments(AbstractFXMLValue value, String resourcePath, Path rootPath) {
+        switch (value) {
+            case FXMLInclude(_, String sourceFile, Charset charset, _, FXMLLazyLoadedDocument lazyLoadedDocument) -> {
+                try {
+                    String substring = sourceFile.substring(1);
+                    ParsedFXML parsedFXML = reader.readFXML(rootPath.resolve(substring), charset);
+                    lazyLoadedDocument.set(parse(parsedFXML, resourcePath, rootPath));
+                } catch (MojoExecutionException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            case FXMLCollection(_, _, _, List<AbstractFXMLValue> values) ->
+                    values.forEach(value1 -> loadIncludeFXMLDocuments(value1, resourcePath, rootPath));
+            case FXMLMap(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> entries) -> entries.values()
+                    .forEach(value1 -> loadIncludeFXMLDocuments(value1, resourcePath, rootPath));
+            case FXMLObject(_, _, _, List<FXMLProperty> properties) ->
+                    properties.forEach(property -> loadIncludeFXMLDocuments(property, resourcePath, rootPath));
+            case FXMLConstant _, FXMLCopy _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _,
+                 FXMLReference _, FXMLResource _, FXMLTranslation _, FXMLValue _ -> {
+            }
+        }
+    }
+
+    /// Loads and processes FXML documents that are included within the provided FXML property.
+    /// This method recursively traverses and loads nested FXML properties or values within the given property.
+    ///
+    /// @param property     The FXML property to be processed. This can be any implementation of [FXMLProperty], including collections, constructors, maps, objects, or static objects. The method handles each property type by recursively invoking the appropriate logic for nested properties or values.
+    /// @param resourcePath The base resource path used for resolving relative paths within included FXML documents.
+    /// @param rootPath     The root path of the project, used for resolving relative paths.
+    private void loadIncludeFXMLDocuments(FXMLProperty property, String resourcePath, Path rootPath) {
+        switch (property) {
+            case FXMLCollectionProperties(_, _, _, List<AbstractFXMLValue> value, List<FXMLProperty> properties) -> {
+                value.forEach(value1 -> loadIncludeFXMLDocuments(value1, resourcePath, rootPath));
+                properties.forEach(property1 -> loadIncludeFXMLDocuments(property1, resourcePath, rootPath));
+            }
+            case FXMLConstructorProperty(_, _, AbstractFXMLValue value) ->
+                    loadIncludeFXMLDocuments(value, resourcePath, rootPath);
+            case FXMLMapProperty(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> value) -> value.values()
+                    .forEach(value1 -> loadIncludeFXMLDocuments(value1, resourcePath, rootPath));
+            case FXMLObjectProperty(_, _, _, AbstractFXMLValue value) ->
+                    loadIncludeFXMLDocuments(value, resourcePath, rootPath);
+            case FXMLStaticObjectProperty(_, _, _, _, AbstractFXMLValue value) ->
+                    loadIncludeFXMLDocuments(value, resourcePath, rootPath);
+        }
     }
 }

@@ -13,6 +13,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -90,18 +91,35 @@ public record FXMLReader(Log log) {
         this.log = Objects.requireNonNull(log);
     }
 
-    /// Reads and parses the specified FXML file to extract its import statements and its XML structure. The resulting
-    /// data includes a list of imports and the root XML element hierarchy represented as a [ParsedFXML] instance.
+    /// Reads and parses the specified FXML file using the default character set (UTF-8).
+    /// The method extracts the import statements and the XML structure of the file and returns it as a [ParsedFXML]
+    /// instance.
     ///
     /// @param fxmlFile the path to the FXML file to read and parse. Must not be null.
-    /// @return a [ParsedFXML] instance containing the import statements and the  root XML structure of the FXML file.
+    /// @return a [ParsedFXML] instance containing the import statements and the root XML structure of the FXML file.
     /// @throws MojoExecutionException if the FXML file cannot be read or parsed due to an I/O error or XML parsing issues.
+    /// @throws NullPointerException   if `fxmlFile` is null.
     public ParsedFXML readFXML(Path fxmlFile) throws MojoExecutionException {
+        return readFXML(fxmlFile, StandardCharsets.UTF_8);
+    }
+
+    /// Reads and parses the specified FXML file to extract its import statements and its XML structure.
+    /// The resulting data includes a list of imports and the root XML element hierarchy represented as a [ParsedFXML]
+    /// instance.
+    ///
+    /// @param fxmlFile the path to the FXML file to read and parse. Must not be null.
+    /// @param charset  the character set to use for reading the file. Defaults to UTF-8 if not specified.
+    /// @return a [ParsedFXML] instance containing the import statements and the root XML structure of the FXML file.
+    /// @throws MojoExecutionException if the FXML file cannot be read or parsed due to an I/O error or XML parsing issues.
+    /// @throws NullPointerException   if `fxmlFile` or `charset` is null.
+    public ParsedFXML readFXML(Path fxmlFile, Charset charset) throws MojoExecutionException, NullPointerException {
+        Objects.requireNonNull(fxmlFile, "`fxmlFile` must not be null");
+        Objects.requireNonNull(charset, "`charset` must not be null");
         record FXMLHeaders(List<String> imports, Optional<String> language) {
         }
 
         FXMLHeaders headers;
-        try (Stream<String> lines = Files.lines(fxmlFile, StandardCharsets.UTF_8)) {
+        try (Stream<String> lines = Files.lines(fxmlFile, charset)) {
             Predicate<String> combinedPredicate = IMPORT_PATTERN.asPredicate()
                     .or(LANGUAGE_PATTERN.asPredicate());
             headers = lines.map(String::strip)

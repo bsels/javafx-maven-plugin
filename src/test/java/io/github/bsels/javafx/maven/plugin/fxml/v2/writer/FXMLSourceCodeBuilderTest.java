@@ -36,8 +36,6 @@ public class FXMLSourceCodeBuilderTest {
     private FXMLDocumentParser documentParser;
     private FXMLSourceCodeBuilder classUnderTest;
 
-    private MockedStatic<ZonedDateTime> zonedDateTimeMock;
-
     @BeforeEach
     void setUp() {
         DefaultLog log = new DefaultLog(new ConsoleLogger());
@@ -49,7 +47,7 @@ public class FXMLSourceCodeBuilderTest {
                 .isNotNull()
                 .startsWith("FXMLReader[log=");
 
-        zonedDateTimeMock = Mockito.mockStatic(ZonedDateTime.class);
+        MockedStatic<ZonedDateTime> zonedDateTimeMock = Mockito.mockStatic(ZonedDateTime.class);
         zonedDateTimeMock.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(ZONED_DATE_TIME_NOW_MOCK);
         classUnderTest = new FXMLSourceCodeBuilder(log, true);
         zonedDateTimeMock.close();
@@ -71,7 +69,11 @@ public class FXMLSourceCodeBuilderTest {
 
     private FXMLDocument parse(String fxml) throws MojoExecutionException {
         ParsedFXML parsedFXML = readFXML(fxml);
-        return documentParser.parse(parsedFXML, "/examples");
+        return documentParser.parse(parsedFXML, "/examples", getRootPath());
+    }
+
+    private Path getRootPath() {
+        return TestHelpers.getTestResourcePath("/examples").getParent();
     }
 
     @Nested
@@ -87,7 +89,8 @@ public class FXMLSourceCodeBuilderTest {
                 "/examples/GridPaneStaticPropertyElementExplicitValue.fxml",
                 "/examples/MyButtonWithConstants.fxml",
                 "/examples/MyHashMap.fxml",
-                "/examples/NodeProperties.fxml"
+                "/examples/NodeProperties.fxml",
+                "/examples/FXInclude.fxml"
         })
         void dummy(String file) throws MojoExecutionException {
             FXMLDocument document = parse(file);

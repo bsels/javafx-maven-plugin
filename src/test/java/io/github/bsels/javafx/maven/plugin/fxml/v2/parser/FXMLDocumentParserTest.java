@@ -127,6 +127,10 @@ public class FXMLDocumentParserTest {
         return fxmlReader.readFXML(fxmlFile);
     }
 
+    private Path getRootPath() {
+        return TestHelpers.getTestResourcePath("/examples").getParent();
+    }
+
     @Nested
     class ParseValueStringTest {
         private Method parseValueString;
@@ -236,7 +240,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/InMemoryScript.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -328,7 +332,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/ExternalScript.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -416,7 +420,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/%s.fxml".formatted(className));
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -504,7 +508,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/MyHashMap.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -551,7 +555,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/MapWithReferences.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -585,7 +589,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/ObservableListDefinition.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -668,7 +672,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/ColorDefinitions.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -869,7 +873,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/FXInclude.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -919,7 +923,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/%s.fxml".formatted(className));
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples/");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples/", getRootPath());
 
             // Assert
             assertThat(document)
@@ -953,7 +957,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/MyButtonWithConstants.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -993,7 +997,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/%s.fxml".formatted(className));
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -1072,7 +1076,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/GridPaneStaticPropertyElementExplicitValue.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -1169,7 +1173,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/LocationResolution.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -1221,7 +1225,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/NodeProperties.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -1311,12 +1315,24 @@ public class FXMLDocumentParserTest {
                                                                     new FXMLClassType(Object.class)
                                                             )
                                                     )
-                                                    .hasFieldOrPropertyWithValue("rawKeyClass", new FXMLClassType(Object.class))
-                                                    .hasFieldOrPropertyWithValue("rawValueClass", new FXMLClassType(Object.class))
+                                                    .hasFieldOrPropertyWithValue(
+                                                            "rawKeyClass",
+                                                            new FXMLClassType(Object.class)
+                                                    )
+                                                    .hasFieldOrPropertyWithValue(
+                                                            "rawValueClass",
+                                                            new FXMLClassType(Object.class)
+                                                    )
                                                     .extracting(FXMLMapProperty::value, MAP_VALUES_ASSERT_FACTORY)
                                                     .hasSize(3)
-                                                    .containsEntry(new FXMLLiteral("attribute"), new FXMLLiteral("Attribute"))
-                                                    .containsEntry(new FXMLLiteral("element"), new FXMLLiteral("Element"))
+                                                    .containsEntry(
+                                                            new FXMLLiteral("attribute"),
+                                                            new FXMLLiteral("Attribute")
+                                                    )
+                                                    .containsEntry(
+                                                            new FXMLLiteral("element"),
+                                                            new FXMLLiteral("Element")
+                                                    )
                                                     .hasEntrySatisfying(
                                                             new FXMLLiteral("elementValue"), value -> assertThat(value)
                                                                     .isInstanceOf(FXMLValue.class)
@@ -1345,7 +1361,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/Styling.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -1387,7 +1403,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/SetListIgnoredAsAttribute.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -1420,7 +1436,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/SetList.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -1505,7 +1521,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/SetMap.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -1569,7 +1585,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/UnsettableProperty.fxml");
 
             // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples");
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
 
             // Assert
             assertThat(document)
@@ -1603,7 +1619,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/invalid/DoubleFxRoot.fxml");
 
             // Act and Assert
-            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("fx:root must be the root element of the FXML document");
         }
@@ -1614,7 +1630,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/invalid/NotAnObjectRoot.fxml");
 
             // Act and Assert
-            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("Root object must be an instance of object, collection, or map, but was Double");
         }
@@ -1625,7 +1641,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/invalid/FXDefineRoot.fxml");
 
             // Act and Assert
-            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("Root object must be an instance of object, collection, or map, but was fx:define");
         }
@@ -1636,7 +1652,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/invalid/IncompleteFXCopy.fxml");
 
             // Act and Assert
-            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("`source` attribute is required for fx:copy");
         }
@@ -1647,7 +1663,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/invalid/IncompleteFXInclude.fxml");
 
             // Act and Assert
-            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("`source` attribute is required for fx:include");
         }
@@ -1658,7 +1674,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/invalid/IncompleteFXRoot.fxml");
 
             // Act and Assert
-            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("fx:root must have a 'type' attribute");
         }
@@ -1669,7 +1685,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/invalid/IncompleteFXReference.fxml");
 
             // Act and Assert
-            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("`source` attribute is required for fx:reference");
         }
@@ -1681,7 +1697,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/invalid/%s.fxml".formatted(file));
 
             // Act and Assert
-            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Map entry element `test` must have exactly one child element representing the value");
         }
@@ -1693,7 +1709,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/invalid/%s.fxml".formatted(file));
 
             // Act and Assert
-            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Expected single value for the static property");
         }
@@ -1704,7 +1720,7 @@ public class FXMLDocumentParserTest {
             ParsedFXML parsedFXML = readFXML("/examples/invalid/DoubleValueStyling.fxml");
 
             // Act and Assert
-            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/"))
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Multiple values found for property: style");
         }
