@@ -3,12 +3,7 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticObjectProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
@@ -43,7 +38,13 @@ final class FXMLSourceCodeBuilderTypeHelper {
     private static final FXMLClassType OBJECT_TYPE = new FXMLClassType(Object.class);
     private static final FXMLClassType STRING_TYPE = new FXMLClassType(String.class);
 
+    /// Helper instance used for managing and resolving recursive property bindings when working with FXML.
+    /// This ensures proper handling of nested property structures and prevents infinite recursion during the binding
+    /// and lookup process.
+    private final FXMLPropertyRecursionHelper propertyRecursionHelper;
+
     FXMLSourceCodeBuilderTypeHelper() {
+        this.propertyRecursionHelper = new FXMLPropertyRecursionHelper();
     }
 
     public Map<String, FXMLType> createIdentifierToTypeMap(FXMLDocument document) {
@@ -200,7 +201,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
             case FXMLInclude(FXMLIdentifier identifier, _, _, _, FXMLLazyLoadedDocument document) ->
                     Stream.of(Map.entry(
                             identifier.toString(),
-                            new Wrapper.FXMLTypeWrapper(document.get().root().type())
+                            new Wrapper.FXMLTypeWrapper(new FXMLUncompiledClassType(document.get().className()))
                     ));
             case FXMLMap(
                     FXMLIdentifier identifier,
@@ -222,7 +223,11 @@ final class FXMLSourceCodeBuilderTypeHelper {
                     List<FXMLProperty> properties
             ) -> Stream.concat(
                     properties.stream()
-                            .flatMap(this::createIdentifierToTypeMapEntry),
+                            .flatMap(property -> propertyRecursionHelper.walk(
+                                    property,
+                                    (v, _) -> createIdentifierToTypeMapEntry(v),
+                                    null
+                            )),
                     Stream.of(Map.entry(identifier.toString(), new Wrapper.FXMLTypeWrapper(type)))
             );
             case FXMLConstant _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _, FXMLReference _,
@@ -230,24 +235,6 @@ final class FXMLSourceCodeBuilderTypeHelper {
             case FXMLValue(Optional<FXMLIdentifier> identifier, FXMLType type, _) -> identifier.stream()
                     .map(FXMLIdentifier::toString)
                     .map(id -> Map.entry(id, new Wrapper.FXMLTypeWrapper(type)));
-        };
-    }
-
-    private Stream<Map.Entry<String, Wrapper>> createIdentifierToTypeMapEntry(FXMLProperty property) {
-        return switch (property) {
-            case FXMLCollectionProperties(_, _, _, List<AbstractFXMLValue> value, List<FXMLProperty> properties) ->
-                    Stream.concat(
-                            value.stream()
-                                    .flatMap(this::createIdentifierToTypeMapEntry),
-                            properties.stream()
-                                    .flatMap(this::createIdentifierToTypeMapEntry)
-                    );
-            case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> createIdentifierToTypeMapEntry(value);
-            case FXMLMapProperty(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> value) -> value.values()
-                    .stream()
-                    .flatMap(this::createIdentifierToTypeMapEntry);
-            case FXMLObjectProperty(_, _, _, AbstractFXMLValue value) -> createIdentifierToTypeMapEntry(value);
-            case FXMLStaticObjectProperty(_, _, _, _, AbstractFXMLValue value) -> createIdentifierToTypeMapEntry(value);
         };
     }
 

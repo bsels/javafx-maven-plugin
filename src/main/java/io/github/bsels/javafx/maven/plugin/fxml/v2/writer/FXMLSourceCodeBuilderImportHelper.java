@@ -1,6 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
@@ -66,10 +67,104 @@ final class FXMLSourceCodeBuilderImportHelper {
                     state.forEach((key, value) -> downstream.push(new ClassCount(key, value)))
     );
 
+    /// Helper instance used for managing and resolving recursive property bindings when working with FXML.
+    /// This ensures proper handling of nested property structures and prevents infinite recursion during the binding
+    /// and lookup process.
+    private final FXMLPropertyRecursionHelper propertyRecursionHelper;
+
     /// A helper class designed to assist in counting and managing FXML-related classes.
     /// This class serves as a utility for performing operations related to FXML class counting.
     /// It does not accept parameters in its constructor and provides functionality related to FXML class analysis and handling.
     FXMLSourceCodeBuilderImportHelper() {
+        this.propertyRecursionHelper = new FXMLPropertyRecursionHelper();
+    }
+
+    /// Finds and organizes the class imports required for the given FXML document.
+    ///
+    /// @param document               the FXMLDocument to process. Must not be null.
+    /// @param addGeneratedAnnotation a boolean flag indicating whether to include a generated annotation in the processing logic.
+    /// @return an Imports object containing the list of import statements and a mapping of inline class names.
+    /// @throws NullPointerException if the provided document is null.
+    public Imports findImports(FXMLDocument document, boolean addGeneratedAnnotation) throws NullPointerException {
+        Objects.requireNonNull(document, "`document` must not be null");
+        List<String> documentClassNames = getDocumentClassNames(document).toList();
+        List<ClassCount> classCounts = findClassCounts(document, addGeneratedAnnotation);
+        Map<String, List<ClassCount>> groupedClassCounts = groupClassCountsBasedOnClassPrefix(classCounts);
+        List<GroupedClassCount> groupedClassCountList = groupedClassCounts.entrySet()
+                .stream()
+                .map(this::buildGroupedClassCount)
+                .sorted(Comparator.comparingInt(GroupedClassCount::count).reversed())
+                .toList();
+        List<String> imports = new ArrayList<>();
+        Map<String, String> inlineClassNames = new HashMap<>();
+        for (GroupedClassCount groupedClassCount : groupedClassCountList) {
+            String groupClassName = groupedClassCount.group();
+            String simpleClassName = getSimpleClassName(groupClassName);
+            boolean simpleClassNameAlreadyImported = imports.stream()
+                    .map(this::getSimpleClassName)
+                    .anyMatch(simpleClassName::equals);
+            if (
+                    simpleClassNameAlreadyImported &&
+                            documentClassNames.stream().anyMatch(className -> className.endsWith(simpleClassName))
+            ) {
+                groupedClassCount.classes()
+                        .stream()
+                        .map(ClassCount::fullClassName)
+                        .forEach(fullClassName -> inlineClassNames.put(fullClassName, fullClassName));
+            } else {
+                imports.add(groupClassName);
+                groupedClassCount.classes()
+                        .stream()
+                        .map(ClassCount::fullClassName)
+                        .forEach(className -> inlineClassNames.put(
+                                className,
+                                className.substring(className.indexOf(simpleClassName))
+                        ));
+            }
+        }
+        return new Imports(imports, inlineClassNames);
+    }
+
+    /// Retrieves a stream of class names associated with the given FXML document.
+    ///
+    /// @param document the [FXMLDocument] object whose class names are to be retrieved
+    /// @return a [Stream] of class names as Strings, including the document's own class name, the class names from its root, and the class names from its definitions
+    private Stream<String> getDocumentClassNames(FXMLDocument document) {
+        return Stream.concat(
+                Stream.of(document.className()),
+                Stream.concat(
+                        getDocumentClassNames(document.root()),
+                        document.definitions()
+                                .stream()
+                                .flatMap(this::getDocumentClassNames)
+                )
+        );
+    }
+
+    /// Extracts a stream of class names from an [AbstractFXMLValue] instance.
+    /// The method traverses various types of FXML structures, such as collections, maps, objects,
+    /// and included documents, recursively collecting relevant class names.
+    ///
+    /// @param value the [AbstractFXMLValue] instance to process, which can represent different FXML constructs such as collections, maps, objects, includes, or individual elements.
+    /// @return a stream of class names extracted from the given [AbstractFXMLValue] instance, or an empty stream if no class names are present.
+    private Stream<String> getDocumentClassNames(AbstractFXMLValue value) {
+        return switch (value) {
+            case FXMLCollection(_, _, _, List<AbstractFXMLValue> values) -> values.stream()
+                    .flatMap(this::getDocumentClassNames);
+            case FXMLMap(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> entries) -> entries.values()
+                    .stream()
+                    .flatMap(this::getDocumentClassNames);
+            case FXMLObject(_, _, _, List<FXMLProperty> properties) -> properties.stream()
+                    .flatMap(property -> propertyRecursionHelper.walk(
+                            property,
+                            (v, _) -> getDocumentClassNames(v),
+                            null
+                    ));
+            case FXMLInclude(_, _, _, _, FXMLLazyLoadedDocument lazyLoadedDocument) ->
+                    getDocumentClassNames(lazyLoadedDocument.get());
+            case FXMLConstant _, FXMLCopy _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _,
+                 FXMLReference _, FXMLResource _, FXMLTranslation _, FXMLValue _ -> Stream.empty();
+        };
     }
 
     /// Finds and returns a list of class counts derived from the provided FXML document.
@@ -80,7 +175,7 @@ final class FXMLSourceCodeBuilderImportHelper {
     /// @param addGeneratedAnnotation whether to include generated annotation in class counts
     /// @return a list of [ClassCount] objects representing the count of occurrences for each class within the provided [FXMLDocument]
     /// @throws NullPointerException if the provided document is null
-    public List<ClassCount> findClassCounts(FXMLDocument document, boolean addGeneratedAnnotation)
+    private List<ClassCount> findClassCounts(FXMLDocument document, boolean addGeneratedAnnotation)
             throws NullPointerException {
         Objects.requireNonNull(document, "`document` must not be null");
         final Stream<ClassCount> generationAnnotation;
@@ -105,50 +200,6 @@ final class FXMLSourceCodeBuilderImportHelper {
                 )
                 .gather(CLASS_COUNT_MERGER)
                 .toList();
-    }
-
-    /// Analyzes a list of [ClassCount] objects to determine the necessary import statements and inline class names.
-    /// The method groups classes by their package, sorts them by their usage count in descending order,
-    /// and resolves import conflicts by determining which classes should be imported or referenced inline.
-    ///
-    /// @param classCounts  a list of [ClassCount] objects, each representing the usage count of a fully qualified class name. Must not be null.
-    /// @param ownClassName the name of the class that is currently being analyzed. Must not be null.
-    /// @return an [Imports] object containing the list of import statements and a mapping of inline class names to their resolved representations.
-    /// @throws NullPointerException if `classCounts` is null
-    public Imports findImports(List<ClassCount> classCounts, String ownClassName) throws NullPointerException {
-        Objects.requireNonNull(classCounts, "`classCounts` must not be null");
-        Objects.requireNonNull(ownClassName, "`ownClassName` must not be null");
-        Map<String, List<ClassCount>> groupedClassCounts = groupClassCountsBasedOnClassPrefix(classCounts);
-        List<GroupedClassCount> groupedClassCountList = groupedClassCounts.entrySet()
-                .stream()
-                .map(this::buildGroupedClassCount)
-                .sorted(Comparator.comparingInt(GroupedClassCount::count).reversed())
-                .toList();
-        List<String> imports = new ArrayList<>();
-        Map<String, String> inlineClassNames = new HashMap<>();
-        for (GroupedClassCount groupedClassCount : groupedClassCountList) {
-            String groupClassName = groupedClassCount.group();
-            String simpleClassName = getSimpleClassName(groupClassName);
-            boolean simpleClassNameAlreadyImported = imports.stream()
-                    .map(this::getSimpleClassName)
-                    .anyMatch(simpleClassName::equals);
-            if (simpleClassNameAlreadyImported && ownClassName.endsWith(simpleClassName)) {
-                groupedClassCount.classes()
-                        .stream()
-                        .map(ClassCount::fullClassName)
-                        .forEach(fullClassName -> inlineClassNames.put(fullClassName, fullClassName));
-            } else {
-                imports.add(groupClassName);
-                groupedClassCount.classes()
-                        .stream()
-                        .map(ClassCount::fullClassName)
-                        .forEach(className -> inlineClassNames.put(
-                                className,
-                                className.substring(className.indexOf(simpleClassName))
-                        ));
-            }
-        }
-        return new Imports(imports, inlineClassNames);
     }
 
     /// Builds an [GroupedClassCount] object based on the provided entry containing group information and a list of
@@ -235,8 +286,19 @@ final class FXMLSourceCodeBuilderImportHelper {
             case FXMLObject fxmlObject -> findFXMLObjectClassCount(fxmlObject);
             case FXMLValue(_, FXMLType type, _) -> findFXMLTypeClassCounts(type);
             case FXMLConstant(FXMLClassType clazz, _, _) -> findFXMLTypeClassCounts(clazz);
-            case FXMLCopy _, FXMLExpression _, FXMLInclude _, FXMLInlineScript _, FXMLLiteral _, FXMLReference _,
-                 FXMLResource _, FXMLTranslation _ -> Stream.<ClassCount>empty();
+            case FXMLInclude(_, _, _, _, FXMLLazyLoadedDocument lazyLoadedDocument) -> Stream.concat(
+                    Stream.concat(
+                            findAbstractFXMLValueClassCount(lazyLoadedDocument.get().root()),
+                            lazyLoadedDocument.get().controller()
+                                    .stream()
+                                    .flatMap(this::findControllerClassCounts)
+                    ),
+                    lazyLoadedDocument.get().definitions()
+                            .stream()
+                            .flatMap(this::findAbstractFXMLValueClassCount)
+            );
+            case FXMLCopy _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLReference _, FXMLResource _,
+                 FXMLTranslation _ -> Stream.<ClassCount>empty();
         }).gather(CLASS_COUNT_MERGER);
     }
 

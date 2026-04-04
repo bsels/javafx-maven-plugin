@@ -15,6 +15,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticObjectProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
@@ -46,6 +47,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 public final class FXMLSourceCodeBuilder {
     private static final String INTERNAL_RESOURCE_BUNDLE = "$INTERNAL$RESOURCE$BUNDLE$";
@@ -107,11 +109,22 @@ public final class FXMLSourceCodeBuilder {
     private final FXMLSourceCodeBuilderTypeHelper typeHelper;
     private final boolean addGeneratedAnnotation;
     private final ZonedDateTime buildTime;
+    private final String defaultResourceBundle;
+    /// Helper instance used for managing and resolving recursive property bindings when working with FXML.
+    /// This ensures proper handling of nested property structures and prevents infinite recursion during the binding
+    /// and lookup process.
+    private final FXMLPropertyRecursionHelper propertyRecursionHelper;
 
-    public FXMLSourceCodeBuilder(Log log, boolean addGeneratedAnnotation) {
+    public FXMLSourceCodeBuilder(Log log, String defaultResourceBundle, boolean addGeneratedAnnotation)
+            throws NullPointerException {
         this.log = Objects.requireNonNull(log, "`log` must not be null");
+        this.defaultResourceBundle = Objects.requireNonNull(
+                defaultResourceBundle,
+                "`defaultResourceBundle` must not be null"
+        );
         this.builderImportHelper = new FXMLSourceCodeBuilderImportHelper();
         this.typeHelper = new FXMLSourceCodeBuilderTypeHelper();
+        this.propertyRecursionHelper = new FXMLPropertyRecursionHelper();
         this.addGeneratedAnnotation = addGeneratedAnnotation;
         this.buildTime = ZonedDateTime.now(ZoneOffset.UTC);
     }
@@ -119,28 +132,48 @@ public final class FXMLSourceCodeBuilder {
     public String generateSourceCode(FXMLDocument document, String packageName) throws NullPointerException {
         Objects.requireNonNull(document, "`document` must not be null");
         log.debug("Generating source code for FXML document with classname: %s".formatted(document.className()));
-        Map<String, FXMLType> identifierToTypeMap = typeHelper.createIdentifierToTypeMap(document);
 
-        List<ClassCount> classCountList = builderImportHelper.findClassCounts(document, addGeneratedAnnotation);
-        Imports imports = builderImportHelper.findImports(classCountList, document.className());
-        SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(imports, identifierToTypeMap);
+        Map<String, FXMLType> identifierToTypeMap = typeHelper.createIdentifierToTypeMap(document);
+        SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                builderImportHelper.findImports(document, addGeneratedAnnotation),
+                defaultResourceBundle,
+                identifierToTypeMap
+        );
+
+        return internalGenerateSourceCode(document, context, packageName, true);
+    }
+
+    private String internalGenerateSourceCode(
+            FXMLDocument document,
+            SourceCodeGeneratorContext context,
+            String packageName,
+            boolean isRootDocument
+    ) {
 
         addPackageLine(context, packageName);
         addImports(context);
         addFields(context, document);
         addConstructorEpilogue(context, document);
+        addInnerClass(document, context);
 
         // The class declaration should be done last
-        addClassDeclaration(context, document);
-        return generateSourceCode(context, document.className(), addGeneratedAnnotation);
+        addClassDeclaration(context, document, isRootDocument);
+        return generateSourceCode(context, document.className(), isRootDocument, addGeneratedAnnotation);
     }
 
-    private String generateSourceCode(SourceCodeGeneratorContext context, String className, boolean addGeneratedAnnotation) {
-        StringBuilder sourceCode = new StringBuilder()
-                .append(context.sourceCode(SourcePart.PACKAGE))
-                .append(context.sourceCode(SourcePart.IMPORTS));
+    private String generateSourceCode(
+            SourceCodeGeneratorContext context,
+            String className,
+            boolean isRootDocument,
+            boolean addGeneratedAnnotation
+    ) {
+        StringBuilder sourceCode = new StringBuilder();
+        if (isRootDocument) {
+            sourceCode.append(context.sourceCode(SourcePart.PACKAGE))
+                    .append(context.sourceCode(SourcePart.IMPORTS));
+        }
 
-        if (addGeneratedAnnotation) {
+        if (isRootDocument && addGeneratedAnnotation) {
             sourceCode.append('@')
                     .append(typeHelper.typeToSourceCode(context, FXMLType.of(Generated.class)))
                     .append("(\n    value=\"")
@@ -152,10 +185,11 @@ public final class FXMLSourceCodeBuilder {
 
         sourceCode.append(context.sourceCode(SourcePart.CLASS_DECLARATION)).append(" {\n");
         if (context.hasFeature(Feature.RESOURCE_BUNDLE)) {
-            // TODO: Assign the resource bundle
             sourceCode.append("private static final java.util.ResourceBundle ")
                     .append(INTERNAL_RESOURCE_BUNDLE)
-                    .append(" = null;\n\n");
+                    .append(" = ")
+                    .append(context.resourceBundle())
+                    .append(";\n\n");
         }
         sourceCode.append(context.sourceCode(SourcePart.FIELDS).toString().indent(4));
 
@@ -170,6 +204,7 @@ public final class FXMLSourceCodeBuilder {
                 .append("super();".indent(8))
                 .append(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString().indent(8))
                 .append("}\n".indent(4))
+                .append('\n')
                 .append(context.sourceCode(SourcePart.METHODS).toString().indent(4));
 
         if (context.hasFeature(Feature.STRING_TO_URL_METHOD)) {
@@ -188,6 +223,8 @@ public final class FXMLSourceCodeBuilder {
             sourceCode.append(INTERNAL_STRING_TO_FILE_METHOD_BODY.indent(4))
                     .append('\n');
         }
+
+        sourceCode.append(context.sourceCode(SourcePart.NESTED_TYPES).toString().indent(4));
 
         return sourceCode.append("}\n")
                 .toString();
@@ -215,91 +252,92 @@ public final class FXMLSourceCodeBuilder {
 
     private void addFields(SourceCodeGeneratorContext context, FXMLDocument document) {
         StringBuilder sourceCode = context.sourceCode(SourcePart.FIELDS);
-        document.controller()
-                .ifPresent(c -> sourceCode
-                        .append("private final ")
-                        .append(typeHelper.typeToSourceCode(context, c.controllerClass()))
-                        .append(' ')
-                        .append(INTERNAL_CONTROLLER_FIELD)
-                        .append(";\n"));
-        addFields(context, document.root());
-        document.definitions()
-                .forEach(d -> addFields(context, d));
-        sourceCode
+        Stream.concat(
+                        document.controller()
+                                .stream()
+                                .map(c -> "private final %s %s;\n".formatted(
+                                        typeHelper.typeToSourceCode(context, c.controllerClass()),
+                                        INTERNAL_CONTROLLER_FIELD
+                                )),
+                        Stream.concat(
+                                addFields(document.root(), context),
+                                document.definitions()
+                                        .stream()
+                                        .flatMap(d -> addFields(d, context))
+                        )
+                )
+                .sorted()
+                .reduce(sourceCode, StringBuilder::append, StringBuilder::append)
                 .append("\n");
     }
 
-    private void addFields(SourceCodeGeneratorContext context, AbstractFXMLValue value) {
-        switch (value) {
-            case FXMLCollection(FXMLIdentifier identifier, FXMLType type, _, List<AbstractFXMLValue> values) -> {
-                identifierToField(context, identifier, type);
-                values.forEach(v -> addFields(context, v));
-            }
+    private Stream<String> addFields(AbstractFXMLValue value, SourceCodeGeneratorContext context) {
+        return switch (value) {
+            case FXMLCollection(FXMLIdentifier identifier, FXMLType type, _, List<AbstractFXMLValue> values) ->
+                    Stream.concat(
+                            identifierToField(context, identifier, type),
+                            values.stream().flatMap(v -> addFields(v, context))
+                    );
             case FXMLCopy(FXMLIdentifier identifier, String name) ->
                     identifierToField(context, identifier, context.identifierToTypeMap().get(name));
             case FXMLInclude(FXMLIdentifier identifier, _, _, _, FXMLLazyLoadedDocument document) -> {
                 FXMLDocument fxmlDocument = document.get();
-                identifierToField(context, identifier, fxmlDocument.root().type());
-                fxmlDocument.controller()
-                        .ifPresent(
-                                controller -> identifierToField(
-                                        context,
-                                        new FXMLExposedIdentifier(identifier + "Controller"),
-                                        controller.controllerClass()
+                yield Stream.concat(
+                        identifierToField(context, identifier, new FXMLUncompiledClassType(fxmlDocument.className())),
+                        fxmlDocument.controller()
+                                .stream()
+                                .flatMap(controller -> identifierToField(
+                                                context,
+                                                new FXMLExposedIdentifier(identifier + "Controller"),
+                                                controller.controllerClass()
+                                        )
                                 )
-                        );
+                );
             }
             case FXMLMap(
                     FXMLIdentifier identifier, FXMLType type, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> entries
-            ) -> {
-                identifierToField(context, identifier, type);
-                entries.values().forEach(v -> addFields(context, v));
-            }
-            case FXMLObject(FXMLIdentifier identifier, FXMLType type, _, List<FXMLProperty> properties) -> {
-                identifierToField(context, identifier, type);
-                properties.forEach(p -> addFields(context, p));
-            }
-            case FXMLConstant _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _, FXMLReference _, FXMLResource _, FXMLTranslation _ -> {
-            }
-            case FXMLValue(Optional<FXMLIdentifier> identifier, FXMLType type, _) ->
-                    identifier.ifPresent(id -> identifierToField(context, id, type));
-        }
+            ) -> Stream.concat(
+                    identifierToField(context, identifier, type),
+                    entries.values().stream().flatMap(v -> addFields(v, context))
+            );
+            case FXMLObject(FXMLIdentifier identifier, FXMLType type, _, List<FXMLProperty> properties) ->
+                    Stream.concat(
+                            identifierToField(context, identifier, type),
+                            properties.stream().flatMap(
+                                    property -> propertyRecursionHelper.walk(property, this::addFields, context)
+                            )
+                    );
+            case FXMLConstant _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _, FXMLReference _,
+                 FXMLResource _, FXMLTranslation _ -> Stream.empty();
+            case FXMLValue(Optional<FXMLIdentifier> identifier, FXMLType type, _) -> identifier.stream()
+                    .flatMap(id -> identifierToField(context, id, type));
+        };
     }
 
-    private void addFields(SourceCodeGeneratorContext context, FXMLProperty property) {
-        switch (property) {
-            case FXMLCollectionProperties(_, _, _, List<AbstractFXMLValue> value, List<FXMLProperty> properties) -> {
-                value.forEach(v -> addFields(context, v));
-                properties.forEach(p -> addFields(context, p));
-            }
-            case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> addFields(context, value);
-            case FXMLMapProperty(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> value) ->
-                    value.values().forEach(v -> addFields(context, v));
-            case FXMLObjectProperty(_, _, _, AbstractFXMLValue value) -> addFields(context, value);
-            case FXMLStaticObjectProperty(_, _, _, _, AbstractFXMLValue value) -> addFields(context, value);
-        }
+    private Stream<String> identifierToField(SourceCodeGeneratorContext context, FXMLIdentifier identifier, FXMLType type) {
+        return switch (identifier) {
+            case FXMLExposedIdentifier(String name) ->
+                    Stream.of("protected final %s %s;\n".formatted(typeHelper.typeToSourceCode(context, type), name));
+            case FXMLInternalIdentifier id ->
+                    Stream.of("private final %s %s;\n".formatted(typeHelper.typeToSourceCode(context, type), id));
+            case FXMLNamedRootIdentifier _, FXMLRootIdentifier _ -> Stream.empty();
+        };
     }
 
-    private void identifierToField(SourceCodeGeneratorContext context, FXMLIdentifier identifier, FXMLType type) {
-        switch (identifier) {
-            case FXMLExposedIdentifier(String name) -> context.sourceCode(SourcePart.FIELDS)
-                    .append("protected final ")
-                    .append(typeHelper.typeToSourceCode(context, type))
-                    .append(" ").append(name).append(";\n");
-            case FXMLInternalIdentifier id -> context.sourceCode(SourcePart.FIELDS)
-                    .append("private final ")
-                    .append(typeHelper.typeToSourceCode(context, type))
-                    .append(" ").append(id).append(";\n");
-            case FXMLNamedRootIdentifier _, FXMLRootIdentifier _ -> {
-            }
-        }
-    }
-
-    private void addClassDeclaration(SourceCodeGeneratorContext context, FXMLDocument document) {
+    private void addClassDeclaration(SourceCodeGeneratorContext context, FXMLDocument document, boolean isRootDocument) {
         StringBuilder sourceCode = context.sourceCode(SourcePart.CLASS_DECLARATION);
-        sourceCode.append("public ");
-        if (context.hasFeature(Feature.ABSTRACT_CLASS)) {
-            sourceCode.append("abstract ");
+        if (isRootDocument) {
+            sourceCode.append("public ");
+            if (context.hasFeature(Feature.ABSTRACT_CLASS)) {
+                sourceCode.append("abstract ");
+            }
+        } else {
+            sourceCode.append("private static ");
+            if (context.hasFeature(Feature.ABSTRACT_CLASS)) {
+                throw new UnsupportedOperationException(
+                        "Abstract inner classes for included FXML documents are not supported."
+                );
+            }
         }
         sourceCode.append("class ")
                 .append(document.className())
@@ -378,9 +416,7 @@ public final class FXMLSourceCodeBuilder {
                 value.forEach(v -> addConstructorEpilogue(context, v));
                 properties.forEach(p -> addConstructorEpilogue(context, collectionSelection, p));
             }
-            case FXMLConstructorProperty _ -> {
-                // Added in the constructor prologue during the constructor call
-            }
+            case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> addConstructorEpilogue(context, value);
             case FXMLMapProperty(
                     _,
                     String getter,
@@ -477,6 +513,48 @@ public final class FXMLSourceCodeBuilder {
             }
             case FXMLValue(Optional<FXMLIdentifier> identifier, FXMLType t, String v) ->
                     identifier.map(FXMLIdentifier::toString).orElseGet(() -> typeHelper.encodeLiteral(context, v, t));
+        };
+    }
+
+    private void addInnerClass(FXMLDocument document, SourceCodeGeneratorContext context) {
+        StringBuilder sourceCode = context.sourceCode(SourcePart.NESTED_TYPES);
+        Stream.concat(
+                        addInnerClass(document.root(), context),
+                        document.definitions()
+                                .stream()
+                                .flatMap(value -> addInnerClass(value, context))
+                )
+                .reduce(sourceCode, StringBuilder::append, StringBuilder::append)
+                .append("\n");
+    }
+
+    private Stream<String> addInnerClass(AbstractFXMLValue value, SourceCodeGeneratorContext context) {
+        return switch (value) {
+            case FXMLCollection(_, _, _, List<AbstractFXMLValue> values) -> values.stream()
+                    .flatMap(v -> addInnerClass(v, context));
+            case FXMLMap(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> entries) -> entries.values()
+                    .stream()
+                    .flatMap(v -> addInnerClass(v, context));
+            case FXMLObject(_, _, _, List<FXMLProperty> properties) -> properties.stream()
+                    .flatMap(property -> propertyRecursionHelper.walk(property, this::addInnerClass, context));
+            case FXMLInclude(_, String sourceFile, _, Optional<String> resources, FXMLLazyLoadedDocument document) -> {
+                if (context.seenNestedFXMLFiles().add(sourceFile)) {
+                    yield Stream.of(internalGenerateSourceCode(
+                            document.get(),
+                            context.with(
+                                    resources.map(typeHelper::encodeString)
+                                            .map("java.util.ResourceBundle.getBundle(%s)"::formatted)
+                                            .orElse(context.resourceBundle())
+                            ),
+                            null,
+                            false
+                    ));
+                } else {
+                    yield Stream.empty();
+                }
+            }
+            case FXMLConstant _, FXMLCopy _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _,
+                 FXMLReference _, FXMLResource _, FXMLTranslation _, FXMLValue _ -> Stream.empty();
         };
     }
 }

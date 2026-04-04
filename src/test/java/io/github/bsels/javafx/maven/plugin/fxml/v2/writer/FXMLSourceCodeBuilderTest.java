@@ -49,7 +49,7 @@ public class FXMLSourceCodeBuilderTest {
 
         MockedStatic<ZonedDateTime> zonedDateTimeMock = Mockito.mockStatic(ZonedDateTime.class);
         zonedDateTimeMock.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(ZONED_DATE_TIME_NOW_MOCK);
-        classUnderTest = new FXMLSourceCodeBuilder(log, true);
+        classUnderTest = new FXMLSourceCodeBuilder(log, "org.example.Translations.RESOURCE_BUNDLE", true);
         zonedDateTimeMock.close();
     }
 
