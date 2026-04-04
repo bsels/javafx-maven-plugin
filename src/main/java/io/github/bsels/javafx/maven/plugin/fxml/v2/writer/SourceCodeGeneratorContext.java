@@ -11,6 +11,16 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+/// Represents the context used during Java source code generation for an FXML document.
+/// It maintains the generated source code parts, imports, features, and other necessary metadata.
+///
+/// @param sourceCode          A map containing `StringBuilder` instances for each [SourcePart].
+/// @param resourceBundle      The resource bundle expression used for translations.
+/// @param imports             The [Imports] needed for the generated source code.
+/// @param fieldDefinitions    A list of field definition strings.
+/// @param features            A set of [Feature]s identified as necessary for the generated code.
+/// @param identifierToTypeMap A map from FXML identifiers to their corresponding [FXMLType]s.
+/// @param seenNestedFXMLFiles A set of paths to FXML files that have already been processed as nested includes.
 record SourceCodeGeneratorContext(
         Map<SourcePart, StringBuilder> sourceCode,
         String resourceBundle,
@@ -21,6 +31,16 @@ record SourceCodeGeneratorContext(
         Set<String> seenNestedFXMLFiles
 ) {
 
+    /// Constructs a `SourceCodeGeneratorContext` and validates that all parameters are non-null.
+    ///
+    /// @param sourceCode          A map containing `StringBuilder` instances for each [SourcePart].
+    /// @param resourceBundle      The resource bundle expression used for translations.
+    /// @param imports             The [Imports] needed for the generated source code.
+    /// @param fieldDefinitions    A list of field definition strings.
+    /// @param features            A set of [Feature]s identified as necessary for the generated code.
+    /// @param identifierToTypeMap A map from FXML identifiers to their corresponding [FXMLType]s.
+    /// @param seenNestedFXMLFiles A set of paths to FXML files that have already been processed as nested includes.
+    /// @throws NullPointerException If any of the parameters is null.
     public SourceCodeGeneratorContext {
         Objects.requireNonNull(sourceCode, "`sourceCode` must not be null");
         Objects.requireNonNull(resourceBundle, "`resourceBundle` must not be null");
@@ -31,6 +51,11 @@ record SourceCodeGeneratorContext(
         Objects.requireNonNull(seenNestedFXMLFiles, "`seenNestedFXMLFiles` must not be null");
     }
 
+    /// Creates a new `SourceCodeGeneratorContext` with default empty collections.
+    ///
+    /// @param imports             The [Imports] for the generated source code.
+    /// @param resourceBundle      The initial resource bundle expression.
+    /// @param identifierToTypeMap A map from FXML identifiers to their corresponding [FXMLType]s.
     public SourceCodeGeneratorContext(Imports imports, String resourceBundle, Map<String, FXMLType> identifierToTypeMap) {
         Map<SourcePart, StringBuilder> sourceCode = createSourceCodeBuilders();
         this(
@@ -44,6 +69,9 @@ record SourceCodeGeneratorContext(
         );
     }
 
+    /// Creates a map of [StringBuilder]s for each [SourcePart].
+    ///
+    /// @return An unmodifiable map containing a `StringBuilder` for each `SourcePart`.
     private static Map<SourcePart, StringBuilder> createSourceCodeBuilders() {
         Map<SourcePart, StringBuilder> sourceCode = new EnumMap<>(SourcePart.class);
         for (SourcePart part : SourcePart.values()) {
@@ -52,18 +80,34 @@ record SourceCodeGeneratorContext(
         return Collections.unmodifiableMap(sourceCode);
     }
 
+    /// Retrieves the [StringBuilder] for the specified [SourcePart].
+    ///
+    /// @param part The `SourcePart` for which to get the `StringBuilder`.
+    /// @return The `StringBuilder` associated with the given `SourcePart`.
     public StringBuilder sourceCode(SourcePart part) {
         return sourceCode.get(part);
     }
 
+    /// Checks if a [Feature] is present in this context.
+    ///
+    /// @param feature The `Feature` to check.
+    /// @return `true` if the feature is present, `false` otherwise.
     public boolean hasFeature(Feature feature) {
         return features.contains(feature);
     }
 
+    /// Adds a [Feature] to this context.
+    ///
+    /// @param feature The `Feature` to add.
     public void addFeature(Feature feature) {
         features.add(feature);
     }
 
+    /// Creates a copy of this context with a new resource bundle.
+    /// The copied context uses fresh `StringBuilder` instances for its source code.
+    ///
+    /// @param resourceBundle The new resource bundle expression.
+    /// @return A new `SourceCodeGeneratorContext` with the updated resource bundle.
     public SourceCodeGeneratorContext with(String resourceBundle) {
         return new SourceCodeGeneratorContext(
                 createSourceCodeBuilders(),

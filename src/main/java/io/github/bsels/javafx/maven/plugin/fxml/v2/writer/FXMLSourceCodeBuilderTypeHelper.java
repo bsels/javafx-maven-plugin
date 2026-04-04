@@ -34,8 +34,12 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/// A helper class for handling [FXMLType]s and their conversion to Java source code.
+/// It provides methods for creating type mappings, encoding literals, and generating class names.
 final class FXMLSourceCodeBuilderTypeHelper {
+    /// The [FXMLClassType] for [Object].
     private static final FXMLClassType OBJECT_TYPE = new FXMLClassType(Object.class);
+    /// The [FXMLClassType] for [String].
     private static final FXMLClassType STRING_TYPE = new FXMLClassType(String.class);
 
     /// Helper instance used for managing and resolving recursive property bindings when working with FXML.
@@ -43,10 +47,15 @@ final class FXMLSourceCodeBuilderTypeHelper {
     /// and lookup process.
     private final FXMLPropertyRecursionHelper propertyRecursionHelper;
 
+    /// Constructs a new `FXMLSourceCodeBuilderTypeHelper` instance.
     FXMLSourceCodeBuilderTypeHelper() {
         this.propertyRecursionHelper = new FXMLPropertyRecursionHelper();
     }
 
+    /// Creates a mapping from FXML identifiers to their corresponding [FXMLType]s for the given document.
+    ///
+    /// @param document The [FXMLDocument] to process.
+    /// @return A map associating FXML identifiers with their resolved types.
     public Map<String, FXMLType> createIdentifierToTypeMap(FXMLDocument document) {
         Map<String, Wrapper> identifierTypeMap = Stream.concat(
                         Stream.of(document.root()),
@@ -68,10 +77,22 @@ final class FXMLSourceCodeBuilderTypeHelper {
                 );
     }
 
+    /// Returns the appropriate type for a map entry.
+    /// If the type is [Object], it defaults to [String].
+    ///
+    /// @param type The [FXMLClassType] to convert.
+    /// @return The resolved [FXMLClassType].
     public FXMLClassType getTypeForMapEntry(FXMLClassType type) {
         return OBJECT_TYPE.equals(type) ? STRING_TYPE : type;
     }
 
+    /// Encodes a literal value for use in Java source code.
+    ///
+    /// @param context The [SourceCodeGeneratorContext].
+    /// @param value   The literal value as a string.
+    /// @param type    The [FXMLType] of the literal.
+    /// @return The Java source code representation of the literal.
+    /// @throws IllegalArgumentException If the literal is invalid for the given type.
     public String encodeLiteral(SourceCodeGeneratorContext context, String value, FXMLType type) {
         if (type instanceof FXMLClassType(Class<?> clazz)) {
             if (clazz.isAssignableFrom(String.class)) {
@@ -133,10 +154,19 @@ final class FXMLSourceCodeBuilderTypeHelper {
         return "%s.valueOf(%s)".formatted(typeToSourceCode(context, type), encodeString(value));
     }
 
+    /// Encodes a string for use in Java source code.
+    ///
+    /// @param translationKey The string to encode.
+    /// @return The Java source code representation of the string.
     public String encodeString(String translationKey) {
         return ObjectMapperProvider.encodeObject(translationKey);
     }
 
+    /// Converts an [FXMLType] to its Java source code representation.
+    ///
+    /// @param context The [SourceCodeGeneratorContext].
+    /// @param type    The [FXMLType] to convert.
+    /// @return The Java source code representation of the type.
     public String typeToSourceCode(SourceCodeGeneratorContext context, FXMLType type) {
         return switch (type) {
             case FXMLClassType(Class<?> clazz) -> createBaseTypeSourceCode(context, clazz.getName());
@@ -149,12 +179,23 @@ final class FXMLSourceCodeBuilderTypeHelper {
         };
     }
 
+    /// Creates the Java source code for a base type.
+    ///
+    /// @param context   The [SourceCodeGeneratorContext].
+    /// @param className The fully qualified class name.
+    /// @return The simple or fully qualified class name, depending on imports.
     private String createBaseTypeSourceCode(SourceCodeGeneratorContext context, String className) {
         return context.imports()
                 .inlineClassNames()
                 .getOrDefault(className, className);
     }
 
+    /// Creates the Java source code for a generic type.
+    ///
+    /// @param context   The [SourceCodeGeneratorContext].
+    /// @param className The fully qualified class name.
+    /// @param generics  The list of [FXMLType] generic arguments.
+    /// @return The Java source code for the generic type.
     private String createGenericTypeSourceCode(
             SourceCodeGeneratorContext context,
             String className,
@@ -175,6 +216,12 @@ final class FXMLSourceCodeBuilderTypeHelper {
                 .toString();
     }
 
+    /// Recursively finds the [FXMLType] for a given [Wrapper] value in the type map.
+    ///
+    /// @param typeMap The map of identifiers to [Wrapper] values.
+    /// @param value   The [Wrapper] value to resolve.
+    /// @return The resolved [FXMLType].
+    /// @throws java.util.NoSuchElementException If the reference cannot be resolved.
     private FXMLType findTypeRecursion(Map<String, Wrapper> typeMap, Wrapper value) {
         return switch (value) {
             case Wrapper.FXMLTypeWrapper(FXMLType type) -> type;
@@ -184,6 +231,10 @@ final class FXMLSourceCodeBuilderTypeHelper {
         };
     }
 
+    /// Creates a stream of mapping entries from FXML identifiers to their [Wrapper] values for a given FXML value.
+    ///
+    /// @param value The [AbstractFXMLValue] to process.
+    /// @return A stream of identifier-to-wrapper entries.
     private Stream<Map.Entry<String, Wrapper>> createIdentifierToTypeMapEntry(AbstractFXMLValue value) {
         return switch (value) {
             case FXMLCollection(
@@ -238,16 +289,29 @@ final class FXMLSourceCodeBuilderTypeHelper {
         };
     }
 
+    /// A sealed interface used as a container for either an [FXMLType] or a reference to another identifier.
     private sealed interface Wrapper {
+        /// A wrapper for an [FXMLType].
+        ///
+        /// @param type The [FXMLType] being wrapped.
         record FXMLTypeWrapper(FXMLType type) implements Wrapper {
 
+            /// Constructs an `FXMLTypeWrapper` and ensures the type is not null.
+            ///
+            /// @param type The [FXMLType] being wrapped.
             public FXMLTypeWrapper {
                 Objects.requireNonNull(type, "`type` must not be null");
             }
         }
 
+        /// A wrapper for a reference to another FXML identifier.
+        ///
+        /// @param reference The name of the FXML identifier being referenced.
         record ReferenceWrapper(String reference) implements Wrapper {
 
+            /// Constructs a `ReferenceWrapper` and ensures the reference name is not null.
+            ///
+            /// @param reference The name of the FXML identifier being referenced.
             public ReferenceWrapper {
                 Objects.requireNonNull(reference, "`reference` must not be null");
             }
