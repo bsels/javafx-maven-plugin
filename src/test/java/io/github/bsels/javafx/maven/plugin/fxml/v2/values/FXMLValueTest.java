@@ -1,5 +1,6 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
@@ -409,27 +410,34 @@ class FXMLValueTest {
     class FXMLIncludeTest {
         @Test
         void shouldCreateWithValidParams() {
-            FXMLInclude inc = new FXMLInclude(id, "src", StandardCharsets.UTF_8, Optional.of("res"));
-            assertThat(inc.identifier()).isEqualTo(id);
-            assertThat(inc.sourceFile()).isEqualTo("src");
-            assertThat(inc.charset()).isEqualTo(StandardCharsets.UTF_8);
-            assertThat(inc.resources()).contains("res");
+            FXMLLazyLoadedDocument fxmlLazyLoadedDocument = new FXMLLazyLoadedDocument();
+            FXMLInclude inc = new FXMLInclude(id, "src", StandardCharsets.UTF_8, Optional.of("res"), fxmlLazyLoadedDocument);
+            assertThat(inc)
+                    .hasFieldOrPropertyWithValue("identifier", id)
+                    .hasFieldOrPropertyWithValue("sourceFile", "src")
+                    .hasFieldOrPropertyWithValue("charset", StandardCharsets.UTF_8)
+                    .hasFieldOrPropertyWithValue("resources", Optional.of("res"))
+                    .hasFieldOrPropertyWithValue("lazyLoadedDocument", fxmlLazyLoadedDocument);
         }
 
         @Test
         void shouldThrowNpeWithMessages() {
-            assertThatThrownBy(() -> new FXMLInclude(null, "s", StandardCharsets.UTF_8, Optional.empty()))
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            assertThatThrownBy(() -> new FXMLInclude(null, "s", StandardCharsets.UTF_8, Optional.empty(), lazy))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`identifier` must not be null");
-            assertThatThrownBy(() -> new FXMLInclude(id, null, StandardCharsets.UTF_8, Optional.empty()))
+            assertThatThrownBy(() -> new FXMLInclude(id, null, StandardCharsets.UTF_8, Optional.empty(), lazy))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`sourceFile` must not be null");
-            assertThatThrownBy(() -> new FXMLInclude(id, "s", null, Optional.empty()))
+            assertThatThrownBy(() -> new FXMLInclude(id, "s", null, Optional.empty(), lazy))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`charset` must not be null");
-            assertThatThrownBy(() -> new FXMLInclude(id, "s", StandardCharsets.UTF_8, null))
+            assertThatThrownBy(() -> new FXMLInclude(id, "s", StandardCharsets.UTF_8, null, lazy))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`resources` must not be null");
+            assertThatThrownBy(() -> new FXMLInclude(id, "s", StandardCharsets.UTF_8, Optional.empty(), null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`lazyLoadedDocument` must not be null");
         }
     }
 

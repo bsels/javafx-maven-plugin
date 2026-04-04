@@ -1,5 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -13,7 +15,8 @@ record SourceCodeGeneratorContext(
         Map<SourcePart, StringBuilder> sourceCode,
         Imports imports,
         List<String> fieldDefinitions,
-        Set<Feature> features
+        Set<Feature> features,
+        Map<String, FXMLType> identifierToTypeMap
 ) {
 
     public SourceCodeGeneratorContext {
@@ -21,15 +24,16 @@ record SourceCodeGeneratorContext(
         Objects.requireNonNull(imports, "`imports` must not be null");
         Objects.requireNonNull(fieldDefinitions, "`fieldDefinitions` must not be null");
         Objects.requireNonNull(features, "`features` must not be null");
+        Objects.requireNonNull(identifierToTypeMap, "`identifierToTypeMap` must not be null");
     }
 
-    public SourceCodeGeneratorContext(Imports imports) {
+    public SourceCodeGeneratorContext(Imports imports, Map<String, FXMLType> identifierToTypeMap) {
         Map<SourcePart, StringBuilder> sourceCode = new EnumMap<>(SourcePart.class);
         for (SourcePart part : SourcePart.values()) {
             sourceCode.put(part, new StringBuilder());
         }
         sourceCode = Collections.unmodifiableMap(sourceCode);
-        this(sourceCode, imports, new ArrayList<>(), new HashSet<>());
+        this(sourceCode, imports, new ArrayList<>(), new HashSet<>(), identifierToTypeMap);
     }
 
     public StringBuilder sourceCode(SourcePart part) {

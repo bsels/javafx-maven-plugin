@@ -64,8 +64,8 @@ class ObjectMapperProviderTest {
     @Test
     void testTypeSerialization() throws Exception {
         ObjectMapper objectMapper = ObjectMapperProvider.getObjectMapper();
-        assertThat(objectMapper.writeValueAsString(TypeEncoderTest.class))
-                .isEqualTo("\"class io.github.bsels.javafx.maven.plugin.utils.TypeEncoderTest\"");
+        assertThat(objectMapper.writeValueAsString(Field.class))
+                .isEqualTo("\"class java.lang.reflect.Field\"");
     }
 
     private static class TestClass {

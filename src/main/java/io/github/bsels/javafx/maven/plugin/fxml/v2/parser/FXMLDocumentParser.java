@@ -2,6 +2,7 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLConstants;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
@@ -344,7 +345,7 @@ public final class FXMLDocumentParser {
         Optional<String> resources = Optional.ofNullable(properties.get(FXMLConstants.RESOURCES_ATTRIBUTE))
                 .map(r -> helper.resolveResourcePath(r, buildContext));
         source = helper.resolveResourcePath(source, buildContext);
-        return Optional.of(new FXMLInclude(includeId, source, charset, resources));
+        return Optional.of(new FXMLInclude(includeId, source, charset, resources, new FXMLLazyLoadedDocument()));
     }
 
     /// Parses an `fx:root` element from the given XML structure and creates an appropriate representation of it,

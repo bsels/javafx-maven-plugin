@@ -1,6 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
@@ -13,11 +14,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticObjectProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLWildcardType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
@@ -34,7 +31,6 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLReference;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLResource;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLTranslation;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
-import io.github.bsels.javafx.maven.plugin.utils.ObjectMapperProvider;
 import org.apache.maven.plugin.logging.Log;
 
 import javax.annotation.processing.Generated;
@@ -57,9 +53,55 @@ public final class FXMLSourceCodeBuilder {
     private static final String INTERNAL_STRING_TO_PATH_METHOD = "$internalMethod$stringToPath$";
     private static final String INTERNAL_STRING_TO_URI_METHOD = "$internalMethod$stringToURI$";
     private static final String INTERNAL_STRING_TO_URL_METHOD = "$internalMethod$stringToURL$";
+    private static final String INTERNAL_CONTROLLER_FIELD = "$internalField$controller$";
     private static final Set<String> PRIMITIVE_TYPES = Set.of(
             "boolean", "byte", "char", "short", "int", "long", "float", "double"
     );
+    private static final String INTERNAL_STRING_TO_FILE_METHOD_BODY = """
+            private java.io.File %s(String value) {
+                try {
+                    return new java.io.File(
+                            getClass()
+                                    .getResource(value)
+                                    .toURI()
+                    );
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            """.formatted(INTERNAL_STRING_TO_FILE_METHOD);
+    private static final String INTERNAL_STRING_TO_PATH_METHOD_BODY = """
+            private java.nio.file.Path %s(String value) {
+                try {
+                    return java.nio.file.Paths.get(
+                            getClass()
+                                    .getResource(value)
+                                    .toURI()
+                    );
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            """.formatted(INTERNAL_STRING_TO_PATH_METHOD);
+    private static final String INTERNAL_STRING_TO_URI_METHOD_BODY = """
+            private java.net.URI %s(String value) {
+                try {
+                    return getClass()
+                            .getResource(value)
+                            .toURI();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            """.formatted(INTERNAL_STRING_TO_URI_METHOD);
+    private static final String INTERNAL_STRING_TO_URL_METHOD_BODY = """
+            private java.net.URL %s(String value) {
+                return java.util.Objects.requireNonNull(
+                        getClass()
+                                .getResource(value)
+                );
+            }
+            """.formatted(INTERNAL_STRING_TO_URL_METHOD);
     private final Log log;
     private final FXMLSourceCodeBuilderImportHelper builderImportHelper;
     private final FXMLSourceCodeBuilderTypeHelper typeHelper;
@@ -77,9 +119,11 @@ public final class FXMLSourceCodeBuilder {
     public String generateSourceCode(FXMLDocument document, String packageName) throws NullPointerException {
         Objects.requireNonNull(document, "`document` must not be null");
         log.debug("Generating source code for FXML document with classname: %s".formatted(document.className()));
+        Map<String, FXMLType> identifierToTypeMap = typeHelper.createIdentifierToTypeMap(document);
+
         List<ClassCount> classCountList = builderImportHelper.findClassCounts(document, addGeneratedAnnotation);
         Imports imports = builderImportHelper.findImports(classCountList, document.className());
-        SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(imports);
+        SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(imports, identifierToTypeMap);
 
         addPackageLine(context, packageName);
         addImports(context);
@@ -121,13 +165,31 @@ public final class FXMLSourceCodeBuilder {
             sourceCode.append("public".indent(4).stripTrailing());
         }
 
-        return sourceCode.append(" ").append(className).append("() {\n")
+        sourceCode.append(" ").append(className).append("() {\n")
                 .append(context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString().indent(8))
                 .append("super();".indent(8))
                 .append(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString().indent(8))
                 .append("}\n".indent(4))
-                .append(context.sourceCode(SourcePart.METHODS).toString().indent(4))
-                .append("}\n")
+                .append(context.sourceCode(SourcePart.METHODS).toString().indent(4));
+
+        if (context.hasFeature(Feature.STRING_TO_URL_METHOD)) {
+            sourceCode.append(INTERNAL_STRING_TO_URL_METHOD_BODY.indent(4))
+                    .append('\n');
+        }
+        if (context.hasFeature(Feature.STRING_TO_URI_METHOD)) {
+            sourceCode.append(INTERNAL_STRING_TO_URI_METHOD_BODY.indent(4))
+                    .append('\n');
+        }
+        if (context.hasFeature(Feature.STRING_TO_PATH_METHOD)) {
+            sourceCode.append(INTERNAL_STRING_TO_PATH_METHOD_BODY.indent(4))
+                    .append('\n');
+        }
+        if (context.hasFeature(Feature.STRING_TO_FILE_METHOD)) {
+            sourceCode.append(INTERNAL_STRING_TO_FILE_METHOD_BODY.indent(4))
+                    .append('\n');
+        }
+
+        return sourceCode.append("}\n")
                 .toString();
     }
 
@@ -157,7 +219,9 @@ public final class FXMLSourceCodeBuilder {
                 .ifPresent(c -> sourceCode
                         .append("private final ")
                         .append(typeHelper.typeToSourceCode(context, c.controllerClass()))
-                        .append(" $internalController$;\n"));
+                        .append(' ')
+                        .append(INTERNAL_CONTROLLER_FIELD)
+                        .append(";\n"));
         addFields(context, document.root());
         document.definitions()
                 .forEach(d -> addFields(context, d));
@@ -171,12 +235,19 @@ public final class FXMLSourceCodeBuilder {
                 identifierToField(context, identifier, type);
                 values.forEach(v -> addFields(context, v));
             }
-            case FXMLCopy(FXMLIdentifier identifier, String name) -> {
-                identifierToField(context, identifier, FXMLType.of(Object.class)); // TODO: handle copy type
-            }
-            case FXMLInclude(FXMLIdentifier identifier, String sourceFile, _, _) -> {
-                identifierToField(context, identifier, FXMLType.of(Object.class)); // TODO: handle include type
-                // TODO: Check for linked controller
+            case FXMLCopy(FXMLIdentifier identifier, String name) ->
+                    identifierToField(context, identifier, context.identifierToTypeMap().get(name));
+            case FXMLInclude(FXMLIdentifier identifier, _, _, _, FXMLLazyLoadedDocument document) -> {
+                FXMLDocument fxmlDocument = document.get();
+                identifierToField(context, identifier, fxmlDocument.root().type());
+                fxmlDocument.controller()
+                        .ifPresent(
+                                controller -> identifierToField(
+                                        context,
+                                        new FXMLExposedIdentifier(identifier + "Controller"),
+                                        controller.controllerClass()
+                                )
+                        );
             }
             case FXMLMap(
                     FXMLIdentifier identifier, FXMLType type, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> entries
@@ -368,10 +439,9 @@ public final class FXMLSourceCodeBuilder {
             case FXMLConstant(FXMLClassType clazz, String identifier, _) ->
                     "%s.%s".formatted(typeHelper.typeToSourceCode(context, clazz), identifier);
             case FXMLCopy(FXMLIdentifier identifier, _) -> identifier.toString();
-            case FXMLExpression fxmlExpression ->
-                    throw new UnsupportedOperationException("Expression values are not supported yet");
-            case FXMLInclude(FXMLIdentifier identifier, _, _, _) -> identifier.toString();
-            case FXMLInlineScript fxmlInlineScript ->
+            case FXMLExpression _ -> throw new UnsupportedOperationException("Expression values are not supported yet");
+            case FXMLInclude(FXMLIdentifier identifier, _, _, _, _) -> identifier.toString();
+            case FXMLInlineScript _ ->
                     throw new UnsupportedOperationException("Inline script values are not supported yet");
             case FXMLLiteral(String literal) -> typeHelper.encodeLiteral(context, literal, type);
             case FXMLMethod(String name, _, _) -> "this::%s".formatted(name);

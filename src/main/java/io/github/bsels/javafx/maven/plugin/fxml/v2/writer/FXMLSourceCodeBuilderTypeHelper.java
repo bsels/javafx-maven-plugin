@@ -1,21 +1,70 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticObjectProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLWildcardType;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLConstant;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCopy;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLExpression;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInclude;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInlineScript;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLLiteral;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMap;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMethod;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLObject;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLReference;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLResource;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLTranslation;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
 import io.github.bsels.javafx.maven.plugin.utils.ObjectMapperProvider;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 final class FXMLSourceCodeBuilderTypeHelper {
     private static final FXMLClassType OBJECT_TYPE = new FXMLClassType(Object.class);
     private static final FXMLClassType STRING_TYPE = new FXMLClassType(String.class);
 
     FXMLSourceCodeBuilderTypeHelper() {
+    }
+
+    public Map<String, FXMLType> createIdentifierToTypeMap(FXMLDocument document) {
+        Map<String, Wrapper> identifierTypeMap = Stream.concat(
+                        Stream.of(document.root()),
+                        document.definitions()
+                                .stream()
+                )
+                .flatMap(this::createIdentifierToTypeMapEntry)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        return identifierTypeMap.entrySet()
+                .stream()
+                .collect(
+                        Collectors.collectingAndThen(
+                                Collectors.toMap(
+                                        Map.Entry::getKey,
+                                        entry -> findTypeRecursion(identifierTypeMap, entry.getValue())
+                                ),
+                                Map::copyOf
+                        )
+                );
     }
 
     public FXMLClassType getTypeForMapEntry(FXMLClassType type) {
@@ -123,5 +172,98 @@ final class FXMLSourceCodeBuilderTypeHelper {
                 .deleteCharAt(s.length() - 1)
                 .append(">")
                 .toString();
+    }
+
+    private FXMLType findTypeRecursion(Map<String, Wrapper> typeMap, Wrapper value) {
+        return switch (value) {
+            case Wrapper.FXMLTypeWrapper(FXMLType type) -> type;
+            case Wrapper.ReferenceWrapper(String reference) -> Optional.ofNullable(typeMap.get(reference))
+                    .map(nestedValue -> findTypeRecursion(typeMap, nestedValue))
+                    .orElseThrow();
+        };
+    }
+
+    private Stream<Map.Entry<String, Wrapper>> createIdentifierToTypeMapEntry(AbstractFXMLValue value) {
+        return switch (value) {
+            case FXMLCollection(
+                    FXMLIdentifier identifier,
+                    FXMLType type,
+                    _,
+                    List<AbstractFXMLValue> values
+            ) -> Stream.concat(
+                    values.stream()
+                            .flatMap(this::createIdentifierToTypeMapEntry),
+                    Stream.of(Map.entry(identifier.toString(), new Wrapper.FXMLTypeWrapper(type)))
+            );
+            case FXMLCopy(FXMLIdentifier identifier, String name) ->
+                    Stream.of(Map.entry(identifier.toString(), new Wrapper.ReferenceWrapper(name)));
+            case FXMLInclude(FXMLIdentifier identifier, _, _, _, FXMLLazyLoadedDocument document) ->
+                    Stream.of(Map.entry(
+                            identifier.toString(),
+                            new Wrapper.FXMLTypeWrapper(document.get().root().type())
+                    ));
+            case FXMLMap(
+                    FXMLIdentifier identifier,
+                    FXMLType type,
+                    _,
+                    _,
+                    _,
+                    Map<FXMLLiteral, AbstractFXMLValue> entries
+            ) -> Stream.concat(
+                    entries.values()
+                            .stream()
+                            .flatMap(this::createIdentifierToTypeMapEntry),
+                    Stream.of(Map.entry(identifier.toString(), new Wrapper.FXMLTypeWrapper(type)))
+            );
+            case FXMLObject(
+                    FXMLIdentifier identifier,
+                    FXMLType type,
+                    _,
+                    List<FXMLProperty> properties
+            ) -> Stream.concat(
+                    properties.stream()
+                            .flatMap(this::createIdentifierToTypeMapEntry),
+                    Stream.of(Map.entry(identifier.toString(), new Wrapper.FXMLTypeWrapper(type)))
+            );
+            case FXMLConstant _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _, FXMLReference _,
+                 FXMLResource _, FXMLTranslation _ -> Stream.empty();
+            case FXMLValue(Optional<FXMLIdentifier> identifier, FXMLType type, _) -> identifier.stream()
+                    .map(FXMLIdentifier::toString)
+                    .map(id -> Map.entry(id, new Wrapper.FXMLTypeWrapper(type)));
+        };
+    }
+
+    private Stream<Map.Entry<String, Wrapper>> createIdentifierToTypeMapEntry(FXMLProperty property) {
+        return switch (property) {
+            case FXMLCollectionProperties(_, _, _, List<AbstractFXMLValue> value, List<FXMLProperty> properties) ->
+                    Stream.concat(
+                            value.stream()
+                                    .flatMap(this::createIdentifierToTypeMapEntry),
+                            properties.stream()
+                                    .flatMap(this::createIdentifierToTypeMapEntry)
+                    );
+            case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> createIdentifierToTypeMapEntry(value);
+            case FXMLMapProperty(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> value) -> value.values()
+                    .stream()
+                    .flatMap(this::createIdentifierToTypeMapEntry);
+            case FXMLObjectProperty(_, _, _, AbstractFXMLValue value) -> createIdentifierToTypeMapEntry(value);
+            case FXMLStaticObjectProperty(_, _, _, _, AbstractFXMLValue value) -> createIdentifierToTypeMapEntry(value);
+        };
+    }
+
+    private sealed interface Wrapper {
+        record FXMLTypeWrapper(FXMLType type) implements Wrapper {
+
+            public FXMLTypeWrapper {
+                Objects.requireNonNull(type, "`type` must not be null");
+            }
+        }
+
+        record ReferenceWrapper(String reference) implements Wrapper {
+
+            public ReferenceWrapper {
+                Objects.requireNonNull(reference, "`reference` must not be null");
+            }
+        }
     }
 }
