@@ -4,7 +4,6 @@ import io.github.bsels.javafx.maven.plugin.CheckAndCast;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
@@ -54,6 +53,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -460,6 +460,10 @@ public final class FXMLSourceCodeBuilder {
                                 .flatMap(d -> findConstructions(d, context))
                 )
                 .collect(Collectors.toCollection(LinkedList::new));
+        Set<FXMLIdentifier> constructorDependencies = constructions.stream()
+                .map(Constructions::dependencies)
+                .flatMap(List::stream)
+                .collect(Collectors.toSet());
         Constructions superCall = constructions.removeFirst();
         List<Constructions> orderedConstructions = resolveConstructionOrder(
                 constructions);
@@ -469,81 +473,115 @@ public final class FXMLSourceCodeBuilder {
                 superCall,
                 context
         ).append(");");
-        addFieldCreationPrologue(context, orderedConstructions);
+        addFieldCreationPrologue(context, orderedConstructions, constructorDependencies);
     }
 
     /// Adds field creation logic to the constructor prologue.
     ///
-    /// @param context              The current [SourceCodeGeneratorContext].
-    /// @param orderedConstructions The list of constructions in their resolved order.
-    private void addFieldCreationPrologue(SourceCodeGeneratorContext context, List<Constructions> orderedConstructions) {
-        StringBuilder sourceCode = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE);
+    /// @param context                 The current [SourceCodeGeneratorContext].
+    /// @param orderedConstructions    The list of constructions in their resolved order.
+    /// @param constructorDependencies The internal constructor dependencies.
+    private void addFieldCreationPrologue(
+            SourceCodeGeneratorContext context,
+            List<Constructions> orderedConstructions,
+            Set<FXMLIdentifier> constructorDependencies
+    ) {
         for (Constructions construction : orderedConstructions) {
             switch (construction) {
                 case AbstractFXMLObjectAndDependencies(AbstractFXMLObject object, _, _) -> {
                     String typeString = typeHelper.typeToSourceCode(context, object.type());
-                    sourceCode.append(typeString)
-                            .append(' ')
-                            .append(CONSTRUCTOR_VARIABLE_PREFIX)
-                            .append(object.identifier())
-                            .append(" = ");
-                    Optional<FXMLFactoryMethod> method = object.factoryMethod();
-                    if (method.isPresent()) {
-                        FXMLFactoryMethod factoryMethod = method.get();
-                        sourceCode.append(typeHelper.typeToSourceCode(context, factoryMethod.clazz()))
-                                .append('.')
-                                .append(factoryMethod.method());
-                    } else {
-                        sourceCode.append("new ")
-                                .append(typeString);
-                    }
-                    prepareArgumentsLists(sourceCode.append('('), construction, context)
-                            .append(");\n");
-                    bindPrologueVariableToField(sourceCode, object.identifier());
+                    addPrologue(
+                            context,
+                            constructorDependencies,
+                            typeString,
+                            object.identifier(),
+                            s -> prepareArgumentsLists(
+                                    object.factoryMethod()
+                                            .map(
+                                                    method -> s.append(typeHelper.typeToSourceCode(
+                                                                    context,
+                                                                    method.clazz()
+                                                            ))
+                                                            .append('.')
+                                                            .append(method.method()))
+                                            .orElseGet(() -> s.append("new ").append(typeString))
+                                            .append('('),
+                                    construction,
+                                    context
+                            ).append(")")
+                    );
                 }
                 case FXMLCopyAndDependencies(FXMLCopy(FXMLIdentifier identifier, FXMLExposedIdentifier source), _) -> {
                     FXMLType type = context.identifierToTypeMap().get(source.name());
                     String typeString = typeHelper.typeToSourceCode(context, type);
-                    sourceCode.append(typeString)
-                            .append(' ')
-                            .append(CONSTRUCTOR_VARIABLE_PREFIX)
-                            .append(identifier)
-                            .append(" = new ")
-                            .append(typeString)
-                            .append("(");
-                    prepareArgumentsLists(sourceCode, construction, context)
-                            .append(");\n");
-                    bindPrologueVariableToField(sourceCode, identifier);
+                    addPrologue(
+                            context,
+                            constructorDependencies,
+                            typeString,
+                            identifier,
+                            s -> prepareArgumentsLists(
+                                    s.append("new ").append(typeString).append('('),
+                                    construction,
+                                    context
+                            ).append(')')
+
+                    );
                 }
                 case FXMLIncludeAndDependencies(
                         FXMLInclude(FXMLIdentifier identifier, _, _, _, FXMLLazyLoadedDocument document), _
                 ) -> {
-                    String typeString = typeHelper.typeToSourceCode(
+                    FXMLUncompiledClassType type = new FXMLUncompiledClassType(document.get().className());
+                    String typeString = typeHelper.typeToSourceCode(context, type);
+                    addPrologue(
                             context,
-                            new FXMLUncompiledClassType(document.get().className())
+                            constructorDependencies,
+                            typeString,
+                            identifier,
+                            s -> s.append("new ").append(typeString).append("()")
                     );
-                    sourceCode.append(typeString)
-                            .append(' ')
-                            .append(CONSTRUCTOR_VARIABLE_PREFIX)
-                            .append(identifier)
-                            .append(" = new ")
-                            .append(typeString)
-                            .append("();\n");
-                    bindPrologueVariableToField(sourceCode, identifier);
                 }
                 case FXMLValueConstruction(
-                        FXMLValue(Optional<FXMLIdentifier> identifier, FXMLType type, String value), _
-                ) -> identifier.ifPresent(fxmlIdentifier -> {
-                    sourceCode.append(typeHelper.typeToSourceCode(context, type))
-                            .append(' ')
-                            .append(CONSTRUCTOR_VARIABLE_PREFIX)
-                            .append(fxmlIdentifier)
-                            .append(" = ")
-                            .append(typeHelper.encodeLiteral(context, value, type))
-                            .append(";\n");
-                    bindPrologueVariableToField(sourceCode, fxmlIdentifier);
-                });
+                        FXMLValue(Optional<FXMLIdentifier> id, FXMLType type, String value), _
+                ) -> id.ifPresent(identifier -> addPrologue(
+                        context,
+                        constructorDependencies,
+                        typeHelper.typeToSourceCode(context, type),
+                        identifier,
+                        s -> s.append(typeHelper.encodeLiteral(context, value, type))
+                ));
             }
+        }
+    }
+
+    /// Adds the prologue section for the source code generation process.
+    /// This includes initializing the specified identifier and optionally binding it to a field if it is marked
+    /// as a dependency.
+    ///
+    /// @param context                 The context of the source code generator, used to retrieve the target source code section.
+    /// @param constructorDependencies A set of identifiers that are dependencies in the constructor.
+    /// @param typeString              The type of the identifier being added to the prologue (e.g., class name or primitive type).
+    /// @param identifier              The FXML identifier to be initialized in the prologue.
+    /// @param sourceCodeConsumer      A consumer that appends additional source code logic to the initialization.
+    private void addPrologue(
+            SourceCodeGeneratorContext context,
+            Set<FXMLIdentifier> constructorDependencies,
+            String typeString,
+            FXMLIdentifier identifier,
+            Consumer<StringBuilder> sourceCodeConsumer
+    ) {
+        StringBuilder sourceCode = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE);
+        boolean isDependency = constructorDependencies.contains(identifier);
+        if (isDependency) {
+            sourceCode.append(typeString)
+                    .append(' ')
+                    .append(CONSTRUCTOR_VARIABLE_PREFIX);
+        }
+        sourceCode.append(identifier)
+                .append(" = ");
+        sourceCodeConsumer.accept(sourceCode);
+        sourceCode.append(";\n");
+        if (isDependency) {
+            bindPrologueVariableToField(sourceCode, identifier);
         }
     }
 
