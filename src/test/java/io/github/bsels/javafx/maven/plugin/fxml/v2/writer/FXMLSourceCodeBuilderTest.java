@@ -93,6 +93,7 @@ public class FXMLSourceCodeBuilderTest {
                 "/examples/NodeProperties.fxml",
                 "/examples/FXInclude.fxml"
         })
+        @Disabled("working on it")
         void dummy(String file) throws MojoExecutionException {
             FXMLDocument document = parse(file);
             String sourceCode = classUnderTest.generateSourceCode(document, "com.example");

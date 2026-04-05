@@ -5,6 +5,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLUtils;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
@@ -72,6 +73,42 @@ final class FXMLSourceCodeBuilderTypeHelper {
         this.propertyRecursionHelper = new FXMLPropertyRecursionHelper();
         this.constructorCache = new HashMap<>();
         this.factoryMethodCache = new HashMap<>();
+    }
+
+    /// Returns the default value of a given [FXMLType] as a string representation.
+    /// For primitive types,
+    /// the method returns their zero-equivalent value (e.g., `0` for integers, `false` for booleans).
+    /// For non-primitive types, the method returns `"null"`.
+    ///
+    /// @param type the [FXMLType] whose default value is to be determined
+    /// @return a string representation of the default value corresponding to the given [FXMLType]
+    public String defaultTypeValue(FXMLType type) {
+        Class<?> rawClass = FXMLUtils.findRawType(type);
+        if (boolean.class.equals(rawClass)) {
+            return "false";
+        }
+        if (char.class.equals(rawClass)) {
+            return "'\0'";
+        }
+        if (byte.class.equals(rawClass)) {
+            return "(byte) 0";
+        }
+        if (short.class.equals(rawClass)) {
+            return "(short) 0";
+        }
+        if (int.class.equals(rawClass)) {
+            return "0";
+        }
+        if (long.class.equals(rawClass)) {
+            return "0L";
+        }
+        if (float.class.equals(rawClass)) {
+            return "0f";
+        }
+        if (double.class.equals(rawClass)) {
+            return "0.0";
+        }
+        return "null";
     }
 
     /// Creates a mapping from FXML identifiers to their corresponding [FXMLType]s for the given document.

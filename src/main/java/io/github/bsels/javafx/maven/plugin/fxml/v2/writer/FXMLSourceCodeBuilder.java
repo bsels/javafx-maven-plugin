@@ -4,6 +4,7 @@ import io.github.bsels.javafx.maven.plugin.CheckAndCast;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
@@ -75,7 +76,7 @@ public final class FXMLSourceCodeBuilder {
     /// Internal constant for the controller field name.
     private static final String INTERNAL_CONTROLLER_FIELD = "$internalField$controller$";
     /// Internal constant for constructor variable prefix.
-    private static final String CONSTRUCTOR_VARIABLE_PREFIX = "$constructorVariable$";
+    private static final String CONSTRUCTOR_VARIABLE_PREFIX = "$$";
     /// A set of Java primitive types.
     private static final Set<String> PRIMITIVE_TYPES = Set.of(
             "boolean", "byte", "char", "short", "int", "long", "float", "double"
@@ -188,10 +189,10 @@ public final class FXMLSourceCodeBuilder {
 
     /// Internal method to generate source code, allowing for recursive processing of nested FXML documents.
     ///
-    /// @param document        The [FXMLDocument] being processed.
-    /// @param context         The current [SourceCodeGeneratorContext].
-    /// @param packageName     The package name for the class.
-    /// @param isRootDocument  Whether this is the root FXML document or an included one.
+    /// @param document       The [FXMLDocument] being processed.
+    /// @param context        The current [SourceCodeGeneratorContext].
+    /// @param packageName    The package name for the class.
+    /// @param isRootDocument Whether this is the root FXML document or an included one.
     /// @return The generated Java source code.
     private String internalGenerateSourceCode(
             FXMLDocument document,
@@ -456,6 +457,100 @@ public final class FXMLSourceCodeBuilder {
                 )
                 .collect(Collectors.toCollection(LinkedList::new));
         Constructions superCall = constructions.removeFirst();
+        List<Constructions> orderedConstructions = resolveConstructionOrder(
+                constructions);
+        prepareArgumentsLists(
+                context.sourceCode(SourcePart.CONSTRUCTOR_SUPER_CALL)
+                        .append("super("),
+                superCall,
+                context
+        ).append(");");
+        addFieldCreationPrologue(context, orderedConstructions);
+    }
+
+    private void addFieldCreationPrologue(SourceCodeGeneratorContext context, List<Constructions> orderedConstructions) {
+        StringBuilder sourceCode = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE);
+        for (Constructions construction : orderedConstructions) {
+            switch (construction) {
+                case AbstractFXMLObjectAndDependencies(
+                        AbstractFXMLObject object, List<FXMLConstructorProperty> properties, _
+                ) -> {
+                    String typeString = typeHelper.typeToSourceCode(context, object.type());
+                    sourceCode.append(typeString)
+                            .append(' ')
+                            .append(CONSTRUCTOR_VARIABLE_PREFIX)
+                            .append(object.identifier())
+                            .append(" = ");
+                    Optional<FXMLFactoryMethod> method = object.factoryMethod();
+                    if (method.isPresent()) {
+                        FXMLFactoryMethod factoryMethod = method.get();
+                        sourceCode.append(typeHelper.typeToSourceCode(context, factoryMethod.clazz()))
+                                .append('.')
+                                .append(factoryMethod.method());
+                    } else {
+                        sourceCode.append("new ")
+                                .append(typeString);
+                    }
+                    prepareArgumentsLists(sourceCode.append('('), construction, context)
+                            .append(");\n");
+                    bindPrologueVariableToField(sourceCode, object.identifier());
+                }
+                case FXMLCopyAndDependencies(FXMLCopy(FXMLIdentifier identifier, FXMLExposedIdentifier source), _) -> {
+                    FXMLType type = context.identifierToTypeMap().get(source.name());
+                    String typeString = typeHelper.typeToSourceCode(context, type);
+                    sourceCode.append(typeString)
+                            .append(' ')
+                            .append(CONSTRUCTOR_VARIABLE_PREFIX)
+                            .append(identifier)
+                            .append(" = new ")
+                            .append(typeString)
+                            .append("(");
+                    prepareArgumentsLists(sourceCode, construction, context)
+                            .append(");\n");
+                    bindPrologueVariableToField(sourceCode, identifier);
+                }
+                case FXMLIncludeAndDependencies(
+                        FXMLInclude(FXMLIdentifier identifier, _, _, _, FXMLLazyLoadedDocument document), _
+                ) -> {
+                    String typeString = typeHelper.typeToSourceCode(
+                            context,
+                            new FXMLUncompiledClassType(document.get().className())
+                    );
+                    sourceCode.append(typeString)
+                            .append(' ')
+                            .append(CONSTRUCTOR_VARIABLE_PREFIX)
+                            .append(identifier)
+                            .append(" = new ")
+                            .append(typeString)
+                            .append("();\n");
+                    bindPrologueVariableToField(sourceCode, identifier);
+                }
+                case FXMLValueConstruction(
+                        FXMLValue(Optional<FXMLIdentifier> identifier, FXMLType type, String value), _
+                ) -> identifier.ifPresent(fxmlIdentifier -> {
+                    sourceCode.append(typeHelper.typeToSourceCode(context, type))
+                            .append(' ')
+                            .append(CONSTRUCTOR_VARIABLE_PREFIX)
+                            .append(fxmlIdentifier)
+                            .append(" = ")
+                            .append(typeHelper.encodeLiteral(context, value, type))
+                            .append(";\n");
+                    bindPrologueVariableToField(sourceCode, fxmlIdentifier);
+                });
+            }
+        }
+    }
+
+    private void bindPrologueVariableToField(StringBuilder sourceCode, FXMLIdentifier fxmlIdentifier) {
+        sourceCode.append(fxmlIdentifier)
+                .append(" = ")
+                .append(CONSTRUCTOR_VARIABLE_PREFIX)
+                .append(fxmlIdentifier)
+                .append(";\n");
+    }
+
+    private List<Constructions> resolveConstructionOrder(List<Constructions> constructions)
+            throws IllegalArgumentException {
         List<Constructions> orderedConstructions = new ArrayList<>();
         Set<FXMLIdentifier> seenIdentifiers = new HashSet<>();
         int oldSize = -1;
@@ -486,13 +581,7 @@ public final class FXMLSourceCodeBuilder {
                     "Cyclic dependencies detected in FXML document: %s".formatted(constructions)
             );
         }
-        prepareArgumentsLists(
-                context.sourceCode(SourcePart.CONSTRUCTOR_SUPER_CALL)
-                        .append("super("),
-                superCall,
-                context
-        ).append(");");
-        // TODO
+        return orderedConstructions;
     }
 
     private StringBuilder prepareArgumentsLists(
@@ -525,7 +614,7 @@ public final class FXMLSourceCodeBuilder {
                         builder.append(
                                 property.defaultValue()
                                         .map(v -> encodeFXMLValue(context, v, property.type()))
-                                        .orElseGet(() -> "null") // TODO: Handle default values based on type
+                                        .orElseGet(() -> typeHelper.defaultTypeValue(property.type()))
                         );
                     } else {
                         builder.append(encodeFXMLValue(
