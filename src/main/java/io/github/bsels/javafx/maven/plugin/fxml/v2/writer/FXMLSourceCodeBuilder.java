@@ -448,6 +448,10 @@ public final class FXMLSourceCodeBuilder {
         ;
     }
 
+    /// Adds the constructor prologue to the generated source code.
+    ///
+    /// @param context  The current [SourceCodeGeneratorContext].
+    /// @param document The [FXMLDocument] to process.
     private void addConstructorPrologue(SourceCodeGeneratorContext context, FXMLDocument document) {
         List<Constructions> constructions = Stream.concat(
                         findConstructions(document.root(), context),
@@ -468,13 +472,15 @@ public final class FXMLSourceCodeBuilder {
         addFieldCreationPrologue(context, orderedConstructions);
     }
 
+    /// Adds field creation logic to the constructor prologue.
+    ///
+    /// @param context              The current [SourceCodeGeneratorContext].
+    /// @param orderedConstructions The list of constructions in their resolved order.
     private void addFieldCreationPrologue(SourceCodeGeneratorContext context, List<Constructions> orderedConstructions) {
         StringBuilder sourceCode = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE);
         for (Constructions construction : orderedConstructions) {
             switch (construction) {
-                case AbstractFXMLObjectAndDependencies(
-                        AbstractFXMLObject object, List<FXMLConstructorProperty> properties, _
-                ) -> {
+                case AbstractFXMLObjectAndDependencies(AbstractFXMLObject object, _, _) -> {
                     String typeString = typeHelper.typeToSourceCode(context, object.type());
                     sourceCode.append(typeString)
                             .append(' ')
@@ -541,6 +547,10 @@ public final class FXMLSourceCodeBuilder {
         }
     }
 
+    /// Binds a prologue variable to its corresponding field.
+    ///
+    /// @param sourceCode     The [StringBuilder] containing the source code.
+    /// @param fxmlIdentifier The [FXMLIdentifier] of the field to bind.
     private void bindPrologueVariableToField(StringBuilder sourceCode, FXMLIdentifier fxmlIdentifier) {
         sourceCode.append(fxmlIdentifier)
                 .append(" = ")
@@ -549,6 +559,11 @@ public final class FXMLSourceCodeBuilder {
                 .append(";\n");
     }
 
+    /// Resolves the construction order of FXML objects based on their dependencies.
+    ///
+    /// @param constructions The list of constructions to reorder.
+    /// @return A list of constructions in an order that satisfies all dependencies.
+    /// @throws IllegalArgumentException If cyclic dependencies are detected.
     private List<Constructions> resolveConstructionOrder(List<Constructions> constructions)
             throws IllegalArgumentException {
         List<Constructions> orderedConstructions = new ArrayList<>();
@@ -584,6 +599,12 @@ public final class FXMLSourceCodeBuilder {
         return orderedConstructions;
     }
 
+    /// Prepares the argument list for a construction call.
+    ///
+    /// @param builder       The [StringBuilder] to append the argument list to.
+    /// @param constructions The construction for which to prepare arguments.
+    /// @param context       The current [SourceCodeGeneratorContext].
+    /// @return The same [StringBuilder] instance with the argument list appended.
     private StringBuilder prepareArgumentsLists(
             StringBuilder builder,
             Constructions constructions,
@@ -630,6 +651,10 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
+    /// Identifies dependencies for the construction of an FXML object.
+    ///
+    /// @param object The [AbstractFXMLObject] to analyze.
+    /// @return An [AbstractFXMLObjectAndDependencies] containing the object, its constructor properties, and its dependencies.
     private AbstractFXMLObjectAndDependencies findDependenciesForObjectConstruction(AbstractFXMLObject object) {
         return switch (object) {
             case FXMLCollection fxmlCollection ->
@@ -650,6 +675,10 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
+    /// Finds the identifier associated with an FXML value, if any.
+    ///
+    /// @param value The [AbstractFXMLValue] to inspect.
+    /// @return An [Optional] containing the [FXMLIdentifier] if found, or empty otherwise.
     private Optional<FXMLIdentifier> findIdentifierForValue(AbstractFXMLValue value) {
         return switch (value) {
             case AbstractFXMLObject abstractFXMLObject -> Optional.of(abstractFXMLObject.identifier());
@@ -662,6 +691,11 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
+    /// Recursively finds all constructions and their dependencies for an FXML value.
+    ///
+    /// @param value   The [AbstractFXMLValue] to analyze.
+    /// @param context The current [SourceCodeGeneratorContext].
+    /// @return A stream of [Constructions] representing the necessary construction steps.
     private Stream<Constructions> findConstructions(AbstractFXMLValue value, SourceCodeGeneratorContext context) {
         return switch (value) {
             case FXMLCollection fxmlCollection -> Stream.concat(
@@ -956,16 +990,30 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
+    /// Represents an FXML construction step that may have dependencies.
     private sealed interface Constructions {
+        /// Returns the identifiers this construction depends on.
+        ///
+        /// @return A list of [FXMLIdentifier] dependencies.
         List<FXMLIdentifier> dependencies();
     }
 
+    /// Represents an FXML object construction and its dependencies.
+    ///
+    /// @param object                The [AbstractFXMLObject] being constructed.
+    /// @param constructorProperties The properties passed to the constructor.
+    /// @param dependencies          The identifiers this object depends on.
     private record AbstractFXMLObjectAndDependencies(
             AbstractFXMLObject object,
             List<FXMLConstructorProperty> constructorProperties,
             List<FXMLIdentifier> dependencies
     ) implements Constructions {
 
+        /// Validates the object and initializes the lists.
+        ///
+        /// @param object                The [AbstractFXMLObject] being constructed.
+        /// @param constructorProperties The properties passed to the constructor.
+        /// @param dependencies          The identifiers this object depends on.
         private AbstractFXMLObjectAndDependencies {
             Objects.requireNonNull(object, "object");
             constructorProperties = List.copyOf(Objects.requireNonNullElseGet(constructorProperties, List::of));
@@ -973,31 +1021,57 @@ public final class FXMLSourceCodeBuilder {
         }
     }
 
+    /// Represents an FXML copy construction and its dependencies.
+    ///
+    /// @param copy         The [FXMLCopy] being constructed.
+    /// @param dependencies The identifiers this copy depends on.
     private record FXMLCopyAndDependencies(
             FXMLCopy copy,
             List<FXMLIdentifier> dependencies
     ) implements Constructions {
 
+        /// Validates the copy and initializes the dependency list.
+        ///
+        /// @param copy         The [FXMLCopy] being constructed.
+        /// @param dependencies The identifiers this copy depends on.
         private FXMLCopyAndDependencies {
             Objects.requireNonNull(copy, "copy");
             dependencies = List.copyOf(Objects.requireNonNullElseGet(dependencies, List::of));
         }
     }
 
+    /// Represents an FXML include construction and its dependencies.
+    ///
+    /// @param include      The [FXMLInclude] being constructed.
+    /// @param dependencies The identifiers this includes depend on.
     private record FXMLIncludeAndDependencies(
             FXMLInclude include,
             List<FXMLIdentifier> dependencies
     ) implements Constructions {
+
+        /// Validates the include and initializes the dependency list.
+        ///
+        /// @param include      The [FXMLInclude] being constructed.
+        /// @param dependencies The identifiers this includes depend on.
         private FXMLIncludeAndDependencies {
             Objects.requireNonNull(include, "include");
             dependencies = List.copyOf(Objects.requireNonNullElseGet(dependencies, List::of));
         }
     }
 
+    /// Represents an FXML value construction and its dependencies.
+    ///
+    /// @param value        The [FXMLValue] being constructed.
+    /// @param dependencies The identifiers this value construction depends on.
     private record FXMLValueConstruction(
             FXMLValue value,
             List<FXMLIdentifier> dependencies
     ) implements Constructions {
+
+        /// Validates the value and initializes the dependency list.
+        ///
+        /// @param value        The [FXMLValue] being constructed.
+        /// @param dependencies The identifiers this value construction depends on.
         private FXMLValueConstruction {
             Objects.requireNonNull(value, "value");
             dependencies = List.copyOf(Objects.requireNonNullElseGet(dependencies, List::of));
