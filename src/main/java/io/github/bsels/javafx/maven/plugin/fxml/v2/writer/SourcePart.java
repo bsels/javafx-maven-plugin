@@ -12,6 +12,8 @@ enum SourcePart {
     FIELDS,
     /// The beginning of the constructor.
     CONSTRUCTOR_PROLOGUE,
+    /// The call to the superclass constructor.
+    CONSTRUCTOR_SUPER_CALL,
     /// The end of the constructor, where property assignments and initialization occur.
     CONSTRUCTOR_EPILOGUE,
     /// The class methods.

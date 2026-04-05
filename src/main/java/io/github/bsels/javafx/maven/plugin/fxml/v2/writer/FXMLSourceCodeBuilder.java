@@ -1,5 +1,6 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
+import io.github.bsels.javafx.maven.plugin.CheckAndCast;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
@@ -7,6 +8,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLUtils;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
@@ -32,6 +34,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLReference;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLResource;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLTranslation;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
+import io.github.bsels.javafx.maven.plugin.utils.Utils;
 import org.apache.maven.plugin.logging.Log;
 
 import javax.annotation.processing.Generated;
@@ -41,12 +44,18 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /// A builder for generating Java source code from an [FXMLDocument].
@@ -65,6 +74,8 @@ public final class FXMLSourceCodeBuilder {
     private static final String INTERNAL_STRING_TO_URL_METHOD = "$internalMethod$stringToURL$";
     /// Internal constant for the controller field name.
     private static final String INTERNAL_CONTROLLER_FIELD = "$internalField$controller$";
+    /// Internal constant for constructor variable prefix.
+    private static final String CONSTRUCTOR_VARIABLE_PREFIX = "$constructorVariable$";
     /// A set of Java primitive types.
     private static final Set<String> PRIMITIVE_TYPES = Set.of(
             "boolean", "byte", "char", "short", "int", "long", "float", "double"
@@ -192,8 +203,10 @@ public final class FXMLSourceCodeBuilder {
         addPackageLine(context, packageName);
         addImports(context);
         addFields(context, document);
+        addConstructorPrologue(context, document);
         addConstructorEpilogue(context, document);
         addInnerClass(document, context);
+        // TODO: Add methods
 
         // The class declaration should be done last
         addClassDeclaration(context, document, isRootDocument);
@@ -247,7 +260,7 @@ public final class FXMLSourceCodeBuilder {
 
         sourceCode.append(" ").append(className).append("() {\n")
                 .append(context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString().indent(8))
-                .append("super();".indent(8))
+                .append(context.sourceCode(SourcePart.CONSTRUCTOR_SUPER_CALL).toString().indent(8))
                 .append(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString().indent(8))
                 .append("}\n".indent(4))
                 .append('\n')
@@ -270,10 +283,15 @@ public final class FXMLSourceCodeBuilder {
                     .append('\n');
         }
 
-        sourceCode.append(context.sourceCode(SourcePart.NESTED_TYPES).toString().indent(4));
+        if (isRootDocument) {
+            sourceCode.append(context.sourceCode(SourcePart.NESTED_TYPES).toString().indent(4))
+                    .append("}\n");
+        } else {
+            sourceCode.append("}\n\n")
+                    .append(context.sourceCode(SourcePart.NESTED_TYPES));
+        }
 
-        return sourceCode.append("}\n")
-                .toString();
+        return sourceCode.toString();
     }
 
     /// Checks if a given Java type is a primitive type.
@@ -348,7 +366,7 @@ public final class FXMLSourceCodeBuilder {
                             identifierToField(context, identifier, type),
                             values.stream().flatMap(v -> addFields(v, context))
                     );
-            case FXMLCopy(FXMLIdentifier identifier, String name) ->
+            case FXMLCopy(FXMLIdentifier identifier, FXMLExposedIdentifier(String name)) ->
                     identifierToField(context, identifier, context.identifierToTypeMap().get(name));
             case FXMLInclude(FXMLIdentifier identifier, _, _, _, FXMLLazyLoadedDocument document) -> {
                 FXMLDocument fxmlDocument = document.get();
@@ -427,6 +445,167 @@ public final class FXMLSourceCodeBuilder {
                 .append(typeHelper.typeToSourceCode(context, document.root().type()))
         // TODO: Add interfaces
         ;
+    }
+
+    private void addConstructorPrologue(SourceCodeGeneratorContext context, FXMLDocument document) {
+        List<Constructions> constructions = Stream.concat(
+                        findConstructions(document.root(), context),
+                        document.definitions()
+                                .stream()
+                                .flatMap(d -> findConstructions(d, context))
+                )
+                .collect(Collectors.toCollection(LinkedList::new));
+        Constructions superCall = constructions.removeFirst();
+        List<Constructions> orderedConstructions = new ArrayList<>();
+        Set<FXMLIdentifier> seenIdentifiers = new HashSet<>();
+        int oldSize = -1;
+        int newSize = 0;
+        while (!constructions.isEmpty() && (oldSize != newSize)) {
+            Iterator<Constructions> iterator = constructions.iterator();
+            oldSize = seenIdentifiers.size();
+            while (iterator.hasNext()) {
+                Constructions next = iterator.next();
+                if (seenIdentifiers.containsAll(next.dependencies())) {
+                    iterator.remove();
+                    orderedConstructions.add(next);
+                    switch (next) {
+                        case AbstractFXMLObjectAndDependencies(AbstractFXMLObject object, _, _) ->
+                                seenIdentifiers.add(object.identifier());
+                        case FXMLCopyAndDependencies(FXMLCopy copy, _) -> seenIdentifiers.add(copy.identifier());
+                        case FXMLIncludeAndDependencies(FXMLInclude include, _) ->
+                                seenIdentifiers.add(include.identifier());
+                        case FXMLValueConstruction(FXMLValue(Optional<FXMLIdentifier> identifier, _, _), _) ->
+                                identifier.ifPresent(seenIdentifiers::add);
+                    }
+                }
+            }
+            newSize = seenIdentifiers.size();
+        }
+        if (!constructions.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Cyclic dependencies detected in FXML document: %s".formatted(constructions)
+            );
+        }
+        prepareArgumentsLists(
+                context.sourceCode(SourcePart.CONSTRUCTOR_SUPER_CALL)
+                        .append("super("),
+                superCall,
+                context
+        ).append(");");
+        // TODO
+    }
+
+    private StringBuilder prepareArgumentsLists(
+            StringBuilder builder,
+            Constructions constructions,
+            SourceCodeGeneratorContext context
+    ) {
+        return switch (constructions) {
+            case AbstractFXMLObjectAndDependencies(
+                    AbstractFXMLObject object,
+                    List<FXMLConstructorProperty> properties,
+                    _
+            ) -> {
+                FXMLConstructor constructor = object.factoryMethod()
+                        .map(method -> typeHelper.findFactoryMethodConstructor(method, properties))
+                        .orElseGet(() -> typeHelper.findMinimalConstructor(
+                                FXMLUtils.findRawType(object.type()),
+                                properties
+                        ));
+                Map<String, FXMLConstructorProperty> propertyMap = properties.stream()
+                        .collect(Collectors.toMap(FXMLConstructorProperty::name, Function.identity()));
+                boolean first = true;
+                for (ConstructorProperty property : constructor.properties()) {
+                    if (!first) {
+                        builder.append(", ");
+                    }
+                    first = false;
+                    FXMLConstructorProperty fxmlConstructorProperty = propertyMap.get(property.name());
+                    if (fxmlConstructorProperty == null) {
+                        builder.append(
+                                property.defaultValue()
+                                        .map(v -> encodeFXMLValue(context, v, property.type()))
+                                        .orElseGet(() -> "null") // TODO: Handle default values based on type
+                        );
+                    } else {
+                        builder.append(encodeFXMLValue(
+                                context, CONSTRUCTOR_VARIABLE_PREFIX, fxmlConstructorProperty.value(), property.type()
+                        ));
+                    }
+                }
+                yield builder;
+            }
+            case FXMLCopyAndDependencies(FXMLCopy(_, FXMLExposedIdentifier(String name)), _) ->
+                    builder.append("%s%s".formatted(CONSTRUCTOR_VARIABLE_PREFIX, name));
+            case FXMLIncludeAndDependencies _, FXMLValueConstruction _ -> builder;
+        };
+    }
+
+    private AbstractFXMLObjectAndDependencies findDependenciesForObjectConstruction(AbstractFXMLObject object) {
+        return switch (object) {
+            case FXMLCollection fxmlCollection ->
+                    new AbstractFXMLObjectAndDependencies(fxmlCollection, List.of(), List.of());
+            case FXMLMap fxmlMap -> new AbstractFXMLObjectAndDependencies(fxmlMap, List.of(), List.of());
+            case FXMLObject fxmlObject -> {
+                List<FXMLConstructorProperty> constructorProperties = fxmlObject.properties()
+                        .stream()
+                        .gather(CheckAndCast.of(FXMLConstructorProperty.class))
+                        .toList();
+                List<FXMLIdentifier> dependencies = constructorProperties.stream()
+                        .map(FXMLConstructorProperty::value)
+                        .map(this::findIdentifierForValue)
+                        .gather(Utils.optional())
+                        .toList();
+                yield new AbstractFXMLObjectAndDependencies(fxmlObject, constructorProperties, dependencies);
+            }
+        };
+    }
+
+    private Optional<FXMLIdentifier> findIdentifierForValue(AbstractFXMLValue value) {
+        return switch (value) {
+            case AbstractFXMLObject abstractFXMLObject -> Optional.of(abstractFXMLObject.identifier());
+            case FXMLCopy(FXMLIdentifier identifier, _) -> Optional.of(identifier);
+            case FXMLInclude(FXMLIdentifier identifier, _, _, _, _) -> Optional.of(identifier);
+            case FXMLReference(String name) -> Optional.of(new FXMLExposedIdentifier(name));
+            case FXMLValue(Optional<FXMLIdentifier> identifier, _, _) -> identifier;
+            case FXMLConstant _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _, FXMLResource _,
+                 FXMLTranslation _ -> Optional.empty();
+        };
+    }
+
+    private Stream<Constructions> findConstructions(AbstractFXMLValue value, SourceCodeGeneratorContext context) {
+        return switch (value) {
+            case FXMLCollection fxmlCollection -> Stream.concat(
+                    Stream.of(findDependenciesForObjectConstruction(fxmlCollection)),
+                    fxmlCollection.values()
+                            .stream()
+                            .flatMap(v -> findConstructions(v, context))
+            );
+            case FXMLMap fxmlMap -> Stream.concat(
+                    Stream.of(findDependenciesForObjectConstruction(fxmlMap)),
+                    fxmlMap.entries()
+                            .values()
+                            .stream()
+                            .flatMap(v -> findConstructions(v, context))
+            );
+            case FXMLObject fxmlObject -> Stream.concat(
+                    Stream.of(findDependenciesForObjectConstruction(fxmlObject)),
+                    fxmlObject.properties()
+                            .stream()
+                            .flatMap(property -> propertyRecursionHelper.walk(
+                                    property,
+                                    this::findConstructions,
+                                    context
+                            ))
+            );
+            case FXMLCopy copy -> Stream.of(new FXMLCopyAndDependencies(copy, List.of(copy.source())));
+            case FXMLInclude include -> Stream.of(new FXMLIncludeAndDependencies(include, List.of()));
+            case FXMLValue fxmlValue -> fxmlValue.identifier()
+                    .stream()
+                    .map(_ -> new FXMLValueConstruction(fxmlValue, List.of()));
+            case FXMLMethod _, FXMLConstant _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLReference _,
+                 FXMLResource _, FXMLTranslation _ -> Stream.empty();
+        };
     }
 
     /// Adds the constructor epilogue (object initialization and property settings) for all definitions in a document.
@@ -571,13 +750,31 @@ public final class FXMLSourceCodeBuilder {
     /// @throws UnsupportedOperationException If the value type is not yet supported.
     /// @throws IllegalArgumentException      If the value cannot be converted to the required type.
     private String encodeFXMLValue(SourceCodeGeneratorContext context, AbstractFXMLValue value, FXMLType type) {
+        return encodeFXMLValue(context, "", value, type);
+    }
+
+    /// Encodes an FXML value for use in Java source code.
+    ///
+    /// @param context          The current [SourceCodeGeneratorContext].
+    /// @param identifierPrefix The prefix to use for generated identifiers.
+    /// @param value            The [AbstractFXMLValue] to encode.
+    /// @param type             The expected [FXMLType] of the value.
+    /// @return The Java source code representation of the value.
+    /// @throws UnsupportedOperationException If the value type is not yet supported.
+    /// @throws IllegalArgumentException      If the value cannot be converted to the required type.
+    private String encodeFXMLValue(
+            SourceCodeGeneratorContext context,
+            String identifierPrefix,
+            AbstractFXMLValue value,
+            FXMLType type
+    ) {
         return switch (value) {
-            case AbstractFXMLObject object -> object.identifier().toString();
+            case AbstractFXMLObject object -> "%s%s".formatted(identifierPrefix, object.identifier());
             case FXMLConstant(FXMLClassType clazz, String identifier, _) ->
                     "%s.%s".formatted(typeHelper.typeToSourceCode(context, clazz), identifier);
-            case FXMLCopy(FXMLIdentifier identifier, _) -> identifier.toString();
+            case FXMLCopy(FXMLIdentifier identifier, _) -> "%s%s".formatted(identifierPrefix, identifier);
             case FXMLExpression _ -> throw new UnsupportedOperationException("Expression values are not supported yet");
-            case FXMLInclude(FXMLIdentifier identifier, _, _, _, _) -> identifier.toString();
+            case FXMLInclude(FXMLIdentifier identifier, _, _, _, _) -> "%s%s".formatted(identifierPrefix, identifier);
             case FXMLInlineScript _ ->
                     throw new UnsupportedOperationException("Inline script values are not supported yet");
             case FXMLLiteral(String literal) -> typeHelper.encodeLiteral(context, literal, type);
@@ -613,7 +810,9 @@ public final class FXMLSourceCodeBuilder {
                 );
             }
             case FXMLValue(Optional<FXMLIdentifier> identifier, FXMLType t, String v) ->
-                    identifier.map(FXMLIdentifier::toString).orElseGet(() -> typeHelper.encodeLiteral(context, v, t));
+                    identifier.map(FXMLIdentifier::toString)
+                            .map(i -> "%s%s".formatted(identifierPrefix, i))
+                            .orElseGet(() -> typeHelper.encodeLiteral(context, v, t));
         };
     }
 
@@ -666,5 +865,53 @@ public final class FXMLSourceCodeBuilder {
             case FXMLConstant _, FXMLCopy _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _,
                  FXMLReference _, FXMLResource _, FXMLTranslation _, FXMLValue _ -> Stream.empty();
         };
+    }
+
+    private sealed interface Constructions {
+        List<FXMLIdentifier> dependencies();
+    }
+
+    private record AbstractFXMLObjectAndDependencies(
+            AbstractFXMLObject object,
+            List<FXMLConstructorProperty> constructorProperties,
+            List<FXMLIdentifier> dependencies
+    ) implements Constructions {
+
+        private AbstractFXMLObjectAndDependencies {
+            Objects.requireNonNull(object, "object");
+            constructorProperties = List.copyOf(Objects.requireNonNullElseGet(constructorProperties, List::of));
+            dependencies = List.copyOf(Objects.requireNonNullElseGet(dependencies, List::of));
+        }
+    }
+
+    private record FXMLCopyAndDependencies(
+            FXMLCopy copy,
+            List<FXMLIdentifier> dependencies
+    ) implements Constructions {
+
+        private FXMLCopyAndDependencies {
+            Objects.requireNonNull(copy, "copy");
+            dependencies = List.copyOf(Objects.requireNonNullElseGet(dependencies, List::of));
+        }
+    }
+
+    private record FXMLIncludeAndDependencies(
+            FXMLInclude include,
+            List<FXMLIdentifier> dependencies
+    ) implements Constructions {
+        private FXMLIncludeAndDependencies {
+            Objects.requireNonNull(include, "include");
+            dependencies = List.copyOf(Objects.requireNonNullElseGet(dependencies, List::of));
+        }
+    }
+
+    private record FXMLValueConstruction(
+            FXMLValue value,
+            List<FXMLIdentifier> dependencies
+    ) implements Constructions {
+        private FXMLValueConstruction {
+            Objects.requireNonNull(value, "value");
+            dependencies = List.copyOf(Objects.requireNonNullElseGet(dependencies, List::of));
+        }
     }
 }

@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Gatherer;
 import java.util.stream.IntStream;
@@ -87,6 +88,7 @@ final class FXMLSourceCodeBuilderImportHelper {
     /// @throws NullPointerException if the provided document is null.
     public Imports findImports(FXMLDocument document, boolean addGeneratedAnnotation) throws NullPointerException {
         Objects.requireNonNull(document, "`document` must not be null");
+        String rootDocumentClassName = document.className();
         List<String> documentClassNames = getDocumentClassNames(document).toList();
         List<ClassCount> classCounts = findClassCounts(document, addGeneratedAnnotation);
         Map<String, List<ClassCount>> groupedClassCounts = groupClassCountsBasedOnClassPrefix(classCounts);
@@ -122,6 +124,12 @@ final class FXMLSourceCodeBuilderImportHelper {
                         ));
             }
         }
+        documentClassNames.stream()
+                .filter(Predicate.not(rootDocumentClassName::equals))
+                .forEach(className -> inlineClassNames.put(
+                        className,
+                        "%s.%s".formatted(rootDocumentClassName, className)
+                ));
         return new Imports(imports, inlineClassNames);
     }
 

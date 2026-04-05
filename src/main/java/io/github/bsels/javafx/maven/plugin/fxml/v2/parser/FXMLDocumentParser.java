@@ -4,6 +4,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLConstants;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
@@ -314,7 +315,7 @@ public final class FXMLDocumentParser {
         }
         FXMLIdentifier copyId = helper.resolveOptionalIdentifier(properties)
                 .orElseGet(() -> new FXMLInternalIdentifier(buildContext.nextInternalId()));
-        return Optional.of(new FXMLCopy(copyId, source));
+        return Optional.of(new FXMLCopy(copyId, new FXMLExposedIdentifier(source)));
     }
 
     /// Parses an `fx:define` element from the given parsed XML structure and updates the build context

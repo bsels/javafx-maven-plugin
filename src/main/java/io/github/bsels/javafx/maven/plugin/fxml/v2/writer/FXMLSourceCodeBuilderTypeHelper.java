@@ -2,6 +2,7 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
@@ -414,7 +415,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
                             .flatMap(this::createIdentifierToTypeMapEntry),
                     Stream.of(Map.entry(identifier.toString(), new Wrapper.FXMLTypeWrapper(type)))
             );
-            case FXMLCopy(FXMLIdentifier identifier, String name) ->
+            case FXMLCopy(FXMLIdentifier identifier, FXMLExposedIdentifier(String name)) ->
                     Stream.of(Map.entry(identifier.toString(), new Wrapper.ReferenceWrapper(name)));
             case FXMLInclude(FXMLIdentifier identifier, _, _, _, FXMLLazyLoadedDocument document) ->
                     Stream.of(Map.entry(

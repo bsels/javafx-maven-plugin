@@ -576,7 +576,7 @@ public class FXMLDocumentParserTest {
                                             entries -> assertThat(entries.get(new FXMLLiteral("copyEntry")))
                                                     .isInstanceOf(FXMLCopy.class)
                                                     .extracting(FXMLCopy.class::cast)
-                                                    .hasFieldOrPropertyWithValue("name", "myButton")
+                                                    .hasFieldOrPropertyWithValue("source.name", "myButton")
                                                     .extracting(FXMLCopy::identifier)
                                                     .isInstanceOf(FXMLInternalIdentifier.class)
                                     )
