@@ -246,6 +246,13 @@
     </build>
 
     <dependencies>
+        <!-- region Override transitive dependencies -->
+        <dependency>
+            <groupId>org.codehaus.plexus</groupId>
+            <artifactId>plexus-utils</artifactId>
+            <version>3.6.1</version>
+        </dependency>
+        <!-- endregion -->
         <!-- region Dependencies -->
         <dependency>
             <groupId>org.apache.maven</groupId>

@@ -242,7 +242,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
     ///
     /// @param clazz      The [Class] to inspect. Must not be null.
     /// @param properties The list of [FXMLConstructorProperty] to match. Must not be null.
-    /// @return The [FXMLConstructor] with the fewest number of properties that satisfy the criteria.
+    /// @return The [FXMLConstructor] with the lowest number of properties that satisfy the criteria.
     /// @throws NullPointerException     If any input is null.
     /// @throws IllegalArgumentException If no matching constructor is found.
     public FXMLConstructor findMinimalConstructor(Class<?> clazz, List<FXMLConstructorProperty> properties)
@@ -285,7 +285,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
                         properties)));
     }
 
-    /// Retrieves the list of constructors with [@NamedArg] annotations for the given factory method from the cache,
+    /// Retrieves the list of constructors with [@NamedArg] annotations for the given factory method from the cache
     /// or computes them if not already cached.
     ///
     /// @param factoryMethod The factory method for which to retrieve constructors.

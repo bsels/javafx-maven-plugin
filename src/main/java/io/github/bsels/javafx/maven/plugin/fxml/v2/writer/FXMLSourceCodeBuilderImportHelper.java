@@ -49,8 +49,8 @@ import java.util.stream.Stream;
 
 /// A helper class designed to assist in counting and managing FXML-related classes.
 /// This class serves as a utility for performing operations related to FXML class counting.
-/// It does not accept parameters in its constructor and provides functionality related to FXML class analysi
-///  and handling.
+/// It does not accept parameters in its constructor and provides functionality related to FXML class analysis
+/// and handling.
 final class FXMLSourceCodeBuilderImportHelper {
     /// Creates and returns a gatherer for aggregating class counts into a map and producing [ClassCount] objects
     /// for downstream processing.

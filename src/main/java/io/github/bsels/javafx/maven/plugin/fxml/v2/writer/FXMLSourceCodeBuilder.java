@@ -1081,7 +1081,7 @@ public final class FXMLSourceCodeBuilder {
     /// Represents an FXML include construction and its dependencies.
     ///
     /// @param include      The [FXMLInclude] being constructed.
-    /// @param dependencies The identifiers this includes depend on.
+    /// @param dependencies The identifiers this `include` depends on.
     private record FXMLIncludeAndDependencies(
             FXMLInclude include,
             List<FXMLIdentifier> dependencies
@@ -1090,7 +1090,7 @@ public final class FXMLSourceCodeBuilder {
         /// Validates the include and initializes the dependency list.
         ///
         /// @param include      The [FXMLInclude] being constructed.
-        /// @param dependencies The identifiers this includes depend on.
+        /// @param dependencies The identifiers this `include` depends on.
         private FXMLIncludeAndDependencies {
             Objects.requireNonNull(include, "include");
             dependencies = List.copyOf(Objects.requireNonNullElseGet(dependencies, List::of));
