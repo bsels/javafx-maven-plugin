@@ -1073,6 +1073,12 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
+    /// Renders the source code for a specific [FXMLMethod].
+    ///
+    /// @param context    The [SourceCodeGeneratorContext] used for code generation.
+    /// @param controller The [FXMLController] associated with the FXML document.
+    /// @param method     The [FXMLMethod] to be rendered.
+    /// @return The generated source code for the method as a [String].
     private String renderMethod(SourceCodeGeneratorContext context, FXMLController controller, FXMLMethod method) {
         String name = method.name();
         Optional<FXMLControllerMethod> controllerMethod = findMethodInController(controller, method);
@@ -1119,6 +1125,13 @@ public final class FXMLSourceCodeBuilder {
                 .toString();
     }
 
+    /// Generates the body of a method that uses reflection to call a controller method.
+    /// This is used when the controller method is not public or otherwise requires reflective access.
+    ///
+    /// @param context    The [SourceCodeGeneratorContext] used for code generation.
+    /// @param sourceCode The [StringBuilder] to which the generated code is appended.
+    /// @param clazz      The [FXMLClassType] of the controller.
+    /// @param method     The [FXMLControllerMethod] to be called via reflection.
     private void createReflectionCallMethodBody(
             SourceCodeGeneratorContext context,
             StringBuilder sourceCode,
@@ -1153,6 +1166,10 @@ public final class FXMLSourceCodeBuilder {
                 .append("    }\n");
     }
 
+    /// Generates the body of a method that directly calls a public controller method.
+    ///
+    /// @param sourceCode The [StringBuilder] to which the generated code is appended.
+    /// @param fxmlMethod The [FXMLMethod] representing the call to be made.
     private void createDirectCallMethodBody(StringBuilder sourceCode, FXMLMethod fxmlMethod) {
         if (void.class.equals(FXMLUtils.findRawType(fxmlMethod.returnType()))) {
             sourceCode.append("    return ");
@@ -1172,6 +1189,11 @@ public final class FXMLSourceCodeBuilder {
         sourceCode.append(");\n");
     }
 
+    /// Attempts to find a matching method in the given [FXMLController] for a specified [FXMLMethod].
+    ///
+    /// @param controller The [FXMLController] to search in.
+    /// @param method     The [FXMLMethod] containing the target method's name and signature.
+    /// @return An [Optional] containing the [FXMLControllerMethod] if a match is found, otherwise an empty [Optional].
     private Optional<FXMLControllerMethod> findMethodInController(FXMLController controller, FXMLMethod method) {
         final String name = method.name();
         final Optional<FXMLControllerMethod> controllerMethod;
@@ -1193,6 +1215,11 @@ public final class FXMLSourceCodeBuilder {
         return controllerMethod;
     }
 
+    /// Checks if the parameters of an [FXMLControllerMethod] are compatible with the provided list of [Class] types.
+    ///
+    /// @param m              The [FXMLControllerMethod] to check.
+    /// @param parameterTypes The list of parameter types to compare against.
+    /// @return `true` if all parameter types are compatible, `false` otherwise.
     private boolean checkParameterTypes(FXMLControllerMethod m, List<Class<?>> parameterTypes) {
         for (int i = 0; i < parameterTypes.size(); i++) {
             List<FXMLType> fxmlTypes = m.parameterTypes();

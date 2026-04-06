@@ -494,7 +494,11 @@ public final class FXMLDocumentParser {
                 Optional<String> textContent = child.textValue();
                 AbstractFXMLValue value;
                 if (textContent.isPresent()) {
-                    value = parseValueString(textContent.get().stripTrailing(), FXMLType.of(rawValueType), buildContext);
+                    value = parseValueString(
+                            textContent.get().stripTrailing(),
+                            FXMLType.of(rawValueType),
+                            buildContext
+                    );
                 } else {
                     List<AbstractFXMLValue> grandChildren = child.children()
                             .stream()
@@ -945,7 +949,7 @@ public final class FXMLDocumentParser {
     /// The logic handles various FXML prefixes:
     /// - `%`: Returns [FXMLTranslation].
     /// - `@`: Returns [FXMLResource].
-    /// - `#`: Returns [FXMLMethod] via [FXMLDocumentParserHelper#findMethodReferenceType(String, Type, BuildContext)].
+    /// - `#`: Returns [FXMLMethod] via [FXMLDocumentParserHelper#findMethodReferenceType(String, FXMLType, BuildContext)].
     /// - `$`: Returns [FXMLReference].
     /// - `${...}`: Returns [FXMLExpression] if the expression is valid, otherwise throws [IllegalArgumentException].
     /// - `\`: Returns [FXMLLiteral] (escaped).
