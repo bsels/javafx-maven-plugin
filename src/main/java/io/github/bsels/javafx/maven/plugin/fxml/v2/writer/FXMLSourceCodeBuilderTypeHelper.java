@@ -4,6 +4,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLInterface;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
@@ -390,17 +391,24 @@ final class FXMLSourceCodeBuilderTypeHelper {
     ///
     /// @param context    The [SourceCodeGeneratorContext] used for code generation.
     /// @param controller The [FXMLController] associated with the FXML document. Can be null.
+    /// @param interfaces The [FXMLInterface]s declared in the FXML document. Can be empty.
     /// @param method     The [FXMLMethod] to be rendered.
-    /// @return The generated source code for the method as a [String].
+    /// @return The generated source code for the method as a [Stream] of [String].
     /// @throws NullPointerException if `controller`, or `method` is null.
-    public String renderMethod(SourceCodeGeneratorContext context, FXMLController controller, FXMLMethod method)
-            throws NullPointerException {
+    public Stream<String> renderMethod(
+            SourceCodeGeneratorContext context,
+            FXMLController controller,
+            List<FXMLInterface> interfaces,
+            FXMLMethod method
+    ) throws NullPointerException {
         Objects.requireNonNull(context, "`context` must not be null");
+        Objects.requireNonNull(interfaces, "`interfaces` must not be null");
         Objects.requireNonNull(method, "`method` must not be null");
         String name = method.name();
         Optional<FXMLControllerMethod> controllerMethod = findMethodInController(controller, method);
         StringBuilder sourceCode = new StringBuilder();
         if (controllerMethod.isEmpty()) {
+            // TODO: Check for interface methods
             context.addFeature(Feature.ABSTRACT_CLASS);
         }
         sourceCode.append("protected ")
@@ -440,8 +448,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
         } else {
             sourceCode.append(';');
         }
-        return sourceCode.append("\n\n")
-                .toString();
+        return Stream.of(sourceCode.append("\n\n").toString());
     }
 
     /// Generates the body of a method that uses reflection to call a controller method.
@@ -470,8 +477,10 @@ final class FXMLSourceCodeBuilderTypeHelper {
         }
         sourceCode.append(");\n")
                 .append("        method.setAccessible(true);\n        ");
-        if (void.class.equals(FXMLUtils.findRawType(method.returnType()))) {
-            sourceCode.append("return ");
+        if (!void.class.equals(FXMLUtils.findRawType(method.returnType()))) {
+            sourceCode.append("return (")
+                    .append(typeToSourceCode(context, method.returnType()))
+                    .append(") ");
         }
         sourceCode.append("method.invoke(")
                 .append(INTERNAL_CONTROLLER_FIELD);
@@ -480,7 +489,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
                     .append(i);
         }
         sourceCode.append(");\n")
-                .append("    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {\n")
+                .append("    } catch (NoSuchMethodException | IllegalAccessException | java.lang.reflect.InvocationTargetException e) {\n")
                 .append("        throw new RuntimeException(e);\n")
                 .append("    }\n");
     }
@@ -490,7 +499,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
     /// @param sourceCode The [StringBuilder] to which the generated code is appended.
     /// @param fxmlMethod The [FXMLMethod] representing the call to be made.
     private void createDirectCallMethodBody(StringBuilder sourceCode, FXMLMethod fxmlMethod) {
-        if (void.class.equals(FXMLUtils.findRawType(fxmlMethod.returnType()))) {
+        if (!void.class.equals(FXMLUtils.findRawType(fxmlMethod.returnType()))) {
             sourceCode.append("    return ");
         }
         sourceCode.append(INTERNAL_CONTROLLER_FIELD)

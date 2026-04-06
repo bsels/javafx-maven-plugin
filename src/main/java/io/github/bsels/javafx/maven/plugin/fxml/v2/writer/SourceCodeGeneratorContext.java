@@ -1,6 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMethod;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -22,6 +23,7 @@ import java.util.Set;
 /// @param features            A set of [Feature]s identified as necessary for the generated code.
 /// @param identifierToTypeMap A map from FXML identifiers to their corresponding [FXMLType]s.
 /// @param seenNestedFXMLFiles A set of paths to FXML files that have already been processed as nested `includes`.
+/// @param seenFXMLMethods     A set of FXML methods that have already been processed.
 /// @param packageName         The package name for the generated Java class.
 record SourceCodeGeneratorContext(
         Map<SourcePart, StringBuilder> sourceCode,
@@ -31,6 +33,7 @@ record SourceCodeGeneratorContext(
         Set<Feature> features,
         Map<String, FXMLType> identifierToTypeMap,
         Set<String> seenNestedFXMLFiles,
+        Set<FXMLMethod> seenFXMLMethods,
         Optional<String> packageName
 ) {
 
@@ -43,6 +46,7 @@ record SourceCodeGeneratorContext(
     /// @param features            A set of [Feature]s identified as necessary for the generated code.
     /// @param identifierToTypeMap A map from FXML identifiers to their corresponding [FXMLType]s.
     /// @param seenNestedFXMLFiles A set of paths to FXML files that have already been processed as nested `includes`.
+    /// @param seenFXMLMethods     A set of FXML methods that have already been processed.
     /// @param packageName         The package name for the generated Java class.
     /// @throws NullPointerException If any of the parameters is null.
     public SourceCodeGeneratorContext {
@@ -53,6 +57,7 @@ record SourceCodeGeneratorContext(
         Objects.requireNonNull(features, "`features` must not be null");
         Objects.requireNonNull(identifierToTypeMap, "`identifierToTypeMap` must not be null");
         Objects.requireNonNull(seenNestedFXMLFiles, "`seenNestedFXMLFiles` must not be null");
+        Objects.requireNonNull(seenFXMLMethods, "`seenFXMLMethods` must not be null");
         Objects.requireNonNull(packageName, "`packageName` must not be null");
     }
 
@@ -76,6 +81,7 @@ record SourceCodeGeneratorContext(
                 new ArrayList<>(),
                 new HashSet<>(),
                 identifierToTypeMap,
+                new HashSet<>(),
                 new HashSet<>(),
                 Optional.ofNullable(packageName)
         );
@@ -129,6 +135,7 @@ record SourceCodeGeneratorContext(
                 features,
                 identifierToTypeMap,
                 seenNestedFXMLFiles,
+                new HashSet<>(),
                 packageName
         );
     }

@@ -41,7 +41,6 @@ import io.github.bsels.javafx.maven.plugin.utils.Utils;
 import org.apache.maven.plugin.logging.Log;
 
 import javax.annotation.processing.Generated;
-import java.lang.reflect.Modifier;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -56,6 +55,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -79,7 +79,7 @@ public final class FXMLSourceCodeBuilder {
     private static final String CONSTRUCTOR_VARIABLE_PREFIX = "$$";
     /// A set of Java primitive types.
     private static final Set<String> PRIMITIVE_TYPES = Set.of(
-            "boolean", "byte", "char", "short", "int", "long", "float", "double"
+            "boolean", "byte", "char", "short", "int", "long", "float", "double", "void"
     );
     /// The method body for internal string-to-file conversion.
     private static final String INTERNAL_STRING_TO_FILE_METHOD_BODY = """
@@ -962,21 +962,20 @@ public final class FXMLSourceCodeBuilder {
                     .flatMap(v -> addInnerClass(v, context));
             case FXMLObject(_, _, _, List<FXMLProperty> properties) -> properties.stream()
                     .flatMap(property -> propertyRecursionHelper.walk(property, this::addInnerClass, context));
-            case FXMLInclude(_, String sourceFile, _, Optional<String> resources, FXMLLazyLoadedDocument document) -> {
-                if (context.seenNestedFXMLFiles().add(sourceFile)) {
-                    yield Stream.of(internalGenerateSourceCode(
-                            document.get(),
-                            context.with(
-                                    resources.map(typeHelper::encodeString)
-                                            .map("java.util.ResourceBundle.getBundle(%s)"::formatted)
-                                            .orElse(context.resourceBundle())
-                            ),
-                            false
-                    ));
-                } else {
-                    yield Stream.empty();
-                }
-            }
+            case FXMLInclude(_, String sourceFile, _, Optional<String> resources, FXMLLazyLoadedDocument document) ->
+                    singleCreation(
+                            context.seenNestedFXMLFiles(),
+                            sourceFile,
+                            () -> Stream.of(internalGenerateSourceCode(
+                                    document.get(),
+                                    context.with(
+                                            resources.map(typeHelper::encodeString)
+                                                    .map("java.util.ResourceBundle.getBundle(%s)"::formatted)
+                                                    .orElse(context.resourceBundle())
+                                    ),
+                                    false
+                            ))
+                    );
             case FXMLConstant _, FXMLCopy _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _,
                  FXMLReference _, FXMLResource _, FXMLTranslation _, FXMLValue _ -> Stream.empty();
         };
@@ -989,13 +988,14 @@ public final class FXMLSourceCodeBuilder {
     /// @param document The FXML document being processed.
     /// @param context  The context for the source code generation, providing access to utilities and the code builder.
     private void addMethods(FXMLDocument document, SourceCodeGeneratorContext context) {
+        List<FXMLInterface> interfaces = document.interfaces();
         FXMLController controller = document.controller()
                 .orElse(null);
         Stream.concat(
-                        addMethods(document.root(), context, controller),
+                        addMethods(document.root(), context, controller, interfaces),
                         document.definitions()
                                 .stream()
-                                .flatMap(value -> addMethods(value, context, controller))
+                                .flatMap(value -> addMethods(value, context, controller, interfaces))
                 ).reduce(context.sourceCode(SourcePart.METHODS), StringBuilder::append, StringBuilder::append)
                 .append('\n');
     }
@@ -1010,24 +1010,46 @@ public final class FXMLSourceCodeBuilder {
     private Stream<String> addMethods(
             AbstractFXMLValue value,
             SourceCodeGeneratorContext context,
-            FXMLController controller
+            FXMLController controller,
+            List<FXMLInterface> interfaces
     ) {
         return switch (value) {
             case FXMLCollection(_, _, _, List<AbstractFXMLValue> values) -> values.stream()
-                    .flatMap(nested -> addMethods(nested, context, controller));
+                    .flatMap(nested -> addMethods(nested, context, controller, interfaces));
             case FXMLMap(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> entries) -> entries.values()
                     .stream()
-                    .flatMap(nested -> addMethods(nested, context, controller));
+                    .flatMap(nested -> addMethods(nested, context, controller, interfaces));
             case FXMLObject(_, _, _, List<FXMLProperty> properties) -> properties.stream()
                     .flatMap(property -> propertyRecursionHelper.walk(
                             property,
-                            (nested, ctx) -> addMethods(nested, ctx, controller),
+                            (nested, ctx) -> addMethods(nested, ctx, controller, interfaces),
                             context
                     ));
-            case FXMLMethod fxmlMethod -> Stream.of(typeHelper.renderMethod(context, controller, fxmlMethod));
-            // TODO: Check for interface methods
+            case FXMLMethod fxmlMethod -> singleCreation(
+                    context.seenFXMLMethods(),
+                    fxmlMethod,
+                    () -> typeHelper.renderMethod(context, controller, interfaces, fxmlMethod)
+            );
             case FXMLValue _, FXMLConstant _, FXMLCopy _, FXMLExpression _, FXMLInclude _, FXMLInlineScript _,
                  FXMLLiteral _, FXMLReference _, FXMLResource _, FXMLTranslation _ -> Stream.empty();
         };
+    }
+
+    /// Creates a single-element stream using the provided supplier if the specified key is not already present in
+    /// the given set.
+    /// If the key is already present, an empty stream is returned.
+    ///
+    /// @param <K>      the type of the keys in the set
+    /// @param <T>      the type of the elements in the stream
+    /// @param set      the set used to check for key presence and to track added keys
+    /// @param key      the key to check and potentially add to the set
+    /// @param supplier the supplier used to generate the single element stream
+    /// @return a single-element stream if the key was not already present in the set, or an empty stream if the key was already present
+    private <K, T> Stream<T> singleCreation(Set<K> set, K key, Supplier<Stream<T>> supplier) {
+        if (set.add(key)) {
+            return supplier.get();
+        } else {
+            return Stream.empty();
+        }
     }
 }
