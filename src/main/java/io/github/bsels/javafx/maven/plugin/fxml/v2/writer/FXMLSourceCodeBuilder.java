@@ -1006,6 +1006,7 @@ public final class FXMLSourceCodeBuilder {
     /// @param value      the FXML value to process. This can be an FXML collection, map, object, method, or other FXML-related value types.
     /// @param context    the source code generator context that provides context-specific utilities needed for processing values.
     /// @param controller the FXML controller instance associated with the current operation, which may influence how methods are added or processed.
+    /// @param interfaces the list of FXML interfaces to consider when generating method source code.
     /// @return a stream of strings derived from rendering methods or processing specific FXML value types. If no actionable methods or values are found, an empty stream is returned.
     private Stream<String> addMethods(
             AbstractFXMLValue value,

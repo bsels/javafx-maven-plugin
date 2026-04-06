@@ -80,12 +80,17 @@ final class FXMLDocumentParserHelper {
             ^\\s*((?<first>((((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*),\
             \\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?)$\
             """);
+    /// Regular expression pattern for identifying the presence of FXML interfaces in a string.
+    /// This pattern searches for the `interface:` keyword and captures the interface name,
+    /// optionally including associated methods and their signatures.
     private static final Pattern INTERFACES = Pattern.compile("""
             ^\\s*interface\\s*:\\s*(?<interface>\\S([^;]*\\S)?)\\s*((;?)|\
             (;\\s*methods\\s*:\\s*(?<methods>(((\\w+\\.)*\\w+)(<([\\s\\w<,>.]*)>)?)\\s*(\\w+)\\s*\\(
             (([\\s\\w<>,.]+)(\\s*,\\s*[\\s\\w<>,.]+)*)?\\)(\\s*;\\s*(((\\w+\\.)*\\w+)(<([\\s\\w<,>.]*)>)?)\\s*(\\w+)
             \\s*\\((([\\s\\w<>,.]+)(\\s*,\\s*[\\s\\w<>,.]+)*)?\\))*\\s*;?)))\\s*$\
             """);
+    /// Regular expression pattern for parsing individual method signatures defined within an interface block.
+    /// It captures the return type, method name, and parameter list from a method declaration.
     private static final Pattern INTERFACE_METHOD = Pattern.compile("""
             \\s*(?<returnType>((\\w+\\.)*\\w+)(<([\\s\\w<,>.]*)>)?)\\s*(?<methodName>\\w+)\
             \\s*\\((?<parameters>([\\s\\w<>,.]+)(\\s*,\\s*[\\s\\w<>,.]+)*)?\\)\\s*\

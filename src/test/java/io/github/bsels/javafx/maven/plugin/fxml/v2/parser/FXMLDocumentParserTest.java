@@ -913,14 +913,17 @@ public class FXMLDocumentParserTest {
                     )
                     // Validate children values
                     .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
-                    .hasSize(1)
+                    .hasSize(2)
                     .hasOnlyElementsOfType(FXMLInclude.class)
-                    .first(InstanceOfAssertFactories.type(FXMLInclude.class))
-                    .hasFieldOrPropertyWithValue("sourceFile", "/examples/ExplicitDefault.fxml")
-                    .hasFieldOrPropertyWithValue("resources", Optional.empty())
-                    .hasFieldOrPropertyWithValue("charset", StandardCharsets.UTF_8)
-                    .extracting(FXMLInclude::identifier)
-                    .isInstanceOf(FXMLInternalIdentifier.class);
+                    .extracting(FXMLInclude.class::cast)
+                    .allSatisfy(
+                            element -> assertThat(element)
+                                    .hasFieldOrPropertyWithValue("sourceFile", "/examples/ExplicitDefault.fxml")
+                                    .hasFieldOrPropertyWithValue("resources", Optional.empty())
+                                    .hasFieldOrPropertyWithValue("charset", StandardCharsets.UTF_8)
+                                    .extracting(FXMLInclude::identifier)
+                                    .isInstanceOf(FXMLInternalIdentifier.class)
+                    );
         }
 
         @ParameterizedTest
