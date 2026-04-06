@@ -12,11 +12,13 @@ import java.util.Objects;
 ///
 /// @param visibility     The visibility level of the method.
 /// @param name           The name of the method.
+/// @param isAbstract     Indicates whether the method is abstract.
 /// @param returnType     The FXML type representing the return type of the method.
 /// @param parameterTypes The list of FXML types representing the parameter types of the method.
 public record FXMLControllerMethod(
         Visibility visibility,
         String name,
+        boolean isAbstract,
         FXMLType returnType,
         List<FXMLType> parameterTypes
 ) {
@@ -25,6 +27,7 @@ public record FXMLControllerMethod(
     ///
     /// @param visibility     The visibility level of the method.
     /// @param name           The name of the method.
+    /// @param isAbstract     Indicates whether the method is abstract.
     /// @param returnType     The return type of the method.
     /// @param parameterTypes The parameter types of the method.
     /// @throws NullPointerException If any of the parameters are null.

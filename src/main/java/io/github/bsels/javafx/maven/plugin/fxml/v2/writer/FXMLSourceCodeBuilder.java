@@ -4,6 +4,7 @@ import io.github.bsels.javafx.maven.plugin.CheckAndCast;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLInterface;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
@@ -40,6 +41,7 @@ import io.github.bsels.javafx.maven.plugin.utils.Utils;
 import org.apache.maven.plugin.logging.Log;
 
 import javax.annotation.processing.Generated;
+import java.lang.reflect.Modifier;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -424,14 +426,19 @@ public final class FXMLSourceCodeBuilder {
     /// @throws UnsupportedOperationException If an abstract inner class is requested for an included FXML.
     private void addClassDeclaration(SourceCodeGeneratorContext context, FXMLDocument document, boolean isRootDocument) {
         StringBuilder sourceCode = context.sourceCode(SourcePart.CLASS_DECLARATION);
+        boolean hasAbstractInterfaceMethods = document.interfaces()
+                .stream()
+                .map(FXMLInterface::methods)
+                .flatMap(List::stream)
+                .anyMatch(FXMLControllerMethod::isAbstract);
         if (isRootDocument) {
             sourceCode.append("public ");
-            if (context.hasFeature(Feature.ABSTRACT_CLASS)) {
+            if (context.hasFeature(Feature.ABSTRACT_CLASS) || hasAbstractInterfaceMethods) {
                 sourceCode.append("abstract ");
             }
         } else {
             sourceCode.append("private static ");
-            if (context.hasFeature(Feature.ABSTRACT_CLASS)) {
+            if (context.hasFeature(Feature.ABSTRACT_CLASS) || hasAbstractInterfaceMethods) {
                 throw new UnsupportedOperationException(
                         "Abstract inner classes for included FXML documents are not supported."
                 );
@@ -1018,6 +1025,7 @@ public final class FXMLSourceCodeBuilder {
                             context
                     ));
             case FXMLMethod fxmlMethod -> Stream.of(typeHelper.renderMethod(context, controller, fxmlMethod));
+            // TODO: Check for interface methods
             case FXMLValue _, FXMLConstant _, FXMLCopy _, FXMLExpression _, FXMLInclude _, FXMLInlineScript _,
                  FXMLLiteral _, FXMLReference _, FXMLResource _, FXMLTranslation _ -> Stream.empty();
         };

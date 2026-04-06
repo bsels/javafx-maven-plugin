@@ -4,6 +4,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLConstants;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLInterface;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.Visibility;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
@@ -13,6 +14,9 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifie
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLWildcardType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMethod;
 import io.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
 import io.github.bsels.javafx.maven.plugin.utils.InternalClassNotFoundException;
@@ -31,6 +35,7 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -54,8 +59,9 @@ import java.util.stream.Stream;
 /// [FXMLDocumentParser] to transform parsed XML structures into JavaFX-compatible FXML model representations.
 final class FXMLDocumentParserHelper {
     /// Pattern to match generic type definitions in comments (e.g., `generic 0: java.lang.String`).
-    private static final Pattern GENERICS = Pattern.compile(
-            "^\\s*generic\\s+(?<index>\\d+)\\s*:\\s*(?<type>\\S(.*\\S)?)\\s*$");
+    private static final Pattern GENERICS = Pattern.compile("""
+            ^\\s*generic\\s+(?<index>\\d+)\\s*:\\s*(?<type>\\S(.*\\S)?)\\s*$\
+            """);
     /// A regular expression pattern used to match and parse nested generic type definitions.
     ///
     /// This pattern identifies sequences of generic type declarations that may be nested
@@ -70,9 +76,21 @@ final class FXMLDocumentParserHelper {
     ///
     /// It uses named groups `first` for the preceding types, `rawType` for the current class name,
     /// and `generics` for its type arguments.
-    private static final Pattern NESTED_GENERICS = Pattern.compile(
-            "^\\s*((?<first>((((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*),\\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?)$"
-    );
+    private static final Pattern NESTED_GENERICS = Pattern.compile("""
+            ^\\s*((?<first>((((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*),\
+            \\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?)$\
+            """);
+    private static final Pattern INTERFACES = Pattern.compile("""
+            ^\\s*interface\\s*:\\s*(?<interface>\\S([^;]*\\S)?)\\s*((;?)|\
+            (;\\s*methods\\s*:\\s*(?<methods>(((\\w+\\.)*\\w+)(<([\\s\\w<,>.]*)>)?)\\s*(\\w+)\\s*\\(
+            (([\\s\\w<>,.]+)(\\s*,\\s*[\\s\\w<>,.]+)*)?\\)(\\s*;\\s*(((\\w+\\.)*\\w+)(<([\\s\\w<,>.]*)>)?)\\s*(\\w+)
+            \\s*\\((([\\s\\w<>,.]+)(\\s*,\\s*[\\s\\w<>,.]+)*)?\\))*\\s*;?)))\\s*$\
+            """);
+    private static final Pattern INTERFACE_METHOD = Pattern.compile("""
+            \\s*(?<returnType>((\\w+\\.)*\\w+)(<([\\s\\w<,>.]*)>)?)\\s*(?<methodName>\\w+)\
+            \\s*\\((?<parameters>([\\s\\w<>,.]+)(\\s*,\\s*[\\s\\w<>,.]+)*)?\\)\\s*\
+            """);
+
     /// Provides a logger instance for recording runtime information, debugging, and error messages.
     ///
     /// This logger is immutable and initialized once via the constructor, ensuring consistent logging
@@ -115,9 +133,10 @@ final class FXMLDocumentParserHelper {
             case Class<?> clazz -> {
                 Map<String, FXMLType> resolvedMapping = resolveTypeMapping(clazz, buildContext);
                 if (clazz.getTypeParameters().length > 0) {
-                    List<FXMLType> typeArgs = Stream.of(clazz.getTypeParameters())
-                            .map(tp -> resolvedMapping.getOrDefault(tp.getName(), FXMLType.of(Object.class)))
-                            .toList();
+                    List<FXMLType> typeArgs = Stream.of(clazz.getTypeParameters()).map(tp -> resolvedMapping.getOrDefault(
+                            tp.getName(),
+                            FXMLType.of(Object.class)
+                    )).toList();
                     yield FXMLType.of(clazz, typeArgs);
                 }
                 // Check if any superclass/interface resolved type parameters for this class
@@ -128,18 +147,19 @@ final class FXMLDocumentParserHelper {
             }
             case ParameterizedType pt -> {
                 Class<?> rawClass = (Class<?>) pt.getRawType();
-                List<FXMLType> typeArgs = Stream.of(pt.getActualTypeArguments())
-                        .map(arg -> buildFXMLType(arg, buildContext))
-                        .toList();
+                List<FXMLType> typeArgs = Stream.of(pt.getActualTypeArguments()).map(arg -> buildFXMLType(
+                        arg,
+                        buildContext
+                )).toList();
                 yield FXMLType.of(rawClass, typeArgs);
             }
             case TypeVariable<?> tv -> typeMapping.getOrDefault(tv.getName(), FXMLType.wildcard());
-            case WildcardType wt -> Arrays.stream(wt.getUpperBounds())
-                    .findFirst()
-                    .filter(Predicate.not(Predicate.isEqual(Object.class)))
-                    .or(() -> Arrays.stream(wt.getLowerBounds()).findFirst())
-                    .map(bound -> buildFXMLType(bound, buildContext))
-                    .orElseGet(FXMLType::wildcard);
+            case WildcardType wt ->
+                    Arrays.stream(wt.getUpperBounds()).findFirst().filter(Predicate.not(Predicate.isEqual(Object.class))).or(
+                            () -> Arrays.stream(wt.getLowerBounds()).findFirst()).map(bound -> buildFXMLType(
+                            bound,
+                            buildContext
+                    )).orElseGet(FXMLType::wildcard);
             default -> FXMLType.of(Utils.getClassType(type));
         };
     }
@@ -153,8 +173,7 @@ final class FXMLDocumentParserHelper {
     /// @param buildContext The build context used for resolving type variables.
     /// @return A map of type variable names to their resolved [FXMLType]s.
     /// @throws NullPointerException if `clazz` or `buildContext` is null.
-    public Map<String, FXMLType> resolveTypeMapping(Class<?> clazz, BuildContext buildContext)
-            throws NullPointerException {
+    public Map<String, FXMLType> resolveTypeMapping(Class<?> clazz, BuildContext buildContext) throws NullPointerException {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
         Map<String, FXMLType> mapping = new LinkedHashMap<>(buildContext.typeMapping());
@@ -172,8 +191,7 @@ final class FXMLDocumentParserHelper {
     /// @param name         The qualified name of the static property.
     /// @return An [Optional] containing an [InternalStaticSetterProperty] if found, or empty otherwise.
     /// @throws NullPointerException if `buildContext` or `name` is null
-    public Optional<InternalStaticSetterProperty> findStaticSetter(BuildContext buildContext, String name)
-            throws NullPointerException {
+    public Optional<InternalStaticSetterProperty> findStaticSetter(BuildContext buildContext, String name) throws NullPointerException {
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
         Objects.requireNonNull(name, "`name` must not be null");
         int dotIndex = name.lastIndexOf('.');
@@ -206,12 +224,7 @@ final class FXMLDocumentParserHelper {
         Method setter = setters.getFirst();
         Type paramType = setter.getGenericParameterTypes()[1];
         FXMLType fxmlType = buildFXMLType(paramType, buildContext);
-        return Optional.of(new InternalStaticSetterProperty(
-                propName,
-                staticClass,
-                setterName,
-                fxmlType
-        ));
+        return Optional.of(new InternalStaticSetterProperty(propName, staticClass, setterName, fxmlType));
 
     }
 
@@ -226,8 +239,7 @@ final class FXMLDocumentParserHelper {
     /// @param clazz        The class to search for the property.
     /// @param name         The name of the property.
     /// @return An [Optional] containing the [ObjectProperty] if found, or empty otherwise.
-    public Optional<ObjectProperty> findObjectProperty(BuildContext buildContext, Class<?> clazz, String name)
-            throws NullPointerException {
+    public Optional<ObjectProperty> findObjectProperty(BuildContext buildContext, Class<?> clazz, String name) throws NullPointerException {
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         Objects.requireNonNull(name, "`name` must not be null");
@@ -300,8 +312,7 @@ final class FXMLDocumentParserHelper {
     /// @return The corresponding [FXMLMethod].
     /// @throws NullPointerException     if any of the parameters are null
     /// @throws IllegalArgumentException if the paramType is not a functional interface
-    public FXMLMethod findMethodReferenceType(String methodName, FXMLType paramType, BuildContext buildContext)
-            throws NullPointerException, IllegalArgumentException {
+    public FXMLMethod findMethodReferenceType(String methodName, FXMLType paramType, BuildContext buildContext) throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(methodName, "`methodName` must not be null");
         Objects.requireNonNull(paramType, "`paramType` must not be null");
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
@@ -318,9 +329,10 @@ final class FXMLDocumentParserHelper {
             }
             BuildContext localBuildContext = new BuildContext(buildContext, typeMapping);
             FXMLType returnType = buildFXMLType(functionalMethod.getGenericReturnType(), localBuildContext);
-            List<FXMLType> parameterTypes = Arrays.stream(functionalMethod.getGenericParameterTypes())
-                    .map(parameterType -> buildFXMLType(parameterType, localBuildContext))
-                    .toList();
+            List<FXMLType> parameterTypes = Arrays.stream(functionalMethod.getGenericParameterTypes()).map(parameterType -> buildFXMLType(
+                    parameterType,
+                    localBuildContext
+            )).toList();
             return new FXMLMethod(methodName, parameterTypes, returnType);
         }
         throw new IllegalArgumentException("The parameter type '%s' must be a functional interface".formatted(paramType));
@@ -358,8 +370,7 @@ final class FXMLDocumentParserHelper {
     /// @param attributes The XML attributes map.
     /// @return An [Optional] containing the identifier, or empty if no `fx:id` is present.
     /// @throws NullPointerException if `attributes` is null.
-    public Optional<FXMLIdentifier> resolveOptionalIdentifier(Map<String, String> attributes)
-            throws NullPointerException {
+    public Optional<FXMLIdentifier> resolveOptionalIdentifier(Map<String, String> attributes) throws NullPointerException {
         Objects.requireNonNull(attributes, "`attributes` must not be null");
         if (attributes.containsKey(FXMLConstants.FX_ID_ATTRIBUTE)) {
             return Optional.of(new FXMLExposedIdentifier(attributes.get(FXMLConstants.FX_ID_ATTRIBUTE)));
@@ -384,11 +395,7 @@ final class FXMLDocumentParserHelper {
     /// @throws IllegalStateException    if the node is labeled as `fx:root` but is not the document root, or if `fx:root` is missing the required `type` attribute.
     /// @throws IllegalArgumentException if the class type cannot be resolved.
     /// @throws NullPointerException     if `structure` or `buildContext` is null.
-    public ClassAndIdentifier resolveClassAndIdentifier(
-            ParsedXMLStructure structure,
-            BuildContext buildContext,
-            boolean isRoot
-    ) throws IllegalStateException, IllegalArgumentException, NullPointerException {
+    public ClassAndIdentifier resolveClassAndIdentifier(ParsedXMLStructure structure, BuildContext buildContext, boolean isRoot) throws IllegalStateException, IllegalArgumentException, NullPointerException {
         Objects.requireNonNull(structure, "`structure` must not be null");
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
         FXMLIdentifier identifier;
@@ -396,10 +403,8 @@ final class FXMLDocumentParserHelper {
         clazz = Utils.findType(buildContext.imports(), structure.name());
         Map<String, String> attributes = structure.properties();
         if (isRoot) {
-            identifier = Optional.ofNullable(attributes.get(FXMLConstants.FX_ID_ATTRIBUTE))
-                    .map(FXMLNamedRootIdentifier::new)
-                    .map(Function.<FXMLIdentifier>identity())
-                    .orElse(FXMLRootIdentifier.INSTANCE);
+            identifier = Optional.ofNullable(attributes.get(FXMLConstants.FX_ID_ATTRIBUTE)).map(FXMLNamedRootIdentifier::new).map(
+                    Function.<FXMLIdentifier>identity()).orElse(FXMLRootIdentifier.INSTANCE);
         } else if (attributes.containsKey(FXMLConstants.FX_ID_ATTRIBUTE)) {
             identifier = new FXMLExposedIdentifier(attributes.get(FXMLConstants.FX_ID_ATTRIBUTE));
         } else {
@@ -417,9 +422,8 @@ final class FXMLDocumentParserHelper {
     public Charset getCharsetOfElement(ParsedXMLStructure structure) throws NullPointerException {
         Objects.requireNonNull(structure, "`structure` must not be null");
         Map<String, String> properties = structure.properties();
-        return Optional.ofNullable(properties.get(FXMLConstants.CHARSET_ATTRIBUTE))
-                .map(Charset::forName)
-                .orElse(defaultCharset);
+        return Optional.ofNullable(properties.get(FXMLConstants.CHARSET_ATTRIBUTE)).map(Charset::forName).orElse(
+                defaultCharset);
     }
 
     /// Analyzes the provided controller class to inspect its fields, methods, and other relevant details,
@@ -430,31 +434,191 @@ final class FXMLDocumentParserHelper {
     /// @return an `FXMLController` instance that encapsulates the introspected fields and methods of the class.
     /// @throws NullPointerException     if either `clazz` or `buildContext` is null.
     /// @throws IllegalArgumentException if the provided class is not public, is abstract, or does not have a public no-arg constructor.
-    public FXMLController introspectControllerClass(Class<?> clazz, BuildContext buildContext)
-            throws NullPointerException, IllegalArgumentException {
+    public FXMLController introspectControllerClass(Class<?> clazz, BuildContext buildContext) throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
         if (!Modifier.isPublic(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers())) {
             throw new IllegalArgumentException("Class '%s' must be public and not abstract".formatted(clazz.getName()));
         }
-        Optional<Constructor<?>> defaultConstructor = Arrays.stream(clazz.getDeclaredConstructors())
-                .filter(constructor -> constructor.getParameterCount() == 0)
-                .filter(constructor -> Modifier.isPublic(constructor.getModifiers()))
-                .findFirst();
+        Optional<Constructor<?>> defaultConstructor = Arrays.stream(clazz.getDeclaredConstructors()).filter(constructor -> constructor.getParameterCount() == 0).filter(
+                constructor -> Modifier.isPublic(constructor.getModifiers())).findFirst();
         if (defaultConstructor.isEmpty()) {
             throw new IllegalArgumentException("Controller class must have a public no-arg constructor");
         }
-        List<FXMLControllerField> fields = Stream.of(clazz.getDeclaredFields(), clazz.getFields())
-                .flatMap(Arrays::stream)
-                .gather(Utils.unique())
-                .map(field -> createFXMLControllerField(buildContext, field))
-                .toList();
-        List<FXMLControllerMethod> methods = Stream.of(clazz.getDeclaredMethods(), clazz.getMethods())
-                .flatMap(Arrays::stream)
-                .gather(Utils.unique())
-                .map(method -> createFXMLControllerMethod(buildContext, method))
-                .toList();
+        List<FXMLControllerField> fields = Stream.of(
+                clazz.getDeclaredFields(),
+                clazz.getFields()
+        ).flatMap(Arrays::stream).gather(Utils.unique()).map(field -> createFXMLControllerField(
+                buildContext,
+                field
+        )).toList();
+        List<FXMLControllerMethod> methods = Stream.of(
+                clazz.getDeclaredMethods(),
+                clazz.getMethods()
+        ).flatMap(Arrays::stream).gather(Utils.unique()).map(method -> createFXMLControllerMethod(
+                buildContext,
+                method
+        )).toList();
         return new FXMLController(new FXMLClassType(clazz), fields, methods);
+    }
+
+    /// Constructs an [FXMLType] representing a generic type based on a raw class and FXML comments.
+    ///
+    /// The logic parses generic type definitions from comments (e.g., `generic 0: T`)
+    /// and ensures the number of provided generics matches the class's type parameters.
+    ///
+    /// @param rawClass     The raw class of the generic type.
+    /// @param comments     The list of comments to parse for generic definitions.
+    /// @param buildContext The build context containing imports to resolve type names in the generic definitions and to store the type mapping.
+    /// @return The constructed [FXMLType] representing the generic type.
+    /// @throws NullPointerException     if `rawClass`, `comments`, or `imports` is `null`.
+    /// @throws IllegalArgumentException if the number of generic types does not match the class's type parameters.
+    public FXMLType constructGenericType(Class<?> rawClass, List<String> comments, BuildContext buildContext) throws NullPointerException, IllegalArgumentException {
+        Objects.requireNonNull(rawClass, "`rawClass` must not be null");
+        Objects.requireNonNull(comments, "`comments` must not be null");
+        Objects.requireNonNull(buildContext, "`buildContext` must not be null");
+        List<FXMLType> genericTypes = parseGenericsFromComments(comments, buildContext.imports());
+        TypeVariable<? extends Class<?>>[] typeVariables = rawClass.getTypeParameters();
+        int typeParameters = typeVariables.length;
+        int numberOfGenerics = genericTypes.size();
+        if (!genericTypes.isEmpty() && numberOfGenerics != typeParameters) {
+            throw new IllegalArgumentException(
+                    "Generic types count (%d) does not match the number of type parameters (%d).".formatted(
+                            numberOfGenerics,
+                            typeParameters
+                    ));
+        }
+        if (typeParameters > 0) {
+            Map<String, FXMLType> typeMapping = buildContext.typeMapping();
+            if (genericTypes.isEmpty()) {
+                for (TypeVariable<?> typeVariable : typeVariables) {
+                    typeMapping.put(typeVariable.getName(), FXMLType.wildcard());
+                }
+            } else {
+                for (int i = 0; i < numberOfGenerics; i++) {
+                    FXMLType genericType = genericTypes.get(i);
+                    TypeVariable<?> typeVariable = typeVariables[i];
+                    typeMapping.put(typeVariable.getName(), genericType);
+                }
+            }
+        }
+        return FXMLType.of(rawClass, genericTypes);
+    }
+
+    /// Parses a list of comments to extract FXML interface definitions.
+    ///
+    /// @param comments     the list of comment strings to process; must not be null
+    /// @param buildContext the build context used during the parsing process; must not be null
+    /// @return a list of [FXMLInterface] objects parsed from the input comments
+    public List<FXMLInterface> parseInterfaces(List<String> comments, BuildContext buildContext) {
+        Objects.requireNonNull(comments, "`comments` must not be null");
+        Objects.requireNonNull(buildContext, "`buildContext` must not be null");
+        return comments.stream()
+                .map(comment -> parseFXMLInterface(comment, buildContext))
+                .gather(Utils.optional())
+                .toList();
+    }
+
+    /// Parses a given FXML interface string and converts it into an `Optional<FXMLInterface>` by interpreting
+    /// the structure and extracting relevant details such as the interface type and methods.
+    ///
+    /// @param interfaceString the string representation of the FXML interface to be parsed
+    /// @param buildContext    the context containing import references and other metadata required for parsing
+    /// @return an `Optional<FXMLInterface>` containing the constructed interface if parsing is successful, or an empty `Optional` if the string does not match the expected format
+    private Optional<FXMLInterface> parseFXMLInterface(String interfaceString, BuildContext buildContext) {
+        return INTERFACES.matcher(interfaceString)
+                .results()
+                .findFirst()
+                .map(matchResult -> {
+                    String interfaceTypeString = matchResult.group("interface").strip();
+                    FXMLType interfaceType = parseGenericString(interfaceTypeString, buildContext.imports());
+                    List<FXMLControllerMethod> interfaceMethods = switch (interfaceType) {
+                        case FXMLClassType(Class<?> clazz) -> findMethodsOfInterface(clazz, List.of(), buildContext);
+                        case FXMLGenericType(Class<?> clazz, List<FXMLType> genericTypes) ->
+                                findMethodsOfInterface(clazz, genericTypes, buildContext);
+                        case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ ->
+                                parseInterfaceMethodsFromComment(matchResult.group("methods"), buildContext);
+                    };
+                    return new FXMLInterface(interfaceType, interfaceMethods);
+                });
+    }
+
+    /// Parses interface methods from a given comment string and builds a list of [FXMLControllerMethod] objects based
+    /// on the extracted method definitions.
+    ///
+    /// @param methodsString the string containing method definitions, separated by semicolons
+    /// @param buildContext  the context used to construct interface methods
+    /// @return a list of [FXMLControllerMethod] objects parsed from the provided string
+    private List<FXMLControllerMethod> parseInterfaceMethodsFromComment(
+            String methodsString,
+            BuildContext buildContext
+    ) {
+        return Utils.splitString(methodsString, ';')
+                .map(String::strip)
+                .map(methodString -> parseInterfaceMethod(methodString, buildContext))
+                .gather(Utils.optional())
+                .toList();
+    }
+
+    /// Parses a method from a string and converts it into an [Optional] of [FXMLControllerMethod].
+    ///
+    /// This method extracts the return type, method name, and parameters from a string
+    /// representing an interface method. It handles generic type arguments in parameters,
+    /// ensuring they are correctly split even if they contain commas.
+    ///
+    /// @param methodString the string containing the method signature to be parsed
+    /// @param buildContext the context used to resolve types and imports
+    /// @return an [Optional] containing the [FXMLControllerMethod] if parsing is successful, or an empty [Optional] otherwise
+    private Optional<FXMLControllerMethod> parseInterfaceMethod(String methodString, BuildContext buildContext) {
+        return INTERFACE_METHOD.matcher(methodString)
+                .results()
+                .findFirst()
+                .map(matchResult -> {
+                    String returnType = matchResult.group("returnType");
+                    String methodName = matchResult.group("methodName");
+                    String parameters = matchResult.group("parameters");
+                    List<FXMLType> parameterTypes = Stream.ofNullable(parameters)
+                            .filter(Predicate.not(String::isBlank))
+                            .flatMap(Utils::splitByCommaOutsideBrackets)
+                            .map(parameter -> parseGenericString(parameter, buildContext.imports()))
+                            .toList();
+                    return new FXMLControllerMethod(
+                            Visibility.PUBLIC,
+                            methodName,
+                            true, // Unknown
+                            parseGenericString(returnType, buildContext.imports()),
+                            parameterTypes
+                    );
+                });
+    }
+
+    /// Finds and retrieves a list of methods defined in the specified interface class while resolving generic types
+    /// based on the provided type mappings.
+    ///
+    /// @param clazz        the interface class from which methods are to be retrieved
+    /// @param genericTypes a list of generic type mappings corresponding to the type parameters of the class
+    /// @param buildContext the context containing type mapping and other information needed for method building
+    /// @return a list of `FXMLControllerMethod` objects representing non-static methods of the interface
+    /// @throws IllegalArgumentException if the number of generic types provided does not match the number of type parameters in the specified class
+    private List<FXMLControllerMethod> findMethodsOfInterface(
+            Class<?> clazz,
+            List<FXMLType> genericTypes,
+            BuildContext buildContext
+    ) throws IllegalArgumentException {
+        TypeVariable<?>[] typeParameters = clazz.getTypeParameters();
+        Map<String, FXMLType> typeMapping = new HashMap<>(buildContext.typeMapping());
+        if (typeParameters.length != genericTypes.size()) {
+            throw new IllegalArgumentException(
+                    "The number of generic types does not match the number of type parameters");
+        }
+        for (int i = 0; i < typeParameters.length; i++) {
+            typeMapping.put(typeParameters[i].getName(), genericTypes.get(i));
+        }
+        BuildContext localBuildContext = new BuildContext(buildContext, typeMapping);
+        return Arrays.stream(clazz.getMethods())
+                .filter(method -> !Modifier.isStatic(method.getModifiers()))
+                .map(method -> createFXMLControllerMethod(localBuildContext, method))
+                .toList();
     }
 
     /// Creates an instance of [FXMLControllerMethod] based on the provided build context and method.
@@ -466,10 +630,12 @@ final class FXMLDocumentParserHelper {
         return new FXMLControllerMethod(
                 visibilityOfModifier(method.getModifiers()),
                 method.getName(),
+                Modifier.isAbstract(method.getModifiers()),
                 buildFXMLType(method.getGenericReturnType(), buildContext),
-                Arrays.stream(method.getGenericParameterTypes())
-                        .map(parameterType -> buildFXMLType(parameterType, buildContext))
-                        .toList()
+                Arrays.stream(method.getGenericParameterTypes()).map(parameterType -> buildFXMLType(
+                        parameterType,
+                        buildContext
+                )).toList()
         );
     }
 
@@ -503,63 +669,17 @@ final class FXMLDocumentParserHelper {
         return Visibility.PACKAGE_PRIVATE;
     }
 
-    /// Constructs an [FXMLType] representing a generic type based on a raw class and FXML comments.
-    ///
-    /// The logic parses generic type definitions from comments (e.g., `generic 0: T`)
-    /// and ensures the number of provided generics matches the class's type parameters.
-    ///
-    /// @param rawClass     The raw class of the generic type.
-    /// @param comments     The list of comments to parse for generic definitions.
-    /// @param buildContext The build context containing imports to resolve type names in the generic definitions and to store the type mapping.
-    /// @return The constructed [FXMLType] representing the generic type.
-    /// @throws NullPointerException     if `rawClass`, `comments`, or `imports` is `null`.
-    /// @throws IllegalArgumentException if the number of generic types does not match the class's type parameters.
-    public FXMLType constructGenericType(Class<?> rawClass, List<String> comments, BuildContext buildContext)
-            throws NullPointerException, IllegalArgumentException {
-        Objects.requireNonNull(rawClass, "`rawClass` must not be null");
-        Objects.requireNonNull(comments, "`comments` must not be null");
-        Objects.requireNonNull(buildContext, "`buildContext` must not be null");
-        List<FXMLType> genericTypes = parseGenericsFromComments(comments, buildContext.imports());
-        TypeVariable<? extends Class<?>>[] typeVariables = rawClass.getTypeParameters();
-        int typeParameters = typeVariables.length;
-        int numberOfGenerics = genericTypes.size();
-        if (!genericTypes.isEmpty() && numberOfGenerics != typeParameters) {
-            throw new IllegalArgumentException(
-                    "Generic types count (%d) does not match the number of type parameters (%d).".formatted(
-                            numberOfGenerics,
-                            typeParameters
-                    )
-            );
-        }
-        if (typeParameters > 0) {
-            Map<String, FXMLType> typeMapping = buildContext.typeMapping();
-            if (genericTypes.isEmpty()) {
-                for (TypeVariable<?> typeVariable : typeVariables) {
-                    typeMapping.put(typeVariable.getName(), FXMLType.wildcard());
-                }
-            } else {
-                for (int i = 0; i < numberOfGenerics; i++) {
-                    FXMLType genericType = genericTypes.get(i);
-                    TypeVariable<?> typeVariable = typeVariables[i];
-                    typeMapping.put(typeVariable.getName(), genericType);
-                }
-            }
-        }
-        return FXMLType.of(rawClass, genericTypes);
-    }
-
     /// Parses generic type definitions from comments and resolves them using the provided imports.
     ///
     /// @param comments The list of comments to parse.
     /// @param imports  The list of imports to resolve type names.
     /// @return A list of [FXMLType]s parsed from the comments.
     /// @throws IllegalArgumentException if generic indices are not sequential.
-    private List<FXMLType> parseGenericsFromComments(List<String> comments, List<String> imports)
-            throws IllegalArgumentException {
-        return extractGenericsFromComments(comments)
-                .stream()
-                .map(generic -> parseGenericString(generic, imports))
-                .toList();
+    private List<FXMLType> parseGenericsFromComments(List<String> comments, List<String> imports) throws IllegalArgumentException {
+        return extractGenericsFromComments(comments).stream().map(generic -> parseGenericString(
+                generic,
+                imports
+        )).toList();
     }
 
     /// Extracts generic type strings from comments and sorts them by their index.
@@ -567,8 +687,7 @@ final class FXMLDocumentParserHelper {
     /// @param comments The list of comments to extract from.
     /// @return A list of generic type strings in sequential order.
     /// @throws IllegalArgumentException if generic indices are non-sequential or missing.
-    private List<String> extractGenericsFromComments(List<String> comments)
-            throws IllegalArgumentException {
+    private List<String> extractGenericsFromComments(List<String> comments) throws IllegalArgumentException {
         Map<Integer, String> genericTypes = new TreeMap<>(Comparator.naturalOrder());
         for (String comment : comments) {
             Matcher matcher = GENERICS.matcher(comment);
@@ -624,10 +743,7 @@ final class FXMLDocumentParserHelper {
         List<FXMLType> result = new LinkedList<>();
         String remaining = nestedGenerics;
         while (remaining != null) {
-            MatchResult matcher = NESTED_GENERICS.matcher(remaining)
-                    .results()
-                    .findFirst()
-                    .orElseThrow();
+            MatchResult matcher = NESTED_GENERICS.matcher(remaining).results().findFirst().orElseThrow();
             String rawType = matcher.group("rawType").strip();
             String deeper = matcher.group("generics");
             List<FXMLType> deeperArgs = parseNestedGenerics(deeper, imports);

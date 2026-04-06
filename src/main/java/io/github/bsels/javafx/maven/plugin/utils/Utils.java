@@ -456,6 +456,64 @@ public final class Utils {
         return findGenericTypeFromHierarchy(clazz, Map.class, 1);
     }
 
+    /// Splits the given string into a stream of substrings based on the specified character delimiter.
+    /// Consecutive delimiters are treated as a single separator, and empty substrings are ignored.
+    ///
+    /// @param string    the input string to be split
+    /// @param character the character used as the delimiter for splitting the string
+    /// @return a stream of substrings obtained by splitting the input string
+    public static Stream<String> splitString(String string, char character) {
+        Stream.Builder<String> builder = Stream.builder();
+        int size = string.length();
+        int lastIndex = -1;
+        for (int i = 0; i < size; i++) {
+            if (string.charAt(i) == character) {
+                String substring = string.substring(lastIndex + 1, i);
+                if (!substring.isEmpty()) {
+                    builder.accept(substring);
+                }
+                lastIndex = i;
+            }
+        }
+        String substring = string.substring(lastIndex + 1);
+        if (!substring.isEmpty()) {
+            builder.accept(substring);
+        }
+        return builder.build();
+    }
+
+    /// Splits a string by commas, but only when the comma is not inside angle brackets (`< >`).
+    /// This is used for splitting generic type parameters where a type like `Map<String, Integer>`
+    /// should not be split at the comma inside the brackets.
+    ///
+    /// @param string the string to split
+    /// @return a stream of substrings split by commas outside of angle brackets
+    public static Stream<String> splitByCommaOutsideBrackets(String string) {
+        Stream.Builder<String> builder = Stream.builder();
+        int size = string.length();
+        int lastIndex = -1;
+        int depth = 0;
+        for (int i = 0; i < size; i++) {
+            char c = string.charAt(i);
+            if (c == '<') {
+                depth++;
+            } else if (c == '>') {
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                String substring = string.substring(lastIndex + 1, i);
+                if (!substring.isBlank()) {
+                    builder.accept(substring.strip());
+                }
+                lastIndex = i;
+            }
+        }
+        String substring = string.substring(lastIndex + 1);
+        if (!substring.isBlank()) {
+            builder.accept(substring.strip());
+        }
+        return builder.build();
+    }
+
     /// Traverses the class hierarchy of the given class to find the specified target interface and extract its
     /// type argument at the given index.
     ///

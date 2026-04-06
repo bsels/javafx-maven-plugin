@@ -4,6 +4,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLConstants;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLInterface;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
@@ -178,11 +179,12 @@ public final class FXMLDocumentParser {
                     )
             );
         }
+        List<FXMLInterface> interfaces = helper.parseInterfaces(rootStructure.comments(), buildContext);
 
         FXMLDocument fxmlDocument = new FXMLDocument(
                 parsedFXML.className(),
                 root,
-                List.of(), // TODO: Add support for interface comments at root level
+                interfaces,
                 controller,
                 parsedFXML.scriptNamespace(),
                 buildContext.definitions(),
