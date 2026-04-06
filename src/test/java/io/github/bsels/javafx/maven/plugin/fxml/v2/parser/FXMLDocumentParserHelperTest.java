@@ -580,10 +580,12 @@ class FXMLDocumentParserHelperTest {
     @Nested
     class FindMethodReferenceTypeTest {
 
+        public static final FXMLType PARAM_TYPE = FXMLType.of(MyEventHandler.class);
+
         /// Verifies that a null `methodName` throws [NullPointerException].
         @Test
         void nullMethodNameThrowsNullPointerException() {
-            assertThatThrownBy(() -> helper.findMethodReferenceType(null, MyEventHandler.class, buildContext))
+            assertThatThrownBy(() -> helper.findMethodReferenceType(null, PARAM_TYPE, buildContext))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("`methodName` must not be null");
         }
@@ -599,7 +601,7 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a null `buildContext` throws [NullPointerException].
         @Test
         void nullBuildContextThrowsNullPointerException() {
-            assertThatThrownBy(() -> helper.findMethodReferenceType("onAction", MyEventHandler.class, null))
+            assertThatThrownBy(() -> helper.findMethodReferenceType("onAction", PARAM_TYPE, null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("`buildContext` must not be null");
         }
@@ -607,7 +609,7 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a functional interface resolves to an [FXMLMethod] with correct name and parameters.
         @Test
         void functionalInterfaceReturnsCorrectFXMLMethod() {
-            assertThat(helper.findMethodReferenceType("onAction", MyEventHandler.class, buildContext))
+            assertThat(helper.findMethodReferenceType("onAction", PARAM_TYPE, buildContext))
                     .isNotNull()
                     .hasFieldOrPropertyWithValue("name", "onAction")
                     .satisfies(method -> {
@@ -622,7 +624,7 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a standard functional interface ([EventHandler]) resolves correctly.
         @Test
         void standardFunctionalInterfaceEventHandlerResolves() {
-            assertThat(helper.findMethodReferenceType("onAction", EventHandler.class, buildContext))
+            assertThat(helper.findMethodReferenceType("onAction", PARAM_TYPE, buildContext))
                     .isNotNull()
                     .hasFieldOrPropertyWithValue("name", "onAction");
         }
@@ -630,7 +632,7 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a non-functional interface throws [IllegalArgumentException].
         @Test
         void nonFunctionalInterfaceThrowsIllegalArgumentException() {
-            assertThatThrownBy(() -> helper.findMethodReferenceType("onAction", NotFunctional.class, buildContext))
+            assertThatThrownBy(() -> helper.findMethodReferenceType("onAction", FXMLType.of(NotFunctional.class), buildContext))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("must be a functional interface");
         }
@@ -638,7 +640,7 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a plain class (not a functional interface) throws [IllegalArgumentException].
         @Test
         void plainClassThrowsIllegalArgumentException() {
-            assertThatThrownBy(() -> helper.findMethodReferenceType("onAction", String.class, buildContext))
+            assertThatThrownBy(() -> helper.findMethodReferenceType("onAction", FXMLType.of(String.class), buildContext))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("must be a functional interface");
         }

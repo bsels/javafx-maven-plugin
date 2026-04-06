@@ -300,16 +300,26 @@ final class FXMLDocumentParserHelper {
     /// @return The corresponding [FXMLMethod].
     /// @throws NullPointerException     if any of the parameters are null
     /// @throws IllegalArgumentException if the paramType is not a functional interface
-    public FXMLMethod findMethodReferenceType(String methodName, Class<?> paramType, BuildContext buildContext)
+    public FXMLMethod findMethodReferenceType(String methodName, FXMLType paramType, BuildContext buildContext)
             throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(methodName, "`methodName` must not be null");
         Objects.requireNonNull(paramType, "`paramType` must not be null");
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
-        if (FXMLUtils.isFunctionalInterface(paramType)) {
-            Method functionalMethod = Utils.getFunctionalMethod(paramType);
-            FXMLType returnType = buildFXMLType(functionalMethod.getGenericReturnType(), buildContext);
+        Class<?> clazz = FXMLUtils.findRawType(paramType);
+        if (FXMLUtils.isFunctionalInterface(clazz)) {
+            Method functionalMethod = Utils.getFunctionalMethod(clazz);
+            Map<String, FXMLType> typeMapping = buildContext.typeMapping();
+            if (paramType instanceof FXMLGenericType(_, List<FXMLType> typeArgs)) {
+                TypeVariable<?>[] typeParameters = clazz.getTypeParameters();
+                for (int i = 0; i < typeParameters.length; i++) {
+                    String typeParamName = typeParameters[i].getName();
+                    typeMapping.put(typeParamName, typeArgs.get(i));
+                }
+            }
+            BuildContext localBuildContext = new BuildContext(buildContext, typeMapping);
+            FXMLType returnType = buildFXMLType(functionalMethod.getGenericReturnType(), localBuildContext);
             List<FXMLType> parameterTypes = Arrays.stream(functionalMethod.getGenericParameterTypes())
-                    .map(parameterType -> buildFXMLType(parameterType, buildContext))
+                    .map(parameterType -> buildFXMLType(parameterType, localBuildContext))
                     .toList();
             return new FXMLMethod(methodName, parameterTypes, returnType);
         }

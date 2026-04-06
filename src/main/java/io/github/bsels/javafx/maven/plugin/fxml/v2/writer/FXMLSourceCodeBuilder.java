@@ -3,6 +3,8 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 import io.github.bsels.javafx.maven.plugin.CheckAndCast;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
@@ -181,7 +183,8 @@ public final class FXMLSourceCodeBuilder {
         SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
                 builderImportHelper.findImports(document, addGeneratedAnnotation),
                 defaultResourceBundle,
-                identifierToTypeMap
+                identifierToTypeMap,
+                packageName
         );
 
         return internalGenerateSourceCode(document, context, packageName, true);
@@ -200,32 +203,28 @@ public final class FXMLSourceCodeBuilder {
             String packageName,
             boolean isRootDocument
     ) {
-
         addPackageLine(context, packageName);
         addImports(context);
         addFields(context, document);
         addConstructorPrologue(context, document);
         addConstructorEpilogue(context, document);
         addInnerClass(document, context);
-        // TODO: Add methods
-
+        addMethods(document, context);
         // The class declaration should be done last
         addClassDeclaration(context, document, isRootDocument);
-        return generateSourceCode(context, document.className(), isRootDocument, addGeneratedAnnotation);
+        return generateSourceCode(context, document.className(), isRootDocument);
     }
 
     /// Assembles the final source code from the gathered [SourceCodeGeneratorContext].
     ///
-    /// @param context                The [SourceCodeGeneratorContext].
-    /// @param className              The name of the class being generated.
-    /// @param isRootDocument         Whether this is the root FXML document.
-    /// @param addGeneratedAnnotation Whether to include the `@Generated` annotation.
+    /// @param context        The [SourceCodeGeneratorContext].
+    /// @param className      The name of the class being generated.
+    /// @param isRootDocument Whether this is the root FXML document.
     /// @return The assembled Java source code.
     private String generateSourceCode(
             SourceCodeGeneratorContext context,
             String className,
-            boolean isRootDocument,
-            boolean addGeneratedAnnotation
+            boolean isRootDocument
     ) {
         StringBuilder sourceCode = new StringBuilder();
         if (isRootDocument) {
@@ -1026,6 +1025,184 @@ public final class FXMLSourceCodeBuilder {
             case FXMLConstant _, FXMLCopy _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _,
                  FXMLReference _, FXMLResource _, FXMLTranslation _, FXMLValue _ -> Stream.empty();
         };
+    }
+
+    /// Adds methods to the source code being generated for the given FXML document.
+    /// This method processes the root node of the document as well as its definitions to generate the corresponding
+    /// methods in the source code.
+    ///
+    /// @param document The FXML document being processed.
+    /// @param context  The context for the source code generation, providing access to utilities and the code builder.
+    private void addMethods(FXMLDocument document, SourceCodeGeneratorContext context) {
+        FXMLController controller = document.controller()
+                .orElse(null);
+        Stream.concat(
+                        addMethods(document.root(), context, controller),
+                        document.definitions()
+                                .stream()
+                                .flatMap(value -> addMethods(value, context, controller))
+                ).reduce(context.sourceCode(SourcePart.METHODS), StringBuilder::append, StringBuilder::append)
+                .append('\n');
+    }
+
+    /// Adds methods or processes FXML values recursively by traversing different types of FXML value structures,
+    /// generating a stream of result strings depending on the specific type.
+    ///
+    /// @param value      the FXML value to process. This can be an FXML collection, map, object, method, or other FXML-related value types.
+    /// @param context    the source code generator context that provides context-specific utilities needed for processing values.
+    /// @param controller the FXML controller instance associated with the current operation, which may influence how methods are added or processed.
+    /// @return a stream of strings derived from rendering methods or processing specific FXML value types. If no actionable methods or values are found, an empty stream is returned.
+    private Stream<String> addMethods(
+            AbstractFXMLValue value,
+            SourceCodeGeneratorContext context,
+            FXMLController controller
+    ) {
+        return switch (value) {
+            case FXMLCollection(_, _, _, List<AbstractFXMLValue> values) -> values.stream()
+                    .flatMap(nested -> addMethods(nested, context, controller));
+            case FXMLMap(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> entries) -> entries.values()
+                    .stream()
+                    .flatMap(nested -> addMethods(nested, context, controller));
+            case FXMLObject(_, _, _, List<FXMLProperty> properties) -> properties.stream()
+                    .flatMap(property -> propertyRecursionHelper.walk(
+                            property,
+                            (nested, ctx) -> addMethods(nested, ctx, controller),
+                            context
+                    ));
+            case FXMLMethod fxmlMethod -> Stream.of(renderMethod(context, controller, fxmlMethod));
+            case FXMLValue _, FXMLConstant _, FXMLCopy _, FXMLExpression _, FXMLInclude _, FXMLInlineScript _,
+                 FXMLLiteral _, FXMLReference _, FXMLResource _, FXMLTranslation _ -> Stream.empty();
+        };
+    }
+
+    private String renderMethod(SourceCodeGeneratorContext context, FXMLController controller, FXMLMethod method) {
+        String name = method.name();
+        Optional<FXMLControllerMethod> controllerMethod = findMethodInController(controller, method);
+        StringBuilder sourceCode = new StringBuilder();
+        context.addFeature(Feature.ABSTRACT_CLASS);
+        sourceCode.append("protected ")
+                .append(controllerMethod.map(_ -> "").orElse("abstract "))
+                .append(typeHelper.typeToSourceCode(context, method.returnType()))
+                .append(' ')
+                .append(name)
+                .append('(');
+        List<FXMLType> parameters = method.parameters();
+        for (int i = 0; i < parameters.size(); i++) {
+            if (i > 0) {
+                sourceCode.append(", ");
+            }
+            sourceCode.append(typeHelper.typeToSourceCode(context, parameters.get(i)))
+                    .append(' ')
+                    .append("param")
+                    .append(i);
+        }
+        sourceCode.append(')');
+        if (controllerMethod.isPresent()) {
+            FXMLControllerMethod fxmlMethod = controllerMethod.get();
+            sourceCode.append(" {\n");
+            switch (fxmlMethod.visibility()) {
+                case PUBLIC -> createDirectCallMethodBody(sourceCode, method);
+                case PROTECTED, PACKAGE_PRIVATE -> {
+                    FXMLClassType type = controller.controllerClass();
+                    if (context.packageName().equals(type.clazz().getPackageName())) {
+                        createDirectCallMethodBody(sourceCode, method);
+                    } else {
+                        createReflectionCallMethodBody(context, sourceCode, type, fxmlMethod);
+                    }
+                }
+                case PRIVATE ->
+                        createReflectionCallMethodBody(context, sourceCode, controller.controllerClass(), fxmlMethod);
+            }
+            sourceCode.append("}");
+        } else {
+            sourceCode.append(';');
+        }
+        return sourceCode.append("\n\n")
+                .toString();
+    }
+
+    private void createReflectionCallMethodBody(
+            SourceCodeGeneratorContext context,
+            StringBuilder sourceCode,
+            FXMLClassType clazz,
+            FXMLControllerMethod method
+    ) {
+        List<FXMLType> parameters = method.parameterTypes();
+        sourceCode.append("    try {\n")
+                .append("        java.lang.reflect.Method method = ")
+                .append(typeHelper.typeToSourceCode(context, clazz))
+                .append(".class.getDeclaredMethod(")
+                .append(typeHelper.encodeString(method.name()));
+        for (FXMLType parameter : parameters) {
+            sourceCode.append(", ")
+                    .append(typeHelper.typeToSourceCode(context, FXMLType.of(FXMLUtils.findRawType(parameter))))
+                    .append(".class");
+        }
+        sourceCode.append(");\n")
+                .append("        method.setAccessible(true);\n        ");
+        if (void.class.equals(FXMLUtils.findRawType(method.returnType()))) {
+            sourceCode.append("return ");
+        }
+        sourceCode.append("method.invoke(")
+                .append(INTERNAL_CONTROLLER_FIELD);
+        for (int i = 0; i < parameters.size(); i++) {
+            sourceCode.append(", param")
+                    .append(i);
+        }
+        sourceCode.append(");\n")
+                .append("    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {\n")
+                .append("        throw new RuntimeException(e);\n")
+                .append("    }\n");
+    }
+
+    private void createDirectCallMethodBody(StringBuilder sourceCode, FXMLMethod fxmlMethod) {
+        if (void.class.equals(FXMLUtils.findRawType(fxmlMethod.returnType()))) {
+            sourceCode.append("    return ");
+        }
+        sourceCode.append(INTERNAL_CONTROLLER_FIELD)
+                .append('.')
+                .append(fxmlMethod.name())
+                .append('(');
+        int parameterCount = fxmlMethod.parameters().size();
+        for (int i = 0; i < parameterCount; i++) {
+            if (i > 0) {
+                sourceCode.append(", ");
+            }
+            sourceCode.append("param")
+                    .append(i);
+        }
+        sourceCode.append(");\n");
+    }
+
+    private Optional<FXMLControllerMethod> findMethodInController(FXMLController controller, FXMLMethod method) {
+        final String name = method.name();
+        final Optional<FXMLControllerMethod> controllerMethod;
+        if (controller != null) {
+            Class<?> returnType = FXMLUtils.findRawType(method.returnType());
+            List<Class<?>> parameterTypes = method.parameters()
+                    .stream().map(FXMLUtils::findRawType)
+                    .collect(Collectors.toList());
+            controllerMethod = controller.methods()
+                    .stream()
+                    .filter(m -> name.equals(m.name()))
+                    .filter(m -> m.parameterTypes().size() == parameterTypes.size())
+                    .filter(m -> FXMLUtils.findRawType(m.returnType()).isAssignableFrom(returnType))
+                    .filter(m -> checkParameterTypes(m, parameterTypes))
+                    .findFirst();
+        } else {
+            controllerMethod = Optional.empty();
+        }
+        return controllerMethod;
+    }
+
+    private boolean checkParameterTypes(FXMLControllerMethod m, List<Class<?>> parameterTypes) {
+        for (int i = 0; i < parameterTypes.size(); i++) {
+            List<FXMLType> fxmlTypes = m.parameterTypes();
+            if (!parameterTypes.get(i).isAssignableFrom(FXMLUtils.findRawType(fxmlTypes.get(i)))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Represents an FXML construction step that may have dependencies.

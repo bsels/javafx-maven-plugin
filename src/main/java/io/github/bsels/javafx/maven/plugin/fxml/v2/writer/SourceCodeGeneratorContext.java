@@ -20,7 +20,8 @@ import java.util.Set;
 /// @param fieldDefinitions    A list of field definition strings.
 /// @param features            A set of [Feature]s identified as necessary for the generated code.
 /// @param identifierToTypeMap A map from FXML identifiers to their corresponding [FXMLType]s.
-/// @param seenNestedFXMLFiles A set of paths to FXML files that have already been processed as nested includes.
+/// @param seenNestedFXMLFiles A set of paths to FXML files that have already been processed as nested `includes`.
+/// @param packageName         The package name for the generated Java class.
 record SourceCodeGeneratorContext(
         Map<SourcePart, StringBuilder> sourceCode,
         String resourceBundle,
@@ -28,7 +29,8 @@ record SourceCodeGeneratorContext(
         List<String> fieldDefinitions,
         Set<Feature> features,
         Map<String, FXMLType> identifierToTypeMap,
-        Set<String> seenNestedFXMLFiles
+        Set<String> seenNestedFXMLFiles,
+        String packageName
 ) {
 
     /// Constructs a `SourceCodeGeneratorContext` and validates that all parameters are non-null.
@@ -39,7 +41,8 @@ record SourceCodeGeneratorContext(
     /// @param fieldDefinitions    A list of field definition strings.
     /// @param features            A set of [Feature]s identified as necessary for the generated code.
     /// @param identifierToTypeMap A map from FXML identifiers to their corresponding [FXMLType]s.
-    /// @param seenNestedFXMLFiles A set of paths to FXML files that have already been processed as nested includes.
+    /// @param seenNestedFXMLFiles A set of paths to FXML files that have already been processed as nested `includes`.
+    /// @param packageName         The package name for the generated Java class.
     /// @throws NullPointerException If any of the parameters is null.
     public SourceCodeGeneratorContext {
         Objects.requireNonNull(sourceCode, "`sourceCode` must not be null");
@@ -49,6 +52,7 @@ record SourceCodeGeneratorContext(
         Objects.requireNonNull(features, "`features` must not be null");
         Objects.requireNonNull(identifierToTypeMap, "`identifierToTypeMap` must not be null");
         Objects.requireNonNull(seenNestedFXMLFiles, "`seenNestedFXMLFiles` must not be null");
+        Objects.requireNonNull(packageName, "`packageName` must not be null");
     }
 
     /// Creates a new `SourceCodeGeneratorContext` with default empty collections.
@@ -56,7 +60,8 @@ record SourceCodeGeneratorContext(
     /// @param imports             The [Imports] for the generated source code.
     /// @param resourceBundle      The initial resource bundle expression.
     /// @param identifierToTypeMap A map from FXML identifiers to their corresponding [FXMLType]s.
-    public SourceCodeGeneratorContext(Imports imports, String resourceBundle, Map<String, FXMLType> identifierToTypeMap) {
+    /// @param packageName         The package name for the generated Java class.
+    public SourceCodeGeneratorContext(Imports imports, String resourceBundle, Map<String, FXMLType> identifierToTypeMap, String packageName) {
         Map<SourcePart, StringBuilder> sourceCode = createSourceCodeBuilders();
         this(
                 sourceCode,
@@ -65,7 +70,8 @@ record SourceCodeGeneratorContext(
                 new ArrayList<>(),
                 new HashSet<>(),
                 identifierToTypeMap,
-                new HashSet<>()
+                new HashSet<>(),
+                packageName
         );
     }
 
@@ -116,7 +122,8 @@ record SourceCodeGeneratorContext(
                 fieldDefinitions,
                 features,
                 identifierToTypeMap,
-                seenNestedFXMLFiles
+                seenNestedFXMLFiles,
+                packageName
         );
     }
 }

@@ -481,7 +481,7 @@ public final class FXMLDocumentParser {
                 .filter(entry -> FXMLUtils.hasNonSkippablePrefix(entry.getKey()))
                 .collect(Collectors.toMap(
                         entry -> new FXMLLiteral(entry.getKey()),
-                        entry -> parseValueString(entry.getValue(), rawValueType, buildContext),
+                        entry -> parseValueString(entry.getValue(), FXMLType.of(rawValueType), buildContext),
                         Utils.duplicateThrowException(),
                         HashMap::new
                 ));
@@ -494,7 +494,7 @@ public final class FXMLDocumentParser {
                 Optional<String> textContent = child.textValue();
                 AbstractFXMLValue value;
                 if (textContent.isPresent()) {
-                    value = parseValueString(textContent.get().stripTrailing(), rawValueType, buildContext);
+                    value = parseValueString(textContent.get().stripTrailing(), FXMLType.of(rawValueType), buildContext);
                 } else {
                     List<AbstractFXMLValue> grandChildren = child.children()
                             .stream()
@@ -527,7 +527,7 @@ public final class FXMLDocumentParser {
             Class<?> expectedType
     ) {
         return structure.textValue()
-                .map(value -> parseValueString(value, expectedType, buildContext))
+                .map(value -> parseValueString(value, FXMLType.of(expectedType), buildContext))
                 .or(() -> parseElement(structure, buildContext));
     }
 
@@ -658,7 +658,7 @@ public final class FXMLDocumentParser {
                 buildContext,
                 clazz,
                 attribute,
-                (fxmlType, value) -> parseValueString(value, FXMLUtils.findRawType(fxmlType), buildContext),
+                (fxmlType, value) -> parseValueString(value, fxmlType, buildContext),
                 this::parseObjectProperty,
                 (_, _) -> Optional.empty()
         );
@@ -688,7 +688,7 @@ public final class FXMLDocumentParser {
         if (Collection.class.isAssignableFrom(rawType)) {
             if (property.methodType() == ObjectProperty.MethodType.GETTER) {
                 Class<?> collectionValueType = FXMLUtils.findRawType(FXMLUtils.findCollectionValueType(property.type()));
-                parsedValue = parseValueString(value, collectionValueType, buildContext);
+                parsedValue = parseValueString(value, FXMLType.of(collectionValueType), buildContext);
             } else {
                 log.debug(
                         "Parsing string value property using setter or constructor as collection: %s is not supported.".formatted(
@@ -696,7 +696,7 @@ public final class FXMLDocumentParser {
                 return Optional.empty();
             }
         } else {
-            parsedValue = parseValueString(value, rawType, buildContext);
+            parsedValue = parseValueString(value, property.type(), buildContext);
         }
         return handleObjectPropertyOrCollectionProperties(
                 buildContext, property, Map.of(), List.of(parsedValue)
@@ -749,7 +749,7 @@ public final class FXMLDocumentParser {
         // region: text values
         Optional<String> textValue = value.textValue();
         if (textValue.isPresent()) {
-            return parseValueString(textValue.get().stripTrailing(), FXMLUtils.findRawType(type), buildContext);
+            return parseValueString(textValue.get().stripTrailing(), type, buildContext);
         }
         // endregion
         // region: child elements
@@ -945,7 +945,7 @@ public final class FXMLDocumentParser {
     /// The logic handles various FXML prefixes:
     /// - `%`: Returns [FXMLTranslation].
     /// - `@`: Returns [FXMLResource].
-    /// - `#`: Returns [FXMLMethod] via [FXMLDocumentParserHelper#findMethodReferenceType(String, Class, BuildContext)].
+    /// - `#`: Returns [FXMLMethod] via [FXMLDocumentParserHelper#findMethodReferenceType(String, Type, BuildContext)].
     /// - `$`: Returns [FXMLReference].
     /// - `${...}`: Returns [FXMLExpression] if the expression is valid, otherwise throws [IllegalArgumentException].
     /// - `\`: Returns [FXMLLiteral] (escaped).
@@ -955,7 +955,7 @@ public final class FXMLDocumentParser {
     /// @param paramType    The expected getter parameter type, used to detect functional interfaces.
     /// @param buildContext The context used during the building process.
     /// @return The corresponding [AbstractFXMLValue].
-    private AbstractFXMLValue parseValueString(String value, Class<?> paramType, BuildContext buildContext) {
+    private AbstractFXMLValue parseValueString(String value, FXMLType paramType, BuildContext buildContext) {
         if (value.startsWith(FXMLConstants.TRANSLATION_PREFIX)) {
             return new FXMLTranslation(value.substring(1));
         }
@@ -974,7 +974,7 @@ public final class FXMLDocumentParser {
         if (value.startsWith(FXMLConstants.ESCAPE_PREFIX)) {
             return new FXMLLiteral(value.substring(1));
         }
-        if (FXMLUtils.isEventHandlerType(paramType)) {
+        if (FXMLUtils.isEventHandlerType(FXMLUtils.findRawType(paramType))) {
             return new FXMLInlineScript(value);
         }
         return new FXMLLiteral(value);
