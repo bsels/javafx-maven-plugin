@@ -1,7 +1,6 @@
 package io.github.bsels.javafx.maven.plugin;
 
 import io.github.bsels.javafx.maven.plugin.io.FXMLReader;
-import io.github.bsels.javafx.maven.plugin.parameters.FXMLParameterized;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Execute;
@@ -122,20 +121,6 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     /// Default Value: false
     @Parameter(property = "javafx.fxml.debug.internal.model", defaultValue = "false")
     boolean debugInternalModel;
-    /// Represents a Maven plugin parameter for configuring FXML parameterization.
-    ///
-    /// This field is used to specify a list of `FXMLParameterized` objects that define additional parameters for
-    /// processing FXML files during the plugin execution.
-    /// The parameterization may include customizations or mappings that enhance the handling of FXML structures,
-    /// such as injecting root parameters, identifying parameters in the FXML structure, or mapping various interfaces.
-    ///
-    /// This parameter is configurable via the Maven project's `javafx.fxml.parameterization` property and is intended
-    /// to be used during the execution of the plugin's logic to process FXML files and generate corresponding
-    /// source code.
-    ///
-    /// If this field is null, the plugin may default to using empty or standard parameterization.
-    @Parameter(property = "javafx.fxml.parameterization")
-    List<FXMLParameterized> fxmlParameterizations;
     /// Indicates whether to include source files in the discovery process of classes when processing FXML files.
     ///
     /// This parameter controls the behavior of the class discovery mechanism within the plugin.
@@ -147,8 +132,8 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     /// Customizable through the Maven property `javafx.fxml.include.source.discovery`.
     ///
     /// Default value: `false`.
-    @Parameter(property = "javafx.fxml.include.source.discovery", defaultValue = "false")
-    boolean includeSourceFilesInClassDiscovery = false;
+    @Parameter(property = "javafx.fxml.include.source.discovery", defaultValue = "true")
+    boolean includeSourceFilesInClassDiscovery = true;
 
     /// Constructs a new instance of the [FXMLToSourceCodeMojo] class.
     ///

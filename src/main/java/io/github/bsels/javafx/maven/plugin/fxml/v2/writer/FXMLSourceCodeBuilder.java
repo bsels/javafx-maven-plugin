@@ -4,6 +4,7 @@ import io.github.bsels.javafx.maven.plugin.CheckAndCast;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLInterface;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
@@ -439,9 +440,15 @@ public final class FXMLSourceCodeBuilder {
         sourceCode.append("class ")
                 .append(document.className())
                 .append(" extends ")
-                .append(typeHelper.typeToSourceCode(context, document.root().type()))
-        // TODO: Add interfaces
-        ;
+                .append(typeHelper.typeToSourceCode(context, document.root().type()));
+        if (!document.interfaces().isEmpty()) {
+            sourceCode.append(" implements ");
+            for (FXMLInterface fxmlInterface : document.interfaces()) {
+                sourceCode.append(typeHelper.typeToSourceCode(context, fxmlInterface.type()))
+                        .append(", ");
+            }
+            sourceCode.delete(sourceCode.length() - 2, sourceCode.length());
+        }
     }
 
     /// Adds the constructor prologue to the generated source code.

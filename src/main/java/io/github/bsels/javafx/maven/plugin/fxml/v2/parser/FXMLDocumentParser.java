@@ -182,6 +182,7 @@ public final class FXMLDocumentParser {
         FXMLDocument fxmlDocument = new FXMLDocument(
                 parsedFXML.className(),
                 root,
+                List.of(), // TODO: Add support for interface comments at root level
                 controller,
                 parsedFXML.scriptNamespace(),
                 buildContext.definitions(),

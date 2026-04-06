@@ -6,10 +6,6 @@
 /// ## Key Parts
 /// - [io.github.bsels.javafx.maven.plugin.parameters.AdditionalBinary]: Handles additional binary resources
 ///   and configurations
-/// - [io.github.bsels.javafx.maven.plugin.parameters.FXMLParameterized]: Provides parameterization support for
-///   FXML-related processing
-/// - [io.github.bsels.javafx.maven.plugin.parameters.InterfacesWithMethod]: Manages interfaces and method-related
-///   parameter configurations
 ///
 /// ## Package Responsibilities
 /// - Managing parameter configurations for JavaFX Maven Plugin
@@ -21,7 +17,7 @@
 /// - Flexible parameter configuration
 /// - Support for complex parameter scenarios
 /// - Extensibility for different parameter types
-/// - Integration with Maven build process
+/// - Integration with the Maven build process
 ///
 /// ## Usage Context
 ///
