@@ -132,6 +132,8 @@ public final class FXMLSourceCodeBuilder {
                 );
             }
             """.formatted(INTERNAL_STRING_TO_URL_METHOD);
+    /// The controller suffix for FXML exposed identifiers.
+    private static final String CONTROLLER_SUFFIX = "Controller";
     /// The logger for outputting generation information and debugging messages.
     private final Log log;
     /// Helper for managing and adding imports to the generated source code.
@@ -208,6 +210,7 @@ public final class FXMLSourceCodeBuilder {
         addConstructorEpilogue(context, document);
         addInnerClass(document, context);
         addMethods(document, context);
+
         // The class declaration should be done last
         addClassDeclaration(context, document, isRootDocument);
         return generateSourceCode(context, document.className(), isRootDocument);
@@ -375,7 +378,7 @@ public final class FXMLSourceCodeBuilder {
                                 .stream()
                                 .flatMap(controller -> identifierToField(
                                                 context,
-                                                new FXMLExposedIdentifier(identifier + "Controller"),
+                                                new FXMLExposedIdentifier(identifier + CONTROLLER_SUFFIX),
                                                 controller.controllerClass()
                                         )
                                 )
@@ -451,6 +454,14 @@ public final class FXMLSourceCodeBuilder {
     /// @param context  The current [SourceCodeGeneratorContext].
     /// @param document The [FXMLDocument] to process.
     private void addConstructorPrologue(SourceCodeGeneratorContext context, FXMLDocument document) {
+        document.controller()
+                .ifPresent(
+                        controller -> context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE)
+                                .append(INTERNAL_CONTROLLER_FIELD)
+                                .append(" = new ")
+                                .append(typeHelper.typeToSourceCode(context, controller.controllerClass()))
+                                .append("();\n")
+                );
         List<Constructions> constructions = Stream.concat(
                         findConstructions(document.root(), context),
                         document.definitions()
@@ -818,7 +829,19 @@ public final class FXMLSourceCodeBuilder {
                     _,
                     List<FXMLProperty> properties
             ) -> properties.forEach(p -> addConstructorEpilogue(context, identifier.toString(), p));
-            case FXMLConstant _, FXMLCopy _, FXMLExpression _, FXMLInclude _, FXMLInlineScript _, FXMLLiteral _,
+            case FXMLInclude(FXMLIdentifier identifier, _, _, _, FXMLLazyLoadedDocument fxmlDocument) ->
+                    fxmlDocument.get()
+                            .controller()
+                            .ifPresent(
+                                    _ -> sourceCode.append(identifier)
+                                            .append(CONTROLLER_SUFFIX)
+                                            .append(" = ")
+                                            .append(identifier)
+                                            .append('.')
+                                            .append(INTERNAL_CONTROLLER_FIELD)
+                                            .append(";\n")
+                            );
+            case FXMLConstant _, FXMLCopy _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _,
                  FXMLMethod _, FXMLReference _, FXMLResource _, FXMLTranslation _, FXMLValue _ -> {
             }
         }
@@ -1083,7 +1106,9 @@ public final class FXMLSourceCodeBuilder {
         String name = method.name();
         Optional<FXMLControllerMethod> controllerMethod = findMethodInController(controller, method);
         StringBuilder sourceCode = new StringBuilder();
-        context.addFeature(Feature.ABSTRACT_CLASS);
+        if (controllerMethod.isEmpty()) {
+            context.addFeature(Feature.ABSTRACT_CLASS);
+        }
         sourceCode.append("protected ")
                 .append(controllerMethod.map(_ -> "").orElse("abstract "))
                 .append(typeHelper.typeToSourceCode(context, method.returnType()))
