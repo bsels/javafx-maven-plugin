@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /// Represents the context used during Java source code generation for an FXML document.
@@ -30,7 +31,7 @@ record SourceCodeGeneratorContext(
         Set<Feature> features,
         Map<String, FXMLType> identifierToTypeMap,
         Set<String> seenNestedFXMLFiles,
-        String packageName
+        Optional<String> packageName
 ) {
 
     /// Constructs a `SourceCodeGeneratorContext` and validates that all parameters are non-null.
@@ -61,7 +62,12 @@ record SourceCodeGeneratorContext(
     /// @param resourceBundle      The initial resource bundle expression.
     /// @param identifierToTypeMap A map from FXML identifiers to their corresponding [FXMLType]s.
     /// @param packageName         The package name for the generated Java class.
-    public SourceCodeGeneratorContext(Imports imports, String resourceBundle, Map<String, FXMLType> identifierToTypeMap, String packageName) {
+    public SourceCodeGeneratorContext(
+            Imports imports,
+            String resourceBundle,
+            Map<String, FXMLType> identifierToTypeMap,
+            String packageName
+    ) {
         Map<SourcePart, StringBuilder> sourceCode = createSourceCodeBuilders();
         this(
                 sourceCode,
@@ -71,7 +77,7 @@ record SourceCodeGeneratorContext(
                 new HashSet<>(),
                 identifierToTypeMap,
                 new HashSet<>(),
-                packageName
+                Optional.ofNullable(packageName)
         );
     }
 

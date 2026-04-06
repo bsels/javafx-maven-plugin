@@ -187,23 +187,21 @@ public final class FXMLSourceCodeBuilder {
                 packageName
         );
 
-        return internalGenerateSourceCode(document, context, packageName, true);
+        return internalGenerateSourceCode(document, context, true);
     }
 
     /// Internal method to generate source code, allowing for recursive processing of nested FXML documents.
     ///
     /// @param document       The [FXMLDocument] being processed.
     /// @param context        The current [SourceCodeGeneratorContext].
-    /// @param packageName    The package name for the class.
     /// @param isRootDocument Whether this is the root FXML document or an included one.
     /// @return The generated Java source code.
     private String internalGenerateSourceCode(
             FXMLDocument document,
             SourceCodeGeneratorContext context,
-            String packageName,
             boolean isRootDocument
     ) {
-        addPackageLine(context, packageName);
+        addPackageLine(context);
         addImports(context);
         addFields(context, document);
         addConstructorPrologue(context, document);
@@ -321,12 +319,13 @@ public final class FXMLSourceCodeBuilder {
 
     /// Adds the package declaration to the source code context.
     ///
-    /// @param context     The current [SourceCodeGeneratorContext].
-    /// @param packageName The package name to declare.
-    private void addPackageLine(SourceCodeGeneratorContext context, String packageName) {
-        if (packageName != null) {
-            context.sourceCode(SourcePart.PACKAGE).append("package ").append(packageName).append(";\n\n");
-        }
+    /// @param context The current [SourceCodeGeneratorContext].
+    private void addPackageLine(SourceCodeGeneratorContext context) {
+        context.packageName()
+                .ifPresent(packageName -> context.sourceCode(SourcePart.PACKAGE)
+                        .append("package ")
+                        .append(packageName)
+                        .append(";\n\n"));
     }
 
     /// Adds field declarations to the source code context for the given FXML document.
@@ -1015,7 +1014,6 @@ public final class FXMLSourceCodeBuilder {
                                             .map("java.util.ResourceBundle.getBundle(%s)"::formatted)
                                             .orElse(context.resourceBundle())
                             ),
-                            null,
                             false
                     ));
                 } else {
@@ -1104,7 +1102,7 @@ public final class FXMLSourceCodeBuilder {
                 case PUBLIC -> createDirectCallMethodBody(sourceCode, method);
                 case PROTECTED, PACKAGE_PRIVATE -> {
                     FXMLClassType type = controller.controllerClass();
-                    if (context.packageName().equals(type.clazz().getPackageName())) {
+                    if (context.packageName().map(type.clazz().getPackageName()::equals).orElse(false)) {
                         createDirectCallMethodBody(sourceCode, method);
                     } else {
                         createReflectionCallMethodBody(context, sourceCode, type, fxmlMethod);
