@@ -2,6 +2,8 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
@@ -14,6 +16,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLWildcardType;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLConstant;
@@ -32,10 +35,14 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
 import io.github.bsels.javafx.maven.plugin.utils.ObjectMapperProvider;
 import javafx.beans.NamedArg;
 
+import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
+import java.net.URI;
+import java.net.URL;
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -47,6 +54,13 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilder.INTERNAL_CONTROLLER_FIELD;
+import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilder.INTERNAL_RESOURCE_BUNDLE;
+import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilder.INTERNAL_STRING_TO_FILE_METHOD;
+import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilder.INTERNAL_STRING_TO_PATH_METHOD;
+import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilder.INTERNAL_STRING_TO_URI_METHOD;
+import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilder.INTERNAL_STRING_TO_URL_METHOD;
 
 /// A helper class for handling [FXMLType]s and their conversion to Java source code.
 /// It provides methods for creating type mappings, encoding literals, and generating class names.
@@ -82,7 +96,9 @@ final class FXMLSourceCodeBuilderTypeHelper {
     ///
     /// @param type the [FXMLType] whose default value is to be determined
     /// @return a string representation of the default value corresponding to the given [FXMLType]
-    public String defaultTypeValue(FXMLType type) {
+    /// @throws NullPointerException if `type` is null
+    public String defaultTypeValue(FXMLType type) throws NullPointerException {
+        Objects.requireNonNull(type, "`type` must not be null");
         Class<?> rawClass = FXMLUtils.findRawType(type);
         if (boolean.class.equals(rawClass)) {
             return "false";
@@ -115,7 +131,9 @@ final class FXMLSourceCodeBuilderTypeHelper {
     ///
     /// @param document The [FXMLDocument] to process.
     /// @return A map associating FXML identifiers with their resolved types.
-    public Map<String, FXMLType> createIdentifierToTypeMap(FXMLDocument document) {
+    /// @throws NullPointerException if `document` is null
+    public Map<String, FXMLType> createIdentifierToTypeMap(FXMLDocument document) throws NullPointerException {
+        Objects.requireNonNull(document, "`document` must not be null");
         Map<String, Wrapper> identifierTypeMap = Stream.concat(
                         Stream.of(document.root()),
                         document.definitions()
@@ -151,8 +169,13 @@ final class FXMLSourceCodeBuilderTypeHelper {
     /// @param value   The literal value as a string.
     /// @param type    The [FXMLType] of the literal.
     /// @return The Java source code representation of the literal.
+    /// @throws NullPointerException     If any input is null.
     /// @throws IllegalArgumentException If the literal is invalid for the given type.
-    public String encodeLiteral(SourceCodeGeneratorContext context, String value, FXMLType type) {
+    public String encodeLiteral(SourceCodeGeneratorContext context, String value, FXMLType type)
+            throws NullPointerException, IllegalArgumentException {
+        Objects.requireNonNull(context, "`context` must not be null");
+        Objects.requireNonNull(value, "`value` must not be null");
+        Objects.requireNonNull(type, "`type` must not be null");
         if (type instanceof FXMLClassType(Class<?> clazz)) {
             if (clazz.isAssignableFrom(String.class)) {
                 return encodeString(value);
@@ -215,10 +238,85 @@ final class FXMLSourceCodeBuilderTypeHelper {
 
     /// Encodes a string for use in Java source code.
     ///
-    /// @param translationKey The string to encode.
+    /// @param string The string to encode.
     /// @return The Java source code representation of the string.
-    public String encodeString(String translationKey) {
-        return ObjectMapperProvider.encodeObject(translationKey);
+    public String encodeString(String string) {
+        return ObjectMapperProvider.encodeObject(string);
+    }
+
+    /// Encodes an FXML value for use in Java source code.
+    ///
+    /// @param context The current [SourceCodeGeneratorContext].
+    /// @param value   The [AbstractFXMLValue] to encode.
+    /// @param type    The expected [FXMLType] of the value.
+    /// @return The Java source code representation of the value.
+    /// @throws UnsupportedOperationException If the value type is not yet supported.
+    /// @throws IllegalArgumentException      If the value cannot be converted to the required type.
+    public String encodeFXMLValue(SourceCodeGeneratorContext context, AbstractFXMLValue value, FXMLType type) {
+        return encodeFXMLValue(context, "", value, type);
+    }
+
+    /// Encodes an FXML value for use in Java source code.
+    ///
+    /// @param context          The current [SourceCodeGeneratorContext].
+    /// @param identifierPrefix The prefix to use for generated identifiers.
+    /// @param value            The [AbstractFXMLValue] to encode.
+    /// @param type             The expected [FXMLType] of the value.
+    /// @return The Java source code representation of the value.
+    /// @throws UnsupportedOperationException If the value type is not yet supported.
+    /// @throws IllegalArgumentException      If the value cannot be converted to the required type.
+    public String encodeFXMLValue(
+            SourceCodeGeneratorContext context,
+            String identifierPrefix,
+            AbstractFXMLValue value,
+            FXMLType type
+    ) {
+        return switch (value) {
+            case AbstractFXMLObject object -> "%s%s".formatted(identifierPrefix, object.identifier());
+            case FXMLConstant(FXMLClassType clazz, String identifier, _) ->
+                    "%s.%s".formatted(typeToSourceCode(context, clazz), identifier);
+            case FXMLCopy(FXMLIdentifier identifier, _) -> "%s%s".formatted(identifierPrefix, identifier);
+            case FXMLExpression _ -> throw new UnsupportedOperationException("Expression values are not supported yet");
+            case FXMLInclude(FXMLIdentifier identifier, _, _, _, _) -> "%s%s".formatted(identifierPrefix, identifier);
+            case FXMLInlineScript _ ->
+                    throw new UnsupportedOperationException("Inline script values are not supported yet");
+            case FXMLLiteral(String literal) -> encodeLiteral(context, literal, type);
+            case FXMLMethod(String name, _, _) -> "this::%s".formatted(name);
+            case FXMLReference(String name) -> name;
+            case FXMLResource(String resource) -> {
+                resource = encodeString(resource);
+                if (type instanceof FXMLClassType(Class<?> clazz)) {
+                    if (clazz.isAssignableFrom(String.class)) {
+                        yield resource;
+                    }
+                    if (URI.class.equals(clazz)) {
+                        yield "%s(%s)".formatted(INTERNAL_STRING_TO_URI_METHOD, resource);
+                    }
+                    if (URL.class.equals(clazz)) {
+                        yield "%s(%s)".formatted(INTERNAL_STRING_TO_URL_METHOD, resource);
+                    }
+                    if (clazz.isAssignableFrom(Path.class)) {
+                        yield "%s(%s)".formatted(INTERNAL_STRING_TO_PATH_METHOD, resource);
+                    }
+                    if (clazz.isAssignableFrom(File.class)) {
+                        yield "%s(%s)".formatted(INTERNAL_STRING_TO_FILE_METHOD, resource);
+                    }
+                }
+                throw new IllegalArgumentException(
+                        "Resources can only be used with `java.lang.String`, `java.nio.file.Path`, `java.net.URI`, or `java.net.URL`");
+            }
+            case FXMLTranslation(String translationKey) -> {
+                context.addFeature(Feature.RESOURCE_BUNDLE);
+                yield "%s.getString(%s)".formatted(
+                        INTERNAL_RESOURCE_BUNDLE,
+                        encodeString(translationKey)
+                );
+            }
+            case FXMLValue(Optional<FXMLIdentifier> identifier, FXMLType t, String v) ->
+                    identifier.map(FXMLIdentifier::toString)
+                            .map(i -> "%s%s".formatted(identifierPrefix, i))
+                            .orElseGet(() -> encodeLiteral(context, v, t));
+        };
     }
 
     /// Converts an [FXMLType] to its Java source code representation.
@@ -226,7 +324,10 @@ final class FXMLSourceCodeBuilderTypeHelper {
     /// @param context The [SourceCodeGeneratorContext].
     /// @param type    The [FXMLType] to convert.
     /// @return The Java source code representation of the type.
-    public String typeToSourceCode(SourceCodeGeneratorContext context, FXMLType type) {
+    /// @throws NullPointerException if `context` or `type` is null
+    public String typeToSourceCode(SourceCodeGeneratorContext context, FXMLType type) throws NullPointerException {
+        Objects.requireNonNull(context, "`context` must not be null");
+        Objects.requireNonNull(type, "`type` must not be null");
         return switch (type) {
             case FXMLClassType(Class<?> clazz) -> createBaseTypeSourceCode(context, clazz.getName());
             case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) ->
@@ -271,7 +372,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
     public FXMLConstructor findFactoryMethodConstructor(
             FXMLFactoryMethod factoryMethod,
             List<FXMLConstructorProperty> properties
-    ) {
+    ) throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(factoryMethod, "`factoryMethod` must not be null");
         Objects.requireNonNull(properties, "`properties` must not be null");
         List<String> names = properties.stream()
@@ -283,6 +384,169 @@ final class FXMLSourceCodeBuilderTypeHelper {
                 .min(Comparator.comparing(FXMLConstructor::properties, Comparator.comparingInt(List::size)))
                 .orElseThrow(() -> new IllegalArgumentException("No matching factory method found for properties: %s".formatted(
                         properties)));
+    }
+
+    /// Renders the source code for a specific [FXMLMethod].
+    ///
+    /// @param context    The [SourceCodeGeneratorContext] used for code generation.
+    /// @param controller The [FXMLController] associated with the FXML document. Can be null.
+    /// @param method     The [FXMLMethod] to be rendered.
+    /// @return The generated source code for the method as a [String].
+    /// @throws NullPointerException if `controller`, or `method` is null.
+    public String renderMethod(SourceCodeGeneratorContext context, FXMLController controller, FXMLMethod method)
+            throws NullPointerException {
+        Objects.requireNonNull(context, "`context` must not be null");
+        Objects.requireNonNull(method, "`method` must not be null");
+        String name = method.name();
+        Optional<FXMLControllerMethod> controllerMethod = findMethodInController(controller, method);
+        StringBuilder sourceCode = new StringBuilder();
+        if (controllerMethod.isEmpty()) {
+            context.addFeature(Feature.ABSTRACT_CLASS);
+        }
+        sourceCode.append("protected ")
+                .append(controllerMethod.map(_ -> "").orElse("abstract "))
+                .append(typeToSourceCode(context, method.returnType()))
+                .append(' ')
+                .append(name)
+                .append('(');
+        List<FXMLType> parameters = method.parameters();
+        for (int i = 0; i < parameters.size(); i++) {
+            if (i > 0) {
+                sourceCode.append(", ");
+            }
+            sourceCode.append(typeToSourceCode(context, parameters.get(i)))
+                    .append(' ')
+                    .append("param")
+                    .append(i);
+        }
+        sourceCode.append(')');
+        if (controllerMethod.isPresent()) {
+            FXMLControllerMethod fxmlMethod = controllerMethod.get();
+            sourceCode.append(" {\n");
+            switch (fxmlMethod.visibility()) {
+                case PUBLIC -> createDirectCallMethodBody(sourceCode, method);
+                case PROTECTED, PACKAGE_PRIVATE -> {
+                    FXMLClassType type = controller.controllerClass();
+                    if (context.packageName().map(type.clazz().getPackageName()::equals).orElse(false)) {
+                        createDirectCallMethodBody(sourceCode, method);
+                    } else {
+                        createReflectionCallMethodBody(context, sourceCode, type, fxmlMethod);
+                    }
+                }
+                case PRIVATE ->
+                        createReflectionCallMethodBody(context, sourceCode, controller.controllerClass(), fxmlMethod);
+            }
+            sourceCode.append("}");
+        } else {
+            sourceCode.append(';');
+        }
+        return sourceCode.append("\n\n")
+                .toString();
+    }
+
+    /// Generates the body of a method that uses reflection to call a controller method.
+    /// This is used when the controller method is not public or otherwise requires reflective access.
+    ///
+    /// @param context    The [SourceCodeGeneratorContext] used for code generation.
+    /// @param sourceCode The [StringBuilder] to which the generated code is appended.
+    /// @param clazz      The [FXMLClassType] of the controller.
+    /// @param method     The [FXMLControllerMethod] to be called via reflection.
+    private void createReflectionCallMethodBody(
+            SourceCodeGeneratorContext context,
+            StringBuilder sourceCode,
+            FXMLClassType clazz,
+            FXMLControllerMethod method
+    ) {
+        List<FXMLType> parameters = method.parameterTypes();
+        sourceCode.append("    try {\n")
+                .append("        java.lang.reflect.Method method = ")
+                .append(typeToSourceCode(context, clazz))
+                .append(".class.getDeclaredMethod(")
+                .append(encodeString(method.name()));
+        for (FXMLType parameter : parameters) {
+            sourceCode.append(", ")
+                    .append(typeToSourceCode(context, FXMLType.of(FXMLUtils.findRawType(parameter))))
+                    .append(".class");
+        }
+        sourceCode.append(");\n")
+                .append("        method.setAccessible(true);\n        ");
+        if (void.class.equals(FXMLUtils.findRawType(method.returnType()))) {
+            sourceCode.append("return ");
+        }
+        sourceCode.append("method.invoke(")
+                .append(INTERNAL_CONTROLLER_FIELD);
+        for (int i = 0; i < parameters.size(); i++) {
+            sourceCode.append(", param")
+                    .append(i);
+        }
+        sourceCode.append(");\n")
+                .append("    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {\n")
+                .append("        throw new RuntimeException(e);\n")
+                .append("    }\n");
+    }
+
+    /// Generates the body of a method that directly calls a public controller method.
+    ///
+    /// @param sourceCode The [StringBuilder] to which the generated code is appended.
+    /// @param fxmlMethod The [FXMLMethod] representing the call to be made.
+    private void createDirectCallMethodBody(StringBuilder sourceCode, FXMLMethod fxmlMethod) {
+        if (void.class.equals(FXMLUtils.findRawType(fxmlMethod.returnType()))) {
+            sourceCode.append("    return ");
+        }
+        sourceCode.append(INTERNAL_CONTROLLER_FIELD)
+                .append('.')
+                .append(fxmlMethod.name())
+                .append('(');
+        int parameterCount = fxmlMethod.parameters().size();
+        for (int i = 0; i < parameterCount; i++) {
+            if (i > 0) {
+                sourceCode.append(", ");
+            }
+            sourceCode.append("param")
+                    .append(i);
+        }
+        sourceCode.append(");\n");
+    }
+
+    /// Attempts to find a matching method in the given [FXMLController] for a specified [FXMLMethod].
+    ///
+    /// @param controller The [FXMLController] to search in.
+    /// @param method     The [FXMLMethod] containing the target method's name and signature.
+    /// @return An [Optional] containing the [FXMLControllerMethod] if a match is found, otherwise an empty [Optional].
+    private Optional<FXMLControllerMethod> findMethodInController(FXMLController controller, FXMLMethod method) {
+        final String name = method.name();
+        final Optional<FXMLControllerMethod> controllerMethod;
+        if (controller != null) {
+            Class<?> returnType = FXMLUtils.findRawType(method.returnType());
+            List<Class<?>> parameterTypes = method.parameters()
+                    .stream().map(FXMLUtils::findRawType)
+                    .collect(Collectors.toList());
+            controllerMethod = controller.methods()
+                    .stream()
+                    .filter(m -> name.equals(m.name()))
+                    .filter(m -> m.parameterTypes().size() == parameterTypes.size())
+                    .filter(m -> FXMLUtils.findRawType(m.returnType()).isAssignableFrom(returnType))
+                    .filter(m -> checkParameterTypes(m, parameterTypes))
+                    .findFirst();
+        } else {
+            controllerMethod = Optional.empty();
+        }
+        return controllerMethod;
+    }
+
+    /// Checks if the parameters of an [FXMLControllerMethod] are compatible with the provided list of [Class] types.
+    ///
+    /// @param m              The [FXMLControllerMethod] to check.
+    /// @param parameterTypes The list of parameter types to compare against.
+    /// @return `true` if all parameter types are compatible, `false` otherwise.
+    private boolean checkParameterTypes(FXMLControllerMethod m, List<Class<?>> parameterTypes) {
+        for (int i = 0; i < parameterTypes.size(); i++) {
+            List<FXMLType> fxmlTypes = m.parameterTypes();
+            if (!parameterTypes.get(i).isAssignableFrom(FXMLUtils.findRawType(fxmlTypes.get(i)))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Retrieves the list of constructors with [@NamedArg] annotations for the given factory method from the cache
