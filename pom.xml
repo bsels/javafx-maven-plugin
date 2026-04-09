@@ -64,13 +64,13 @@
         <!-- https://central.sonatype.com/artifact/org.sonatype.central/central-publishing-maven-plugin -->
         <central.publishing.maven.plugin.version>0.10.0</central.publishing.maven.plugin.version>
         <!-- https://central.sonatype.com/artifact/io.github.bsels/semantic-version-maven-plugin -->
-        <semantic.versioning.plugin>1.3.1</semantic.versioning.plugin>
+        <semantic.versioning.plugin>1.3.3</semantic.versioning.plugin>
         <!--endregion-->
         <!--region Dependency versions -->
         <!-- https://central.sonatype.com/artifact/org.assertj/assertj-core -->
         <assertj.version>3.27.7</assertj.version>
         <!-- https://central.sonatype.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
-        <jackson.version>2.21.0</jackson.version>
+        <jackson.version>2.21.2</jackson.version>
         <!-- https://central.sonatype.com/artifact/org.junit.jupiter/junit-jupiter-api -->
         <junit.version>6.0.3</junit.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugin-tools/maven-plugin-annotations -->
@@ -242,6 +242,13 @@
     </build>
 
     <dependencies>
+        <!-- region Override transitive dependencies -->
+        <dependency>
+            <groupId>org.codehaus.plexus</groupId>
+            <artifactId>plexus-utils</artifactId>
+            <version>3.6.1</version>
+        </dependency>
+        <!-- endregion -->
         <!-- region Dependencies -->
         <dependency>
             <groupId>org.apache.maven</groupId>
