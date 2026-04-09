@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.2 - 2026-04-09
+
+### Patch
+
+Updated project dependencies:
+
+- Bumped `jackson-databind` / `jackson-dataformat-yaml` from **2.21.0** to **2.21.2**
+- Added an override for `plexus-utils` to **3.6.1** to address transitive dependency concerns
+- Bumped  semantic versioning plugin to **1.3.3**
+
 ## 1.3.1 - 2026-03-73
 
 ### Patch
