@@ -53,19 +53,25 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /// Helper providing utility methods for parsing FXML documents.
-/// Handles type resolution, property identification, method reference resolution,
-/// resource path handling, and identifier extraction.
+///
+/// This class handles the resolution of Java types from FXML strings,
+/// identification of properties (setters, getters, and constructor parameters), resolution of method references,
+/// resource path handling, and extraction of FXML identifiers.
+/// It also provides introspection for controller classes and parsing of generic type information from FXML comments.
 final class FXMLDocumentParserHelper {
-    /// Pattern to match generic type definitions in comments.
+    /// Regular expression pattern used to match generic type definitions within FXML comments.
+    /// It expects a format like `generic <index> : <type>`.
     private static final Pattern GENERICS = Pattern.compile("""
-            ^\\s*generic\\s+(?<index>\\d+)\\s*:\\s*(?<type>\\S(.*\\S)?)\\s*$\
+            ^\\s*generic\\s+(?<index>\\d+)\\s*:\\s*(?<type>\\S(.*?\\S)?)\\s*$\
             """);
-    /// Pattern for matching and parsing nested generic type definitions.
+    /// Regular expression pattern for matching and parsing nested generic type definitions.
+    /// This pattern is used recursively to decompose strings like `Map<String, List<Integer>>`.
     private static final Pattern NESTED_GENERICS = Pattern.compile("""
             ^\\s*((?<first>((((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*),\
             \\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?)$\
             """);
-    /// Pattern for identifying FXML interfaces in a string.
+    /// Regular expression pattern for identifying FXML interfaces and their methods in a string.
+    /// It matches the format `interface : <type> [; methods : <method_signatures>]`.
     private static final Pattern INTERFACES = Pattern.compile("""
             ^\\s*interface\\s*:\\s*(?<interface>\\S([^;]*\\S)?)\\s*((;?)|\
             (;\\s*methods\\s*:\\s*(?<methods>(((\\w+\\.)*\\w+)(<([\\s\\w<,>.]*)>)?)\\s*(\\w+)\\s*\\(
@@ -73,6 +79,7 @@ final class FXMLDocumentParserHelper {
             \\s*\\((([\\s\\w<>,.]+)(\\s*,\\s*[\\s\\w<>,.]+)*)?\\))*\\s*;?)))\\s*$\
             """);
     /// Pattern for parsing individual method signatures defined within an interface block.
+    /// It extracts the return type, method name, and comma-separated parameter types.
     private static final Pattern INTERFACE_METHOD = Pattern.compile("""
             \\s*(?<returnType>((\\w+\\.)*\\w+)(<([\\s\\w<,>.]*)>)?)\\s*(?<methodName>\\w+)\
             \\s*\\((?<parameters>([\\s\\w<>,.]+)(\\s*,\\s*[\\s\\w<>,.]+)*)?\\)\\s*\
@@ -93,11 +100,21 @@ final class FXMLDocumentParserHelper {
         this.defaultCharset = Objects.requireNonNull(defaultCharset, "`defaultCharset` must not be null");
     }
 
-    /// Builds an [FXMLType] from a [Type] and a list of generic type name strings.
+    /// Builds an [FXMLType] from a Java [Type] and the current [BuildContext].
     ///
-    /// @param type         The base type
-    /// @param buildContext The build context used for class resolution
-    /// @return The corresponding [FXMLType]
+    /// The logic performs the following steps based on the type of the input:
+    /// - **Class**: Resolves the full type hierarchy mapping.
+    ///   If the class has type parameters, they are resolved to use the mapping, defaulting to [Object] if not found.
+    /// - **ParameterizedType**: Recursively builds [FXMLType]s for the raw class and all actual type arguments.
+    /// - **TypeVariable**: Retrieves the resolved type from the build context's type mapping,
+    ///   falling back to a wildcard if unresolved.
+    /// - **WildcardType**: Extracts the first upper bound (if not [Object])
+    ///   or the first lower bound to represent the type; otherwise returns a wildcard.
+    /// - **Default**: Fallback to standard class resolution using [Utils.getClassType].
+    ///
+    /// @param type         The base Java [Type] to convert
+    /// @param buildContext The build context used for class resolution and type mapping
+    /// @return The corresponding [FXMLType] representing the resolved type structure
     /// @throws NullPointerException If `type` or `buildContext` is null
     public FXMLType buildFXMLType(Type type, BuildContext buildContext) throws NullPointerException {
         Objects.requireNonNull(type, "`type` must not be null");
@@ -129,22 +146,29 @@ final class FXMLDocumentParserHelper {
             }
             case TypeVariable<?> tv -> typeMapping.getOrDefault(tv.getName(), FXMLType.wildcard());
             case WildcardType wt ->
-                    Arrays.stream(wt.getUpperBounds()).findFirst().filter(Predicate.not(Predicate.isEqual(Object.class))).or(
-                            () -> Arrays.stream(wt.getLowerBounds()).findFirst()).map(bound -> buildFXMLType(
-                            bound,
-                            buildContext
-                    )).orElseGet(FXMLType::wildcard);
+                    Arrays.stream(wt.getUpperBounds()).findFirst().filter(Predicate.not(Predicate.isEqual(Object.class)))
+                            .or(() -> Arrays.stream(wt.getLowerBounds()).findFirst())
+                            .map(bound -> buildFXMLType(
+                                    bound,
+                                    buildContext
+                            )).orElseGet(FXMLType::wildcard);
             default -> FXMLType.of(Utils.getClassType(type));
         };
     }
 
-    /// Resolves the type mapping for a class by inspecting its hierarchy.
+    /// Resolves the type mapping for a class by inspecting its entire hierarchy.
+    ///
+    /// The method initializes the mapping from the build context and recursively traverses the class's superclasses
+    /// and implemented interfaces.
+    /// It identifies type variables and their resolved values throughout the hierarchy to ensure correct generic type
+    /// resolution within the FXML structure.
     ///
     /// @param clazz        The class to resolve the mapping for
-    /// @param buildContext The build context used for resolving type variables
-    /// @return A map of type variable names to their resolved [FXMLType]s
+    /// @param buildContext The build context used for initial type variable resolution
+    /// @return A map where keys are type variable names and values are their resolved [FXMLType]s
     /// @throws NullPointerException If `clazz` or `buildContext` is null
-    public Map<String, FXMLType> resolveTypeMapping(Class<?> clazz, BuildContext buildContext) throws NullPointerException {
+    public Map<String, FXMLType> resolveTypeMapping(Class<?> clazz, BuildContext buildContext)
+            throws NullPointerException {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
         Map<String, FXMLType> mapping = new LinkedHashMap<>(buildContext.typeMapping());
@@ -153,13 +177,23 @@ final class FXMLDocumentParserHelper {
         return mapping;
     }
 
-    /// Attempts to find a static setter method for a property name.
+    /// Attempts to find a static setter method for a property name in the form `Class.property`.
     ///
-    /// @param buildContext The [BuildContext] used to resolve the class name
-    /// @param name         The qualified name of the static property
-    /// @return An [Optional] containing an [InternalStaticSetterProperty] if found
+    /// The search process involves:
+    /// 1. Splitting the qualified name into the class name and property name.
+    /// 2. Resolving the class using the imports available in the [BuildContext].
+    /// 3. Searching for a static method on that class that follows the JavaFX static setter pattern
+    ///    (e.g., `set<PropertyName>(Node, Value)`).
+    /// 4. Validating that exactly one such setter exists.
+    /// 5. Building the [FXMLType] for the setter's value parameter.
+    ///
+    /// @param buildContext The [BuildContext] used to resolve the class name and types
+    /// @param name         The qualified name of the static property (e.g., "GridPane.columnIndex")
+    /// @return An [Optional] containing an [InternalStaticSetterProperty] if a unique setter is found;
+    ///                 empty otherwise (with a warning logged).
     /// @throws NullPointerException If `buildContext` or `name` is null
-    public Optional<InternalStaticSetterProperty> findStaticSetter(BuildContext buildContext, String name) throws NullPointerException {
+    public Optional<InternalStaticSetterProperty> findStaticSetter(BuildContext buildContext, String name)
+            throws NullPointerException {
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
         Objects.requireNonNull(name, "`name` must not be null");
         int dotIndex = name.lastIndexOf('.');
@@ -196,13 +230,24 @@ final class FXMLDocumentParserHelper {
 
     }
 
-    /// Finds an object property for the specified class and property name.
+    /// Finds an object property (setter, constructor parameter, or getter) for the specified class.
     ///
-    /// @param buildContext The build context used for type resolution
+    /// The method checks for potential properties in the following priority order:
+    /// 1. **Setter**: Looks for a public `set<Name>(Type)` method. If a single setter is found,
+    ///    it is returned as a [ObjectProperty.MethodType.SETTER].
+    /// 2. **Constructor Parameter**: Checks if the property name matches a named parameter in any of the class's
+    ///    constructors (requiring `@NamedArg` or similar mechanism supported by [Utils]).
+    /// 3. **Getter**: Looks for a public `get<Name>()` or `is<Name>()` method.
+    ///    If found, it is returned as a [ObjectProperty.MethodType.GETTER],
+    ///    often used for read-only collections that are populated rather than replaced.
+    ///
+    /// @param buildContext The build context used for type resolution of the property's type
     /// @param clazz        The class to search for the property
-    /// @param name         The name of the property
-    /// @return An [Optional] containing the [ObjectProperty] if found
-    public Optional<ObjectProperty> findObjectProperty(BuildContext buildContext, Class<?> clazz, String name) throws NullPointerException {
+    /// @param name         The name of the property to find
+    /// @return An [Optional] containing the [ObjectProperty] if a match is found; empty otherwise.
+    /// @throws NullPointerException If `buildContext`, `clazz`, or `name` is null
+    public Optional<ObjectProperty> findObjectProperty(BuildContext buildContext, Class<?> clazz, String name)
+            throws NullPointerException {
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         Objects.requireNonNull(name, "`name` must not be null");
@@ -262,15 +307,23 @@ final class FXMLDocumentParserHelper {
         return Optional.empty();
     }
 
-    /// Resolves a method reference value string into an [FXMLMethod].
+    /// Resolves a method reference string from FXML into a detailed [FXMLMethod] description.
     ///
-    /// @param methodName   The method name
-    /// @param paramType    The expected getter parameter type
-    /// @param buildContext The current build context
-    /// @return The corresponding [FXMLMethod]
+    /// The logic performs the following:
+    /// 1. Verifies that the `paramType` (e.g., of an event handler property like `onAction`) is a functional interface.
+    /// 2. Identifies the single abstract method (the functional method) of that interface.
+    /// 3. Resolves the functional method's return type and parameter types, taking into account any generic type
+    ///    arguments from `paramType`.
+    /// 4. Constructs a new [FXMLMethod] that represents how the handler method in the controller should look.
+    ///
+    /// @param methodName   The name of the method as specified in FXML (e.g., "handleButtonAction")
+    /// @param paramType    The [FXMLType] of the property where the method reference is used
+    /// @param buildContext The current build context for type resolution
+    /// @return An [FXMLMethod] describing the signature required for the controller method
     /// @throws NullPointerException     If any parameter is null
-    /// @throws IllegalArgumentException If `paramType` is not a functional interface
-    public FXMLMethod findMethodReferenceType(String methodName, FXMLType paramType, BuildContext buildContext) throws NullPointerException, IllegalArgumentException {
+    /// @throws IllegalArgumentException If `paramType` does not represent a functional interface
+    public FXMLMethod findMethodReferenceType(String methodName, FXMLType paramType, BuildContext buildContext)
+            throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(methodName, "`methodName` must not be null");
         Objects.requireNonNull(paramType, "`paramType` must not be null");
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
@@ -296,11 +349,15 @@ final class FXMLDocumentParserHelper {
         throw new IllegalArgumentException("The parameter type '%s' must be a functional interface".formatted(paramType));
     }
 
-    /// Resolves a resource-related path value.
+    /// Resolves a resource-related path value relative to the current FXML location.
     ///
-    /// @param value        The raw path value to resolve
-    /// @param buildContext The build context
-    /// @return The resolved path string
+    /// If the value starts with `/`, it is treated as an absolute path within the classpath.
+    /// Otherwise, it is prepended with the `resourcePath` stored in the [BuildContext],
+    /// which represents the directory containing the FXML file currently being parsed.
+    ///
+    /// @param value        The raw path value from FXML (e.g., "styles.css" or "/images/logo.png")
+    /// @param buildContext The build context containing the current resource path
+    /// @return The resolved absolute or relative path string
     /// @throws NullPointerException If `value` or `buildContext` is null
     public String resolveResourcePath(String value, BuildContext buildContext) throws NullPointerException {
         Objects.requireNonNull(value, "`value` must not be null");
@@ -311,12 +368,16 @@ final class FXMLDocumentParserHelper {
         return buildContext.resourcePath() + value;
     }
 
-    /// Resolves an optional [FXMLIdentifier] from the specified attributes map.
+    /// Resolves an optional [FXMLIdentifier] from the specified attributes map of an XML element.
     ///
-    /// @param attributes The XML attributes map
-    /// @return An [Optional] containing the identifier
+    /// It specifically looks for the `fx:id` attribute.
+    /// If present, it creates an [FXMLExposedIdentifier] which will be mapped to a field in the controller.
+    ///
+    /// @param attributes The map of XML attributes for the current element
+    /// @return An [Optional] containing the identifier if `fx:id` was present; empty otherwise
     /// @throws NullPointerException If `attributes` is null
-    public Optional<FXMLIdentifier> resolveOptionalIdentifier(Map<String, String> attributes) throws NullPointerException {
+    public Optional<FXMLIdentifier> resolveOptionalIdentifier(Map<String, String> attributes)
+            throws NullPointerException {
         Objects.requireNonNull(attributes, "`attributes` must not be null");
         if (attributes.containsKey(FXMLConstants.FX_ID_ATTRIBUTE)) {
             return Optional.of(new FXMLExposedIdentifier(attributes.get(FXMLConstants.FX_ID_ATTRIBUTE)));
@@ -324,16 +385,27 @@ final class FXMLDocumentParserHelper {
         return Optional.empty();
     }
 
-    /// Resolves and returns a [ClassAndIdentifier] based on node name, attributes, and context.
+    /// Resolves the Java class and FXML identifier for an XML node.
     ///
-    /// @param structure    The parsed XML structure
-    /// @param buildContext The current build context
-    /// @param isRoot       Whether the node is the root
-    /// @return A [ClassAndIdentifier] object
-    /// @throws IllegalStateException    If the node is labeled as `fx:root` but is not the root
-    /// @throws IllegalArgumentException If the class type cannot be resolved
+    /// This method:
+    /// 1. Finds the Java [Class] corresponding to the XML node name using imports in the context.
+    /// 2. Determines the appropriate [FXMLIdentifier]:
+    ///    - If it's the root node: uses [FXMLNamedRootIdentifier] (if `fx:id` is present) or [FXMLRootIdentifier].
+    ///    - If it has `fx:id`: uses [FXMLExposedIdentifier].
+    ///    - Otherwise: generates an [FXMLInternalIdentifier] using a unique ID from the context.
+    ///
+    /// @param structure    The parsed XML structure of the current node
+    /// @param buildContext The current build context for imports and ID generation
+    /// @param isRoot       True if this node is the root of the FXML document
+    /// @return A [ClassAndIdentifier] containing the resolved class and identifier
+    /// @throws IllegalStateException    If validation of the root node fails
+    /// @throws IllegalArgumentException If the class name cannot be resolved to a type
     /// @throws NullPointerException     If `structure` or `buildContext` is null
-    public ClassAndIdentifier resolveClassAndIdentifier(ParsedXMLStructure structure, BuildContext buildContext, boolean isRoot) throws IllegalStateException, IllegalArgumentException, NullPointerException {
+    public ClassAndIdentifier resolveClassAndIdentifier(
+            ParsedXMLStructure structure,
+            BuildContext buildContext,
+            boolean isRoot
+    ) throws IllegalStateException, IllegalArgumentException, NullPointerException {
         Objects.requireNonNull(structure, "`structure` must not be null");
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
         FXMLIdentifier identifier;
@@ -352,10 +424,14 @@ final class FXMLDocumentParserHelper {
         return new ClassAndIdentifier(clazz, identifier);
     }
 
-    /// Retrieves the charset of the specified XML element.
+    /// Retrieves the [Charset] specified for an XML element via the `charset` attribute.
     ///
-    /// @param structure The parsed XML structure
-    /// @return The specified charset, or the default if none
+    /// It checks the element's properties for the `charset` attribute.
+    /// If found, it is converted to a [Charset] instance.
+    /// If not found, the default charset provided during helper initialization is returned.
+    ///
+    /// @param structure The parsed XML structure of the element
+    /// @return The specified [Charset], or the `defaultCharset` if none is specified
     /// @throws NullPointerException If `structure` is null
     public Charset getCharsetOfElement(ParsedXMLStructure structure) throws NullPointerException {
         Objects.requireNonNull(structure, "`structure` must not be null");
@@ -364,21 +440,33 @@ final class FXMLDocumentParserHelper {
                 defaultCharset);
     }
 
-    /// Introspects the specified controller class.
+    /// Introspects a controller class to discover its fields and methods.
     ///
-    /// @param clazz        The controller class
-    /// @param buildContext The build context
-    /// @return An [FXMLController] instance
+    /// The introspection performs the following validations and extractions:
+    /// 1. Ensures the class is public and not abstract.
+    /// 2. Verifies the presence of a public no-argument constructor.
+    /// 3. Extracts all fields (including private ones) and converts them to [FXMLControllerField]s.
+    /// 4. Extracts all methods (including private ones) and converts them to [FXMLControllerMethod]s.
+    ///
+    /// Fields and methods are gathered from the class and its entire superclass hierarchy,
+    /// ensuring uniqueness using [Utils.unique].
+    ///
+    /// @param clazz        The controller [Class] to introspect
+    /// @param buildContext The build context for type resolution of members
+    /// @return An [FXMLController] object containing the discovered metadata
     /// @throws NullPointerException     If `clazz` or `buildContext` is null
     /// @throws IllegalArgumentException If the class is not public, is abstract, or lacks a public no-arg constructor
-    public FXMLController introspectControllerClass(Class<?> clazz, BuildContext buildContext) throws NullPointerException, IllegalArgumentException {
+    public FXMLController introspectControllerClass(Class<?> clazz, BuildContext buildContext)
+            throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
         if (!Modifier.isPublic(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers())) {
             throw new IllegalArgumentException("Class '%s' must be public and not abstract".formatted(clazz.getName()));
         }
-        Optional<Constructor<?>> defaultConstructor = Arrays.stream(clazz.getDeclaredConstructors()).filter(constructor -> constructor.getParameterCount() == 0).filter(
-                constructor -> Modifier.isPublic(constructor.getModifiers())).findFirst();
+        Optional<Constructor<?>> defaultConstructor = Arrays.stream(clazz.getDeclaredConstructors())
+                .filter(constructor -> constructor.getParameterCount() == 0)
+                .filter(constructor -> Modifier.isPublic(constructor.getModifiers()))
+                .findFirst();
         if (defaultConstructor.isEmpty()) {
             throw new IllegalArgumentException("Controller class must have a public no-arg constructor");
         }
@@ -401,13 +489,24 @@ final class FXMLDocumentParserHelper {
 
     /// Constructs an [FXMLType] representing a generic type based on a raw class and FXML comments.
     ///
-    /// @param rawClass     The raw class of the generic type
-    /// @param comments     The list of comments to parse
-    /// @param buildContext The build context
-    /// @return The constructed [FXMLType]
+    /// This method handles the assignment of generic type arguments to a class's type parameters.
+    /// It parses the `<?generic ...?>` processing instructions (provided as `comments`) and
+    /// maps them to the class's `TypeVariable`s.
+    ///
+    /// The process involves:
+    /// 1. Parsing the list of comments to extract ordered [FXMLType] arguments.
+    /// 2. Validating that the number of provided generic arguments matches the class's expected type parameters.
+    /// 3. Updating the `typeMapping` in the [BuildContext] so that nested elements can resolve references to these
+    ///    type variables.
+    ///
+    /// @param rawClass     The raw Java [Class] (e.g., `ArrayList.class`)
+    /// @param comments     The list of comment/processing instruction strings from the XML
+    /// @param buildContext The current build context to be updated with the new type mapping
+    /// @return An [FXMLType] (typically [FXMLGenericType]) representing the specialized type
     /// @throws NullPointerException     If any parameter is null
-    /// @throws IllegalArgumentException If the generic types count does not match the type parameters count
-    public FXMLType constructGenericType(Class<?> rawClass, List<String> comments, BuildContext buildContext) throws NullPointerException, IllegalArgumentException {
+    /// @throws IllegalArgumentException If the count of generic arguments is inconsistent with the class definition
+    public FXMLType constructGenericType(Class<?> rawClass, List<String> comments, BuildContext buildContext)
+            throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(rawClass, "`rawClass` must not be null");
         Objects.requireNonNull(comments, "`comments` must not be null");
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
@@ -439,11 +538,16 @@ final class FXMLDocumentParserHelper {
         return FXMLType.of(rawClass, genericTypes);
     }
 
-    /// Parses a list of comments to extract FXML interface definitions.
+    /// Parses a list of XML comments to extract `fx:interface` definitions.
     ///
-    /// @param comments     The list of comment strings
-    /// @param buildContext The build context
-    /// @return A list of [FXMLInterface] objects
+    /// Each comment string is checked against the [INTERFACES] pattern.
+    /// If a match is found, it is parsed into an [FXMLInterface] object,
+    /// which describes an interface the controller or a specific node is expected to implement, along with its methods.
+    ///
+    /// @param comments     The list of comment strings from the FXML document
+    /// @param buildContext The build context for type and method resolution
+    /// @return A list of successfully parsed [FXMLInterface] objects
+    /// @throws NullPointerException If `comments` or `buildContext` is null
     public List<FXMLInterface> parseInterfaces(List<String> comments, BuildContext buildContext) {
         Objects.requireNonNull(comments, "`comments` must not be null");
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
@@ -453,12 +557,18 @@ final class FXMLDocumentParserHelper {
                 .toList();
     }
 
-    /// Parses a given FXML interface string and converts it into an `Optional<FXMLInterface>` by interpreting
-    /// the structure and extracting relevant details such as the interface type and methods.
+    /// Parses a given FXML interface string and converts it into an [Optional] of [FXMLInterface].
     ///
-    /// @param interfaceString the string representation of the FXML interface to be parsed
-    /// @param buildContext    the context containing import references and other metadata required for parsing
-    /// @return an `Optional<FXMLInterface>` containing the constructed interface if parsing is successful, or an empty `Optional` if the string does not match the expected format
+    /// The parsing logic:
+    /// 1. Matches the string against the [INTERFACES] pattern.
+    /// 2. Extracts the interface type name and resolves it into an [FXMLType].
+    /// 3. If the type is already compiled, it reflects on the class to find its methods.
+    /// 4. If the type is uncompiled (referenced by name only),
+    ///    it parses method signatures provided within the comment itself.
+    ///
+    /// @param interfaceString The string representation of the FXML interface (from a comment)
+    /// @param buildContext    The context used for resolving types and methods
+    /// @return An [Optional] containing the [FXMLInterface] if parsing succeeded; empty otherwise
     private Optional<FXMLInterface> parseFXMLInterface(String interfaceString, BuildContext buildContext) {
         return INTERFACES.matcher(interfaceString)
                 .results()
@@ -477,12 +587,14 @@ final class FXMLDocumentParserHelper {
                 });
     }
 
-    /// Parses interface methods from a given comment string and builds a list of [FXMLControllerMethod] objects based
-    /// on the extracted method definitions.
+    /// Parses interface methods from a comment string and builds a list of [FXMLControllerMethod]s.
     ///
-    /// @param methodsString the string containing method definitions, separated by semicolons
-    /// @param buildContext  the context used to construct interface methods
-    /// @return a list of [FXMLControllerMethod] objects parsed from the provided string
+    /// The string is expected to be a semicolon-separated list of method signatures.
+    /// Each signature is individually parsed by [parseInterfaceMethod].
+    ///
+    /// @param methodsString The string containing one or more method definitions
+    /// @param buildContext  The context used to resolve types for the method signatures
+    /// @return A list of [FXMLControllerMethod] objects representing the parsed methods
     private List<FXMLControllerMethod> parseInterfaceMethodsFromComment(
             String methodsString,
             BuildContext buildContext
@@ -494,15 +606,18 @@ final class FXMLDocumentParserHelper {
                 .toList();
     }
 
-    /// Parses a method from a string and converts it into an [Optional] of [FXMLControllerMethod].
+    /// Parses a single method signature from a string into an [FXMLControllerMethod].
     ///
-    /// This method extracts the return type, method name, and parameters from a string
-    /// representing an interface method. It handles generic type arguments in parameters,
-    /// ensuring they are correctly split even if they contain commas.
+    /// This method uses the [INTERFACE_METHOD] pattern to extract:
+    /// - Return type
+    /// - Method name
+    /// - Parameter types (handled as a comma-separated list, respecting nested brackets for generics)
     ///
-    /// @param methodString the string containing the method signature to be parsed
-    /// @param buildContext the context used to resolve types and imports
-    /// @return an [Optional] containing the [FXMLControllerMethod] if parsing is successful, or an empty [Optional] otherwise
+    /// All types are resolved into [FXMLType]s using the imports in the [BuildContext].
+    ///
+    /// @param methodString The string containing the method signature (e.g., "void handle(String)")
+    /// @param buildContext The context used to resolve types and imports
+    /// @return An [Optional] containing the [FXMLControllerMethod] if parsing was successful; empty otherwise
     private Optional<FXMLControllerMethod> parseInterfaceMethod(String methodString, BuildContext buildContext) {
         return INTERFACE_METHOD.matcher(methodString)
                 .results()
@@ -526,14 +641,20 @@ final class FXMLDocumentParserHelper {
                 });
     }
 
-    /// Finds and retrieves a list of methods defined in the specified interface class while resolving generic types
-    /// based on the provided type mappings.
+    /// Retrieves all non-static methods of an interface class and maps their types.
     ///
-    /// @param clazz        the interface class from which methods are to be retrieved
-    /// @param genericTypes a list of generic type mappings corresponding to the type parameters of the class
-    /// @param buildContext the context containing type mapping and other information needed for method building
-    /// @return a list of `FXMLControllerMethod` objects representing non-static methods of the interface
-    /// @throws IllegalArgumentException if the number of generic types provided does not match the number of type parameters in the specified class
+    /// This method is used when an `fx:interface` refers to an existing class.
+    /// It performs the following:
+    /// 1. Validates that the number of provided `genericTypes` matches the class's type parameters.
+    /// 2. Creates a local type mapping for the duration of method introspection.
+    /// 3. Iterates over all public methods of the class, filtering out static ones.
+    /// 4. Converts each Java [Method] into an [FXMLControllerMethod] with resolved types.
+    ///
+    /// @param clazz        The interface [Class] to inspect
+    /// @param genericTypes The list of [FXMLType] arguments for the interface's type parameters
+    /// @param buildContext The parent build context
+    /// @return A list of [FXMLControllerMethod] objects representing the interface's API
+    /// @throws IllegalArgumentException If the count of generic types does not match the class definition
     private List<FXMLControllerMethod> findMethodsOfInterface(
             Class<?> clazz,
             List<FXMLType> genericTypes,
@@ -555,11 +676,14 @@ final class FXMLDocumentParserHelper {
                 .toList();
     }
 
-    /// Creates an instance of [FXMLControllerMethod] based on the provided build context and method.
+    /// Converts a Java [Method] into an [FXMLControllerMethod] using the provided context.
     ///
-    /// @param buildContext the context used to build FXML-related types and configurations
-    /// @param method       the method being analyzed and converted into an [FXMLControllerMethod]
-    /// @return a newly constructed [FXMLControllerMethod] instance representing the given method
+    /// It extracts visibility, name, abstract status,
+    /// and resolves the return type and parameter types into [FXMLType]s using the context's type mapping.
+    ///
+    /// @param buildContext The context used for type resolution
+    /// @param method       The Java reflection [Method] to convert
+    /// @return An [FXMLControllerMethod] representing the resolved method signature
     private FXMLControllerMethod createFXMLControllerMethod(BuildContext buildContext, Method method) {
         return new FXMLControllerMethod(
                 visibilityOfModifier(method.getModifiers()),
@@ -573,11 +697,14 @@ final class FXMLDocumentParserHelper {
         );
     }
 
-    /// Creates an instance of [FXMLControllerField] using the provided field metadata and build context.
+    /// Converts a Java [Field] into an [FXMLControllerField] using the provided context.
     ///
-    /// @param buildContext the context used to build the FXML type and other field properties
-    /// @param field        the field from which the [FXMLControllerField] is constructed
-    /// @return a new [FXMLControllerField] instance representing the specified field with appropriate properties
+    /// It extracts visibility and name and resolves the field's type into an [FXMLType] based on the context's type
+    /// mapping.
+    ///
+    /// @param buildContext The context used for type resolution
+    /// @param field        The Java reflection [Field] to convert
+    /// @return An [FXMLControllerField] representing the resolved field
     private FXMLControllerField createFXMLControllerField(BuildContext buildContext, Field field) {
         return new FXMLControllerField(
                 visibilityOfModifier(field.getModifiers()),
@@ -586,10 +713,12 @@ final class FXMLDocumentParserHelper {
         );
     }
 
-    /// Determines the visibility of a given modifier.
+    /// Translates Java reflection modifiers into the [Visibility] enum.
     ///
-    /// @param modifier the integer value representing a modifier, typically from the [Modifier] class
-    /// @return the corresponding [Visibility] enum value, such as `PUBLIC`, `PROTECTED`, `PRIVATE`, or `PACKAGE_PRIVATE`
+    /// It checks for `public`, `private`, and `protected` flags. If none are present, it defaults to `PACKAGE_PRIVATE`.
+    ///
+    /// @param modifier The integer modifier bitmask from Java reflection
+    /// @return The corresponding [Visibility] level
     private Visibility visibilityOfModifier(int modifier) {
         if (Modifier.isPublic(modifier)) {
             return Visibility.PUBLIC;
@@ -603,24 +732,32 @@ final class FXMLDocumentParserHelper {
         return Visibility.PACKAGE_PRIVATE;
     }
 
-    /// Parses generic type definitions from comments and resolves them using the provided imports.
+    /// Parses the list of `<?generic ...?>` comments and resolves them into [FXMLType]s.
     ///
-    /// @param comments The list of comments to parse.
-    /// @param imports  The list of imports to resolve type names.
-    /// @return A list of [FXMLType]s parsed from the comments.
-    /// @throws IllegalArgumentException if generic indices are not sequential.
-    private List<FXMLType> parseGenericsFromComments(List<String> comments, List<String> imports) throws IllegalArgumentException {
+    /// The method extracts generic definitions, ensures they are indexed correctly,
+    /// and resolves each type name against the provided imports.
+    ///
+    /// @param comments The list of comment strings from FXML
+    /// @param imports  The list of active imports in the document
+    /// @return A list of resolved [FXMLType]s in the order they were defined
+    /// @throws IllegalArgumentException If the generic indices are not sequential starting from 0
+    private List<FXMLType> parseGenericsFromComments(List<String> comments, List<String> imports)
+            throws IllegalArgumentException {
         return extractGenericsFromComments(comments).stream().map(generic -> parseGenericString(
                 generic,
                 imports
         )).toList();
     }
 
-    /// Extracts generic type strings from comments and sorts them by their index.
+    /// Extracts and sorts generic type strings from FXML comments by their defined index.
     ///
-    /// @param comments The list of comments to extract from.
-    /// @return A list of generic type strings in sequential order.
-    /// @throws IllegalArgumentException if generic indices are non-sequential or missing.
+    /// It iterates over all comments, matching them against the [GENERICS] pattern.
+    /// Matches are stored in a map keyed by index.
+    /// Finally, it verifies that the indices form a continuous sequence starting from 0.
+    ///
+    /// @param comments The list of comment strings to scan
+    /// @return A list of raw type strings, ordered by their index
+    /// @throws IllegalArgumentException If any index is missing or out of order
     private List<String> extractGenericsFromComments(List<String> comments) throws IllegalArgumentException {
         Map<Integer, String> genericTypes = new TreeMap<>(Comparator.naturalOrder());
         for (String comment : comments) {
@@ -641,14 +778,17 @@ final class FXMLDocumentParserHelper {
         return generics;
     }
 
-    /// Parses a generic type string into an [FXMLType].
+    /// Parses a string representation of a generic type into an [FXMLType].
     ///
-    /// The logic handles nested generics and type resolution using the provided imports.
+    /// This method handles complex types like `Map<String, List<Integer>>`.
+    /// It recursively parses nested generic arguments and resolves the raw class name using the provided imports.
+    /// If a class cannot be found (e.g., it's a type parameter or a class not yet compiled),
+    /// it creates an uncompiled type representation.
     ///
-    /// @param genericString The string representing the generic type.
-    /// @param imports       The list of imports for type resolution.
-    /// @return The parsed [FXMLType].
-    /// @throws IllegalArgumentException if the generic string is invalid.
+    /// @param genericString The raw string of the type (e.g., "List<String>")
+    /// @param imports       The list of imports for type resolution
+    /// @return The resolved or uncompiled [FXMLType]
+    /// @throws IllegalArgumentException If the string does not match the expected type format
     private FXMLType parseGenericString(String genericString, List<String> imports) {
         Matcher matcher = NESTED_GENERICS.matcher(genericString);
         if (!matcher.find()) {
@@ -665,11 +805,14 @@ final class FXMLDocumentParserHelper {
         }
     }
 
-    /// Recursively parses nested generic types from a string.
+    /// Recursively parses nested generic type arguments from a string.
     ///
-    /// @param nestedGenerics The string containing nested generic type definitions.
-    /// @param imports        The list of imports for type resolution.
-    /// @return A list of parsed [FXMLType]s.
+    /// For a string like `String, Integer` (from inside `Map<...>`), it splits and parses each type.
+    /// It accounts for further nesting by recursively calling itself.
+    ///
+    /// @param nestedGenerics The content of the angle brackets (e.g., "String, List<Integer>")
+    /// @param imports        The list of imports for type resolution
+    /// @return A list of [FXMLType] objects representing the arguments
     private List<FXMLType> parseNestedGenerics(String nestedGenerics, List<String> imports) {
         if (nestedGenerics == null) {
             return List.of();

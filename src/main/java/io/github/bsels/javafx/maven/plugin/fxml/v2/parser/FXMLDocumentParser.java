@@ -293,8 +293,9 @@ public final class FXMLDocumentParser {
         return Optional.of(new FXMLCopy(copyId, new FXMLExposedIdentifier(source)));
     }
 
-    /// Parses an `fx:define` element from the given parsed XML structure and updates the build context
-    /// with any extracted definitions. Returns an empty optional as this method produces no specific value.
+    /// Parses an `fx:define` element from the given parsed XML structure and updates the build context with any
+    /// extracted definitions.
+    /// Returns an empty optional as this method produces no specific value.
     ///
     /// @param structure    the parsed XML structure containing the FXDefine element and its children
     /// @param buildContext the build context used to store extracted definitions
@@ -377,8 +378,9 @@ public final class FXMLDocumentParser {
         return Optional.of(new FXMLReference(source));
     }
 
-    /// Parses an `fx:script` element from the given XML structure and updates the build context
-    /// by adding the extracted script. Returns an empty optional as this method produces no specific value.
+    /// Parses an `fx:script` element from the given XML structure and updates the build context by adding the extracted
+    /// script.
+    /// Returns an empty optional as this method produces no specific value.
     ///
     /// @param structure    The parsed XML structure containing the `fx:script` element.
     /// @param buildContext The context used to store the extracted script.
@@ -391,8 +393,8 @@ public final class FXMLDocumentParser {
 
     /// Parses the provided [ParsedXMLStructure] and constructs an [FXMLCollection] object.
     ///
-    /// The logic iterates over all child elements of the current structure, parsing each one
-    /// into an [AbstractFXMLValue] using [#parseElement(ParsedXMLStructure, BuildContext)].
+    /// The logic iterates over all child elements of the current structure,
+    /// parsing each one into an [AbstractFXMLValue] using [#parseElement(ParsedXMLStructure, BuildContext)].
     /// These values are then collected into a list and used to create an [FXMLCollection].
     ///
     /// @param context The [ParseContext] containing the parsed XML structure, build context, class and identifier, and FXML type.

@@ -23,8 +23,7 @@ public record FXMLGenericType(Class<?> type, List<FXMLType> typeArguments) imple
         }
     }
 
-    /// Constructs an instance of `FXMLGenericType` using a base class type
-    /// and a variable number of type arguments.
+    /// Constructs an instance of `FXMLGenericType` using a base class type and a variable number of type arguments.
     ///
     /// @param type          The base class type. Must not be `null`.
     /// @param typeArguments The type arguments for the generic type. If no arguments are provided, an empty list is used.

@@ -50,7 +50,7 @@ public final class FXMLUtils {
         // No instances needed
     }
 
-    /// Determines the raw type of an [FXMLType] instance.
+    /// Determines the raw type of [FXMLType] instance.
     ///
     /// @param type The [FXMLType] instance
     /// @return The raw [Class] type; returns `Object.class` for unsupported or wildcard types
@@ -65,7 +65,7 @@ public final class FXMLUtils {
         );
     }
 
-    /// Determines the element type of an [FXMLType] representing a [Collection].
+    /// Determines the element type of [FXMLType] representing a [Collection].
     ///
     /// Logic:
     /// 1. For [FXMLWildcardType], [FXMLUncompiledClassType], and [FXMLUncompiledGenericType], returns `Object`.
@@ -94,7 +94,8 @@ public final class FXMLUtils {
     /// Determines the key and value types of an [FXMLType] representing a [Map].
     ///
     /// Logic:
-    /// 1. For [FXMLWildcardType], [FXMLUncompiledClassType], and [FXMLUncompiledGenericType], returns `Object` for both.
+    /// 1. For [FXMLWildcardType], [FXMLUncompiledClassType], and [FXMLUncompiledGenericType],
+    ///    returns `Object` for both.
     /// 2. For [FXMLClassType], traverses the hierarchy to find concrete key and value types.
     /// 3. For [FXMLGenericType], builds a type mapping and traverses the hierarchy to resolve key and value types.
     ///
@@ -144,37 +145,52 @@ public final class FXMLUtils {
                 resolveTypeMapping(genericInterface, mapping, visited);
             }
         } else if (type instanceof ParameterizedType pt) {
-            Class<?> rawClass = (Class<?>) pt.getRawType();
-            TypeVariable<?>[] rawTypeParameters = rawClass.getTypeParameters();
-            Type[] actualTypeArguments = pt.getActualTypeArguments();
-            int size = Math.min(rawTypeParameters.length, actualTypeArguments.length);
-            for (int i = 0; i < size; i++) {
-                Type arg = actualTypeArguments[i];
-                switch (arg) {
-                    case TypeVariable<?> tv -> {
-                        FXMLType resolved = mapping.get(tv.getName());
-                        if (resolved != null) {
-                            mapping.put(rawTypeParameters[i].getName(), resolved);
-                        }
-                    }
-                    case Class<?> argClass -> mapping.put(rawTypeParameters[i].getName(), FXMLType.of(argClass));
-                    case ParameterizedType argPt -> {
-                        Class<?> argRawClass = (Class<?>) argPt.getRawType();
-                        List<FXMLType> argTypeArgs = Stream.of(argPt.getActualTypeArguments())
-                                .map(innerArg -> {
-                                    if (innerArg instanceof Class<?> innerClass) {
-                                        return FXMLType.of(innerClass);
-                                    }
-                                    return FXMLType.wildcard();
-                                })
-                                .toList();
-                        mapping.put(rawTypeParameters[i].getName(), FXMLType.of(argRawClass, argTypeArgs));
-                    }
-                    case null, default -> mapping.put(rawTypeParameters[i].getName(), FXMLType.wildcard());
-                }
-            }
-            resolveTypeMapping(rawClass, mapping, visited);
+            resolveParameterizedTypeMapping(mapping, visited, pt);
         }
+    }
+
+    /// Resolves and populates a mapping of parameterized types into a provided `Map`.
+    /// This method aims to map type variables of a parameterized type to their corresponding actual type arguments or
+    /// to a wildcard type if resolution is not possible and updates the provided mapping with the resolved types.
+    ///
+    /// @param mapping           A `Map<String, FXMLType>` representing the mapping from type variable names to their resolved `FXMLType` instances. This map will be updated with the resolved mappings for the parameterized type.
+    /// @param visited           A `Set<Type>` used to avoid circular type resolution by tracking the types that have already been visited during the resolution process.
+    /// @param parameterizedType The `ParameterizedType` whose type variables need to be resolved and mapped to their corresponding `FXMLType`.
+    private static void resolveParameterizedTypeMapping(
+            Map<String, FXMLType> mapping,
+            Set<Type> visited,
+            ParameterizedType parameterizedType
+    ) {
+        Class<?> rawClass = (Class<?>) parameterizedType.getRawType();
+        TypeVariable<?>[] rawTypeParameters = rawClass.getTypeParameters();
+        Type[] actualTypeArguments = parameterizedType.getActualTypeArguments();
+        int size = Math.min(rawTypeParameters.length, actualTypeArguments.length);
+        for (int i = 0; i < size; i++) {
+            Type arg = actualTypeArguments[i];
+            switch (arg) {
+                case TypeVariable<?> tv -> {
+                    FXMLType resolved = mapping.get(tv.getName());
+                    if (resolved != null) {
+                        mapping.put(rawTypeParameters[i].getName(), resolved);
+                    }
+                }
+                case Class<?> argClass -> mapping.put(rawTypeParameters[i].getName(), FXMLType.of(argClass));
+                case ParameterizedType argPt -> {
+                    Class<?> argRawClass = (Class<?>) argPt.getRawType();
+                    List<FXMLType> argTypeArgs = Stream.of(argPt.getActualTypeArguments())
+                            .map(innerArg -> {
+                                if (innerArg instanceof Class<?> innerClass) {
+                                    return FXMLType.of(innerClass);
+                                }
+                                return FXMLType.wildcard();
+                            })
+                            .toList();
+                    mapping.put(rawTypeParameters[i].getName(), FXMLType.of(argRawClass, argTypeArgs));
+                }
+                case null, default -> mapping.put(rawTypeParameters[i].getName(), FXMLType.wildcard());
+            }
+        }
+        resolveTypeMapping(rawClass, mapping, visited);
     }
 
     /// Checks if the specified name is an invalid Java identifier.
