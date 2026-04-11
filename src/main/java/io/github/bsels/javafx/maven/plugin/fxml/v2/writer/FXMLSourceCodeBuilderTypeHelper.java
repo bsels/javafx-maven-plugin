@@ -330,9 +330,9 @@ final class FXMLSourceCodeBuilderTypeHelper {
         Objects.requireNonNull(context, "`context` must not be null");
         Objects.requireNonNull(type, "`type` must not be null");
         return switch (type) {
-            case FXMLClassType(Class<?> clazz) -> createBaseTypeSourceCode(context, clazz.getName());
+            case FXMLClassType(Class<?> clazz) -> createBaseTypeSourceCode(context, clazz.getCanonicalName());
             case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) ->
-                    createGenericTypeSourceCode(context, clazz.getName(), generics);
+                    createGenericTypeSourceCode(context, clazz.getCanonicalName(), generics);
             case FXMLUncompiledClassType(String className) -> createBaseTypeSourceCode(context, className);
             case FXMLUncompiledGenericType(String className, List<FXMLType> generics) ->
                     createGenericTypeSourceCode(context, className, generics);

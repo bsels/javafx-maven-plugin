@@ -849,12 +849,14 @@ public final class FXMLDocumentParser {
         // region: collection
         if (Collection.class.isAssignableFrom(rawType) && property.methodType() == ObjectProperty.MethodType.GETTER) {
             return Optional.of(new FXMLCollectionProperties(
-                    property.name(),
-                    property.methodName().orElseThrow(),
-                    property.type(),
-                    values,
-                    parseAttributesProperties(rawType, buildContext, attributes)
-            ));
+                            property.name(),
+                            property.methodName().orElseThrow(),
+                            property.type(),
+                            new FXMLClassType(FXMLUtils.findRawType(FXMLUtils.findCollectionValueType(property.type()))),
+                            values,
+                            parseAttributesProperties(rawType, buildContext, attributes)
+                    )
+            );
         }
         // endregion
         if (values.size() > 1) {
@@ -1037,7 +1039,7 @@ public final class FXMLDocumentParser {
     /// @param rootPath     The root path of the project, used for resolving relative paths.
     private void loadIncludeFXMLDocuments(FXMLProperty property, String resourcePath, Path rootPath) {
         switch (property) {
-            case FXMLCollectionProperties(_, _, _, List<AbstractFXMLValue> value, List<FXMLProperty> properties) -> {
+            case FXMLCollectionProperties(_, _, _, _, List<AbstractFXMLValue> value, List<FXMLProperty> properties) -> {
                 value.forEach(value1 -> loadIncludeFXMLDocuments(value1, resourcePath, rootPath));
                 properties.forEach(property1 -> loadIncludeFXMLDocuments(property1, resourcePath, rootPath));
             }

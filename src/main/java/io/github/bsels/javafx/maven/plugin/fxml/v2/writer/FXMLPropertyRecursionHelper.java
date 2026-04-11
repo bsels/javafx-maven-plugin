@@ -42,7 +42,7 @@ final class FXMLPropertyRecursionHelper {
     /// @return A [Stream] containing results from traversing the property and processing its values.
     <R, C> Stream<R> walk(FXMLProperty property, BiFunction<AbstractFXMLValue, C, Stream<R>> valueWalk, C context) {
         return switch (property) {
-            case FXMLCollectionProperties(_, _, _, List<AbstractFXMLValue> values, List<FXMLProperty> properties) ->
+            case FXMLCollectionProperties(_, _, _, _, List<AbstractFXMLValue> values, List<FXMLProperty> properties) ->
                     Stream.concat(
                             values.stream()
                                     .flatMap(value -> valueWalk.apply(value, context)),

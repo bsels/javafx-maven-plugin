@@ -188,7 +188,7 @@ final class FXMLSourceCodeBuilderImportHelper {
         Objects.requireNonNull(document, "`document` must not be null");
         final Stream<ClassCount> generationAnnotation;
         if (addGeneratedAnnotation) {
-            generationAnnotation = Stream.of(new ClassCount(Generated.class.getName(), 1));
+            generationAnnotation = Stream.of(new ClassCount(Generated.class.getCanonicalName(), 1));
         } else {
             generationAnnotation = Stream.empty();
         }
@@ -318,7 +318,7 @@ final class FXMLSourceCodeBuilderImportHelper {
     private Stream<ClassCount> findFXMLPropertyClassCount(FXMLProperty property) {
         return (switch (property) {
             case FXMLCollectionProperties(
-                    _, _, FXMLType type, List<AbstractFXMLValue> value, List<FXMLProperty> properties
+                    _, _, FXMLType type, _, List<AbstractFXMLValue> value, List<FXMLProperty> properties
             ) -> Stream.concat(
                     findFXMLTypeClassCounts(type),
                     Stream.concat(
@@ -525,9 +525,9 @@ final class FXMLSourceCodeBuilderImportHelper {
     /// @return A stream of [ClassCount] objects, representing the class names and their corresponding counts. If the input type does not represent valid classes (e.g., wildcard), the stream will be empty.
     private Stream<ClassCount> findFXMLTypeClassCounts(FXMLType type) {
         return (switch (type) {
-            case FXMLClassType(Class<?> clazz) -> Stream.of(new ClassCount(clazz.getName(), 1));
+            case FXMLClassType(Class<?> clazz) -> Stream.of(new ClassCount(clazz.getCanonicalName(), 1));
             case FXMLGenericType(Class<?> clazz, List<FXMLType> typeArguments) -> Stream.concat(
-                    Stream.of(new ClassCount(clazz.getName(), 1)),
+                    Stream.of(new ClassCount(clazz.getCanonicalName(), 1)),
                     typeArguments.stream()
                             .flatMap(this::findFXMLTypeClassCounts)
             );

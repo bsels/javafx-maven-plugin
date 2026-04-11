@@ -867,14 +867,15 @@ public final class FXMLSourceCodeBuilder {
             case FXMLCollectionProperties(
                     _,
                     String getter,
-                    FXMLType type,
+                    _,
+                    FXMLClassType elementClassType,
                     List<AbstractFXMLValue> value,
                     List<FXMLProperty> properties
             ) -> {
                 String collectionSelection = "%s.%s()".formatted(identifier, getter);
                 value.forEach(v -> sourceCode.append(collectionSelection)
                         .append(".add(")
-                        .append(typeHelper.encodeFXMLValue(context, v, type))
+                        .append(typeHelper.encodeFXMLValue(context, v, elementClassType))
                         .append(");\n"));
                 value.forEach(v -> addConstructorEpilogue(context, v));
                 properties.forEach(p -> addConstructorEpilogue(context, collectionSelection, p));
