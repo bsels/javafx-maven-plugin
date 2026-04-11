@@ -62,26 +62,37 @@ import java.util.stream.Stream;
 /// A builder for generating Java source code from an [FXMLDocument].
 /// This class handles the conversion of FXML elements, properties, and values into a corresponding Java class
 /// that can be instantiated to create the defined object graph.
+/// It coordinates the overall generation process by orchestrating various steps such as package declaration,
+/// import organization, field definition, constructor building, method generation,
+/// and inner class creation for included FXML documents.
 public final class FXMLSourceCodeBuilder {
-    /// Internal controller field name.
+    /// Internal controller field name used within the generated Java class to hold the controller instance.
     static final String INTERNAL_CONTROLLER_FIELD = "$internalField$controller$";
-    /// Internal resource bundle field name.
+
+    /// Internal resource bundle field name used for translations in the generated Java class.
     static final String INTERNAL_RESOURCE_BUNDLE = "$INTERNAL$RESOURCE$BUNDLE$";
-    /// Internal string-to-file conversion method name.
+
+    /// Internal method name for converting a string value to a [java.io.File] instance.
     static final String INTERNAL_STRING_TO_FILE_METHOD = "$internalMethod$stringToFile$";
-    /// Internal string-to-path conversion method name.
+
+    /// Internal method name for converting a string value to a [java.nio.file.Path] instance.
     static final String INTERNAL_STRING_TO_PATH_METHOD = "$internalMethod$stringToPath$";
-    /// Internal string-to-uri conversion method name.
+
+    /// Internal method name for converting a string value to a [java.net.URI] instance.
     static final String INTERNAL_STRING_TO_URI_METHOD = "$internalMethod$stringToURI$";
-    /// Internal string-to-url conversion method name.
+
+    /// Internal method name for converting a string value to a [java.net.URL] instance.
     static final String INTERNAL_STRING_TO_URL_METHOD = "$internalMethod$stringToURL$";
-    /// Internal constructor variable prefix.
+
+    /// Prefix for internal constructor variables used to avoid naming collisions during object initialization.
     private static final String CONSTRUCTOR_VARIABLE_PREFIX = "$$";
-    /// A set of Java primitive types.
+
+    /// A set of all Java primitive types used to filter out unnecessary imports.
     private static final Set<String> PRIMITIVE_TYPES = Set.of(
             "boolean", "byte", "char", "short", "int", "long", "float", "double", "void"
     );
-    /// Internal string-to-file conversion method body.
+
+    /// The template body for the internal string-to-file conversion method.
     private static final String INTERNAL_STRING_TO_FILE_METHOD_BODY = """
             private java.io.File %s(String value) {
                 try {
@@ -121,7 +132,7 @@ public final class FXMLSourceCodeBuilder {
                 }
             }
             """.formatted(INTERNAL_STRING_TO_URI_METHOD);
-    /// Internal string-to-URL conversion method body.
+    /// The template body for the internal string-to-URL conversion method.
     private static final String INTERNAL_STRING_TO_URL_METHOD_BODY = """
             private java.net.URL %s(String value) {
                 return java.util.Objects.requireNonNull(
@@ -130,29 +141,37 @@ public final class FXMLSourceCodeBuilder {
                 );
             }
             """.formatted(INTERNAL_STRING_TO_URL_METHOD);
-    /// Controller suffix for FXML exposed identifiers.
+
+    /// Suffix appended to FXML identifiers to denote their associated controller fields.
     private static final String CONTROLLER_SUFFIX = "Controller";
+
     /// Logger for outputting generation information and debugging messages.
     private final Log log;
+
     /// Helper for managing and adding imports to the generated source code.
     private final FXMLSourceCodeBuilderImportHelper builderImportHelper;
+
     /// Helper for handling type conversions and literal encoding.
     private final FXMLSourceCodeBuilderTypeHelper typeHelper;
-    /// Flag indicating whether the `@Generated` annotation should be added.
+
+    /// Flag indicating whether the `@Generated` annotation should be added to the class.
     private final boolean addGeneratedAnnotation;
-    /// Build start time, used for the `@Generated` annotation.
+
+    /// The time when the generation process started, used for the `@Generated` annotation timestamp.
     private final ZonedDateTime buildTime;
-    /// Default resource bundle to use for translations.
+
+    /// The default resource bundle to be used for FXML translations if none is specified.
     private final String defaultResourceBundle;
+
     /// Helper instance for managing and resolving recursive property bindings.
     /// Ensures proper handling of nested property structures and prevents infinite recursion.
     private final FXMLPropertyRecursionHelper propertyRecursionHelper;
 
-    /// Initializes a new [FXMLSourceCodeBuilder] instance.
+    /// Initializes a new [FXMLSourceCodeBuilder] instance with the specified configuration.
     ///
-    /// @param log                    The Maven plugin logger.
-    /// @param defaultResourceBundle  The default resource bundle to use for translations.
-    /// @param addGeneratedAnnotation Whether to include the `@Generated` annotation.
+    /// @param log                    The Maven plugin logger for diagnostic output.
+    /// @param defaultResourceBundle  The name of the default resource bundle for translations.
+    /// @param addGeneratedAnnotation Whether to include the standard `@Generated` annotation.
     /// @throws NullPointerException If `log` or `defaultResourceBundle` is null.
     public FXMLSourceCodeBuilder(Log log, String defaultResourceBundle, boolean addGeneratedAnnotation)
             throws NullPointerException {
@@ -168,11 +187,14 @@ public final class FXMLSourceCodeBuilder {
         this.buildTime = ZonedDateTime.now(ZoneOffset.UTC);
     }
 
-    /// Generates the Java source code for the specified [FXMLDocument].
+    /// Generates the Java source code for the specified [FXMLDocument] and package.
+    /// This method serves as the main entry point for the code generation process.
+    /// It first analyzes the document to identify all required types and imports,
+    /// then initiates the internal recursive generation flow.
     ///
-    /// @param document    The [FXMLDocument] to process.
-    /// @param packageName The package name for the generated class.
-    /// @return The generated Java source code as a string.
+    /// @param document    The [FXMLDocument] describing the object graph to convert.
+    /// @param packageName The package name where the generated class will reside.
+    /// @return The complete Java source code as a formatted string.
     /// @throws NullPointerException If `document` is null.
     public String generateSourceCode(FXMLDocument document, String packageName) throws NullPointerException {
         Objects.requireNonNull(document, "`document` must not be null");
@@ -189,12 +211,14 @@ public final class FXMLSourceCodeBuilder {
         return internalGenerateSourceCode(document, context, true);
     }
 
-    /// Generates source code internally, allowing for recursive processing of nested FXML documents.
+    /// Generates source code internally by orchestrating various code sections in the correct order.
+    /// This method allows for recursive processing of nested FXML documents by managing the shared
+    /// [SourceCodeGeneratorContext].
     ///
-    /// @param document       The [FXMLDocument] to process.
-    /// @param context        The current [SourceCodeGeneratorContext].
-    /// @param isRootDocument Whether this is the root FXML document or an included one.
-    /// @return The generated Java source code.
+    /// @param document       The [FXMLDocument] currently being processed.
+    /// @param context        The shared [SourceCodeGeneratorContext] used to accumulate source code parts.
+    /// @param isRootDocument Whether the current document is the top-level root document.
+    /// @return The generated Java source code for the current document level.
     private String internalGenerateSourceCode(
             FXMLDocument document,
             SourceCodeGeneratorContext context,
@@ -208,17 +232,19 @@ public final class FXMLSourceCodeBuilder {
         addInnerClass(document, context);
         addMethods(document, context);
 
-        // The class declaration should be done last
+        // The class declaration should be done last as it may depend on gathered features
         addClassDeclaration(context, document, isRootDocument);
         return generateSourceCode(context, document.className(), isRootDocument);
     }
 
-    /// Assembles the final source code from the gathered [SourceCodeGeneratorContext].
+    /// Assembles the final Java source code string from the accumulated parts in the context.
+    /// This method handles the overall class structure, including annotations, class declaration, field definitions,
+    /// the constructor, and methods.
     ///
-    /// @param context        The [SourceCodeGeneratorContext].
-    /// @param className      The name of the class being generated.
-    /// @param isRootDocument Whether this is the root FXML document.
-    /// @return The assembled Java source code.
+    /// @param context        The [SourceCodeGeneratorContext] containing all gathered source code segments.
+    /// @param className      The simple name of the Java class being generated.
+    /// @param isRootDocument Whether the current document is the top-level root document.
+    /// @return The final assembled Java source code.
     private String generateSourceCode(
             SourceCodeGeneratorContext context,
             String className,
@@ -292,17 +318,20 @@ public final class FXMLSourceCodeBuilder {
         return sourceCode.toString();
     }
 
-    /// Checks if a given Java type is a primitive type.
+    /// Checks if a given Java type name represents a primitive type.
+    /// Primitive types are handled, especially as they do not require import statements.
     ///
-    /// @param type the type to check.
-    /// @return `true` if the type is primitive, `false` otherwise.
+    /// @param type The fully qualified or simple name of the type to check.
+    /// @return `true` if the type is a Java primitive, `false` otherwise.
     private boolean isPrimitive(String type) {
         return PRIMITIVE_TYPES.contains(type);
     }
 
-    /// Adds import statements to the source code context.
+    /// Adds sorted import statements to the source code context.
+    /// Filters out primitive types and ensures the imports are lexicographically ordered for better readability of
+    /// the generated code.
     ///
-    /// @param context The current [SourceCodeGeneratorContext].
+    /// @param context The current [SourceCodeGeneratorContext] where imports will be added.
     private void addImports(SourceCodeGeneratorContext context) {
         List<String> importList = context.imports()
                 .imports()
@@ -317,9 +346,9 @@ public final class FXMLSourceCodeBuilder {
         sourceCode.append("\n");
     }
 
-    /// Adds the package declaration to the source code context.
+    /// Adds the package declaration to the source code context if a package name is defined.
     ///
-    /// @param context The current [SourceCodeGeneratorContext].
+    /// @param context The current [SourceCodeGeneratorContext] where the package line will be added.
     private void addPackageLine(SourceCodeGeneratorContext context) {
         context.packageName()
                 .ifPresent(packageName -> context.sourceCode(SourcePart.PACKAGE)
@@ -328,10 +357,12 @@ public final class FXMLSourceCodeBuilder {
                         .append(";\n\n"));
     }
 
-    /// Adds field declarations to the source code context for the given FXML document.
+    /// Adds all necessary field declarations to the source code context for a given FXML document.
+    /// This includes the internal controller field and fields for all FXML elements with identifiers (fx:id) found in
+    /// the root node and definitions.
     ///
-    /// @param context  The current [SourceCodeGeneratorContext].
-    /// @param document The [FXMLDocument] whose fields should be added.
+    /// @param context  The current [SourceCodeGeneratorContext] where fields will be accumulated.
+    /// @param document The [FXMLDocument] whose elements should be mapped to fields.
     private void addFields(SourceCodeGeneratorContext context, FXMLDocument document) {
         StringBuilder sourceCode = context.sourceCode(SourcePart.FIELDS);
         Stream.concat(
@@ -353,11 +384,13 @@ public final class FXMLSourceCodeBuilder {
                 .append("\n");
     }
 
-    /// Adds a field declaration to the current source code context for an FXML value.
+    /// Recursively identifies and adds field declarations for an FXML value and its nested children.
+    /// Different types of FXML values (collections, includes, maps, objects) are handled  according to their specific
+    /// structural requirements.
     ///
     /// @param context The current [SourceCodeGeneratorContext].
-    /// @param value   The [AbstractFXMLValue] to process for fields.
-    /// @return A stream of field declaration strings.
+    /// @param value   The [AbstractFXMLValue] to process for potential fields.
+    /// @return A stream of field declaration strings (e.g., "private final Button myButton;").
     private Stream<String> addFields(AbstractFXMLValue value, SourceCodeGeneratorContext context) {
         return switch (value) {
             case FXMLCollection(FXMLIdentifier identifier, FXMLType type, _, List<AbstractFXMLValue> values) ->
@@ -401,11 +434,13 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
-    /// Converts an [FXMLIdentifier] and [FXMLType] into a field declaration string.
+    /// Maps an [FXMLIdentifier] and [FXMLType] to a specific Java field declaration.
+    /// Handles exposed identifiers (protected fields for fx:id), internal identifiers (private fields),
+    /// and ignores root identifiers which do not require separate fields.
     ///
     /// @param context    The current [SourceCodeGeneratorContext].
-    /// @param identifier The [FXMLIdentifier] for the field.
-    /// @param type       The [FXMLType] for the field.
+    /// @param identifier The identifier (fx:id) that defines the field name and visibility.
+    /// @param type       The Java type of the field.
     /// @return A stream containing the field declaration string, or an empty stream if no field is needed.
     private Stream<String> identifierToField(SourceCodeGeneratorContext context, FXMLIdentifier identifier, FXMLType type) {
         return switch (identifier) {
@@ -417,12 +452,15 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
-    /// Adds the class declaration to the source code context.
+    /// Constructs the class declaration line, including modifiers, class name, and inheritance/interfaces.
+    /// The class is marked as `abstract` if it has abstract methods from implemented interfaces
+    /// or if it was explicitly configured as an abstract class.
     ///
     /// @param context        The current [SourceCodeGeneratorContext].
-    /// @param document       The [FXMLDocument] being declared.
-    /// @param isRootDocument Whether this is the root FXML document.
-    /// @throws UnsupportedOperationException If an abstract inner class is requested for an included FXML.
+    /// @param document       The [FXMLDocument] defining the class properties.
+    /// @param isRootDocument Whether this class is the main root class or a nested inner class.
+    /// @throws UnsupportedOperationException If an abstract inner class is requested for an included FXML,
+    ///                                       which is currently not supported.
     private void addClassDeclaration(SourceCodeGeneratorContext context, FXMLDocument document, boolean isRootDocument) {
         StringBuilder sourceCode = context.sourceCode(SourcePart.CLASS_DECLARATION);
         boolean hasAbstractInterfaceMethods = document.interfaces()
@@ -457,10 +495,12 @@ public final class FXMLSourceCodeBuilder {
         }
     }
 
-    /// Adds the constructor prologue to the generated source code.
+    /// Adds the constructor prologue, which includes controller initialization and object construction.
+    /// This method resolves the dependency order for all objects defined in the FXML to ensure they are created before
+    /// being referenced by other objects.
     ///
     /// @param context  The current [SourceCodeGeneratorContext].
-    /// @param document The [FXMLDocument] to process.
+    /// @param document The [FXMLDocument] whose objects need to be initialized in the constructor.
     private void addConstructorPrologue(SourceCodeGeneratorContext context, FXMLDocument document) {
         document.controller()
                 .ifPresent(
@@ -493,11 +533,13 @@ public final class FXMLSourceCodeBuilder {
         addFieldCreationPrologue(context, orderedConstructions, constructorDependencies);
     }
 
-    /// Adds field creation logic to the constructor prologue.
+    /// Adds field creation logic to the constructor prologue section.
+    /// Iterates through the ordered list of constructions and generates the corresponding  Java initialization code
+    /// (e.g., `myButton = new Button();`).
     ///
     /// @param context                 The current [SourceCodeGeneratorContext].
-    /// @param orderedConstructions    The list of constructions in their resolved order.
-    /// @param constructorDependencies The internal constructor dependencies.
+    /// @param orderedConstructions    The list of constructions in their resolved dependency order.
+    /// @param constructorDependencies The set of identifiers that act as dependencies for other constructions.
     private void addFieldCreationPrologue(
             SourceCodeGeneratorContext context,
             List<Constructions> orderedConstructions,
@@ -614,11 +656,13 @@ public final class FXMLSourceCodeBuilder {
                 .append(";\n");
     }
 
-    /// Resolves the construction order of FXML objects based on their dependencies.
+    /// Resolves the construction order of FXML objects based on their interdependencies.
+    /// This ensures that if object A depends on object B (e.g., via a constructor property),
+    /// object B is constructed before object A in the generated code.
     ///
-    /// @param constructions The list of constructions to reorder.
-    /// @return A list of constructions in an order that satisfies all dependencies.
-    /// @throws IllegalArgumentException If cyclic dependencies are detected.
+    /// @param constructions The list of construction steps to be reordered.
+    /// @return A new list of constructions ordered such that all dependencies are satisfied.
+    /// @throws IllegalArgumentException If a cyclic dependency is detected in the FXML structure.
     private List<Constructions> resolveConstructionOrder(List<Constructions> constructions)
             throws IllegalArgumentException {
         List<Constructions> orderedConstructions = new ArrayList<>();
@@ -654,12 +698,13 @@ public final class FXMLSourceCodeBuilder {
         return orderedConstructions;
     }
 
-    /// Prepares the argument list for a construction call.
+    /// Prepares the argument list for an object's constructor or factory method call.
+    /// It identifies the most appropriate constructor or method to use based on the available FXML properties.
     ///
-    /// @param builder       The [StringBuilder] to append the argument list to.
-    /// @param constructions The construction for which to prepare arguments.
+    /// @param builder       The [StringBuilder] to which the arguments will be appended.
+    /// @param constructions The construction step containing the object and its properties.
     /// @param context       The current [SourceCodeGeneratorContext].
-    /// @return The same [StringBuilder] instance with the argument list appended.
+    /// @return The same [StringBuilder] instance with the comma-separated arguments appended.
     private StringBuilder prepareArgumentsLists(
             StringBuilder builder,
             Constructions constructions,
@@ -706,10 +751,11 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
-    /// Identifies dependencies for the construction of an FXML object.
+    /// Identifies dependencies for the construction of a specific FXML object.
+    /// Analyzes the object's properties to find any references to other FXML elements.
     ///
-    /// @param object The [AbstractFXMLObject] to analyze.
-    /// @return An [AbstractFXMLObjectAndDependencies] containing the object, its constructor properties, and its dependencies.
+    /// @param object The [AbstractFXMLObject] to analyze for dependencies.
+    /// @return An [AbstractFXMLObjectAndDependencies] containing the object and its identified dependencies.
     private AbstractFXMLObjectAndDependencies findDependenciesForObjectConstruction(AbstractFXMLObject object) {
         return switch (object) {
             case FXMLCollection fxmlCollection ->
@@ -730,10 +776,11 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
-    /// Finds the identifier associated with an FXML value, if any.
+    /// Finds the identifier associated with an FXML value, if it has one.
+    /// This is used to resolve dependencies between elements.
     ///
-    /// @param value The [AbstractFXMLValue] to inspect.
-    /// @return An [Optional] containing the [FXMLIdentifier] if found, or empty otherwise.
+    /// @param value The [AbstractFXMLValue] to check for an identifier.
+    /// @return An [Optional] containing the [FXMLIdentifier] if the value is an identifiable element.
     private Optional<FXMLIdentifier> findIdentifierForValue(AbstractFXMLValue value) {
         return switch (value) {
             case AbstractFXMLObject abstractFXMLObject -> Optional.of(abstractFXMLObject.identifier());
@@ -746,11 +793,12 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
-    /// Recursively finds all constructions and their dependencies for an FXML value.
+    /// Recursively identifies all necessary construction steps and their dependencies for an FXML value.
+    /// This includes traversing nested properties and children of objects and collections.
     ///
     /// @param value   The [AbstractFXMLValue] to analyze.
     /// @param context The current [SourceCodeGeneratorContext].
-    /// @return A stream of [Constructions] representing the necessary construction steps.
+    /// @return A stream of [Constructions] representing the required initialization steps.
     private Stream<Constructions> findConstructions(AbstractFXMLValue value, SourceCodeGeneratorContext context) {
         return switch (value) {
             case FXMLCollection fxmlCollection -> Stream.concat(
@@ -786,20 +834,22 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
-    /// Adds the constructor epilogue (object initialization and property settings) for all definitions in a document.
+    /// Adds the constructor epilogue section, which handles property settings and collection population.
+    /// This part of the constructor executes after all objects have been created.
     ///
     /// @param context  The current [SourceCodeGeneratorContext].
-    /// @param document The [FXMLDocument] to process.
+    /// @param document The [FXMLDocument] whose property settings should be added.
     private void addConstructorEpilogue(SourceCodeGeneratorContext context, FXMLDocument document) {
         addConstructorEpilogue(context, document.root());
         document.definitions()
                 .forEach(d -> addConstructorEpilogue(context, d));
     }
 
-    /// Adds the constructor epilogue for a specific FXML value.
+    /// Recursively generates property-setting logic for an FXML value and its children.
+    /// Handles collection population, map entries, and individual object properties.
     ///
     /// @param context The current [SourceCodeGeneratorContext].
-    /// @param value   The [AbstractFXMLValue] to process.
+    /// @param value   The [AbstractFXMLValue] whose properties should be initialized.
     private void addConstructorEpilogue(SourceCodeGeneratorContext context, AbstractFXMLValue value) {
         StringBuilder sourceCode = context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE);
         switch (value) {
@@ -855,11 +905,12 @@ public final class FXMLSourceCodeBuilder {
         }
     }
 
-    /// Adds the constructor epilogue for a specific FXML property.
+    /// Generates the Java code for setting a specific FXML property.
+    /// This includes calling setters, populating collections, or using static setters.
     ///
     /// @param context    The current [SourceCodeGeneratorContext].
-    /// @param identifier The identifier of the object the property belongs to.
-    /// @param property   The [FXMLProperty] to process.
+    /// @param identifier The variable name of the object that owns the property.
+    /// @param property   The [FXMLProperty] to be set.
     private void addConstructorEpilogue(SourceCodeGeneratorContext context, String identifier, FXMLProperty property) {
         StringBuilder sourceCode = context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE);
         switch (property) {
@@ -932,9 +983,10 @@ public final class FXMLSourceCodeBuilder {
         }
     }
 
-    /// Adds inner class declarations to the source code context for included FXML documents.
+    /// Adds nested inner class declarations for all included FXML files.
+    /// Each unique FXML includes results in a generated inner class that encapsulates its object graph.
     ///
-    /// @param document The [FXMLDocument] whose included documents should be processed.
+    /// @param document The [FXMLDocument] to scan for nested includes.
     /// @param context  The current [SourceCodeGeneratorContext].
     private void addInnerClass(FXMLDocument document, SourceCodeGeneratorContext context) {
         StringBuilder sourceCode = context.sourceCode(SourcePart.NESTED_TYPES);
@@ -981,11 +1033,11 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
-    /// Adds methods to the source code being generated for the given [FXMLDocument].
-    /// Processes the root node of the document as well as its definitions.
+    /// Adds methods (such as event handlers) to the generated class.
+    /// This includes processing the root node and all definitions to find required methods.
     ///
-    /// @param document The [FXMLDocument] to process.
-    /// @param context  The [SourceCodeGeneratorContext].
+    /// @param document The [FXMLDocument] to scan for methods.
+    /// @param context  The current [SourceCodeGeneratorContext].
     private void addMethods(FXMLDocument document, SourceCodeGeneratorContext context) {
         List<FXMLInterface> interfaces = document.interfaces();
         FXMLController controller = document.controller()
@@ -999,13 +1051,15 @@ public final class FXMLSourceCodeBuilder {
                 .append('\n');
     }
 
-    /// Adds methods or processes FXML values recursively by traversing FXML structures.
+    /// Recursively identifies and generates methods for an FXML value and its children.
+    /// This is primarily used to find and render event handler methods that reference controller methods
+    /// or FXML interfaces.
     ///
-    /// @param value      The FXML value to process
-    /// @param context    The generator context
-    /// @param controller The FXML controller instance
-    /// @param interfaces The list of FXML interfaces
-    /// @return A stream of rendered method strings
+    /// @param value      The [AbstractFXMLValue] to process for methods.
+    /// @param context    The current [SourceCodeGeneratorContext].
+    /// @param controller The [FXMLController] of the document, if any.
+    /// @param interfaces The list of [FXMLInterface] definitions.
+    /// @return A stream of rendered method strings.
     private Stream<String> addMethods(
             AbstractFXMLValue value,
             SourceCodeGeneratorContext context,
@@ -1034,16 +1088,16 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
-    /// Creates a single-element stream using the provided supplier if the specified key is not already present in
-    /// the given set.
-    /// If the key is already present, an empty stream is returned.
+    /// Ensures that a particular code element (e.g., a method or a nested class)
+    /// is generated only once for a given key, even if it is referenced multiple times.
     ///
-    /// @param <K>      the type of the keys in the set
-    /// @param <T>      the type of the elements in the stream
-    /// @param set      the set used to check for key presence and to track added keys
-    /// @param key      the key to check and potentially add to the set
-    /// @param supplier the supplier used to generate the single element stream
-    /// @return a single-element stream if the key was not already present in the set, or an empty stream if the key was already present
+    /// @param <K>      The type of the key used for uniqueness tracking.
+    /// @param <T>      The type of the elements in the returned stream.
+    /// @param set      The set used to track which keys have already been processed.
+    /// @param key      The key representing the element to be created.
+    /// @param supplier A supplier that provides the stream of generated elements if the key is new.
+    /// @return A stream containing the generated element(s) if the key was newly added to the set,
+    ///         or an empty stream if the key was already present.
     private <K, T> Stream<T> singleCreation(Set<K> set, K key, Supplier<Stream<T>> supplier) {
         if (set.add(key)) {
             return supplier.get();

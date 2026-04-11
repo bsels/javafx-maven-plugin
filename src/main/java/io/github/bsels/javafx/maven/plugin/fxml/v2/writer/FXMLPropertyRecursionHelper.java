@@ -15,15 +15,15 @@ import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
 /// Helper for recursively traversing and processing FXML property structures.
-/// Navigates through various types of FXML properties, including collections, maps,
-/// and object properties, and applies processing functions to their values.
+/// Navigates through various types of FXML properties, including collections, maps, and object properties,
+/// and applies processing functions to their values.
 final class FXMLPropertyRecursionHelper {
 
     /// Initializes a new [FXMLPropertyRecursionHelper] instance.
     FXMLPropertyRecursionHelper() {
     }
 
-    /// Recursively traverses an [FXMLProperty] structure and processes its values.
+    /// Recursively traverses a [FXMLProperty] structure and processes its values.
     ///
     /// @param <R>       The type of the stream elements returned by the walking function
     /// @param <C>       The type of the context object passed during each walk operation

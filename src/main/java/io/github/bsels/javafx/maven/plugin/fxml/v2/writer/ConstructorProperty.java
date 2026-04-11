@@ -8,8 +8,8 @@ import java.util.Optional;
 
 /// A property passed to a constructor or factory method.
 ///
-/// Stores information about the property's name, its [FXMLType], and an optional default value
-/// if one is specified via the [@NamedArg] annotation.
+/// Stores information about the property's name, its [FXMLType],
+/// and an optional default value if one is specified via the `@NamedArg` annotation.
 ///
 /// @param name         The name of the property
 /// @param type         The [FXMLType] of the property
