@@ -29,8 +29,6 @@ import java.util.stream.Gatherer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UtilsTest {
 
@@ -2557,11 +2555,11 @@ class UtilsTest {
             boolean result = predicate.test(listStringType);
 
             // Then - The raw type of ArrayList<String> is ArrayList.class, not List.class
-            assertFalse(result);
+            assertThat(result).isFalse();
 
             // Let's use a type whose raw type IS List.class
             Predicate<ParameterizedType> listPredicate = invokeCheckRawType(ArrayList.class);
-            assertTrue(listPredicate.test(listStringType));
+            assertThat(listPredicate.test(listStringType)).isTrue();
         }
 
         @Test
@@ -2575,7 +2573,7 @@ class UtilsTest {
             boolean result = predicate.test(listStringType);
 
             // Then
-            assertFalse(result);
+            assertThat(result).isFalse();
         }
     }
 }
