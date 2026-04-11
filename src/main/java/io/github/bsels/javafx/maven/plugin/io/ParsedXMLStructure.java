@@ -5,14 +5,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/// Represents a parsed XML structure including the name, attributes, children, and comments of an XML element.
-/// This class is designed to provide an immutable representation of an XML element hierarchy.
+/// An XML structure representing an element in an FXML file.
 ///
-/// @param name       the name of the XML element
-/// @param properties the attributes of the XML element represented as a map of key-value pairs
-/// @param children   the nested child elements of this XML element represented as a list of [ParsedXMLStructure]
-/// @param comments   the comments related to the element
-/// @param textValue  the plain text value of this XML element, if it contains no child elements
+/// @param name       The XML element name
+/// @param properties The map of attribute names to values
+/// @param children   The list of child elements
+/// @param comments   The list of comments associated with this element
+/// @param textValue  The combined text content of the element
 public record ParsedXMLStructure(
         String name,
         Map<String, String> properties,
@@ -21,13 +20,13 @@ public record ParsedXMLStructure(
         Optional<String> textValue
 ) {
 
-    /// Constructs an instance of [ParsedXMLStructure].
+    /// Initializes a new [ParsedXMLStructure] record instance.
     ///
-    /// @param name       the name of the XML element
-    /// @param properties the attributes of the XML element represented as a map of key-value pairs
-    /// @param children   the nested child elements of this XML element represented as a list of [ParsedXMLStructure]
-    /// @param comments   the comments related to the element
-    /// @param textValue  the plain text value of this XML element, if it contains no child elements
+    /// @param name       The XML element name
+    /// @param properties The attribute properties
+    /// @param children   The child elements
+    /// @param comments   The associated comments
+    /// @param textValue  The combined text content
     public ParsedXMLStructure {
         Objects.requireNonNull(name, "`name` must not be null");
         properties = Map.copyOf(properties);

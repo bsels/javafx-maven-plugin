@@ -5,22 +5,21 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import java.util.Objects;
 import java.util.Optional;
 
-/// Represents a property of an FXML object.
+/// A property of an FXML object.
 ///
-/// @param type       The FXML type of the property.
-/// @param name       The name of the property.
-/// @param methodName The optional method name associated with the property.
-/// @param methodType The type of method (getter, setter, or constructor).
+/// @param type       The FXML type of the property
+/// @param name       The name of the property
+/// @param methodName The optional method name associated with the property
+/// @param methodType The type of method (getter, setter, or constructor)
 record ObjectProperty(FXMLType type, String name, Optional<String> methodName, MethodType methodType) {
-    /// Compact constructor for [ObjectProperty].
+
+    /// Initializes a new [ObjectProperty] record instance.
     ///
-    /// The logic ensures that all components are not `null`.
-    ///
-    /// @param type       The FXML type of the property.
-    /// @param name       The name of the property.
-    /// @param methodName The optional method name.
-    /// @param methodType The type of method.
-    /// @throws NullPointerException if any parameter is `null`.
+    /// @param type       The FXML type of the property
+    /// @param name       The name of the property
+    /// @param methodName The optional method name
+    /// @param methodType The type of method
+    /// @throws NullPointerException If any parameter is null
     ObjectProperty {
         Objects.requireNonNull(type, "`type` must not be null");
         Objects.requireNonNull(name, "`name` must not be null");
@@ -28,13 +27,13 @@ record ObjectProperty(FXMLType type, String name, Optional<String> methodName, M
         Objects.requireNonNull(methodType, "`methodType` must not be null");
     }
 
-    /// Enumerates the types of methods associated with an object property.
+    /// The types of methods associated with an object property.
     enum MethodType {
-        /// A getter method.
+        /// Getter method.
         GETTER,
-        /// A setter method.
+        /// Setter method.
         SETTER,
-        /// A constructor parameter.
+        /// Constructor parameter.
         CONSTRUCTOR
     }
 }

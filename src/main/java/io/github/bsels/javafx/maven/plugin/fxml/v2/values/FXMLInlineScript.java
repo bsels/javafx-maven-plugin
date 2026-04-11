@@ -2,15 +2,16 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
 import java.util.Objects;
 
-/// Represents an inline script within an FXML value.
+/// An inline script within an FXML value.
 ///
-/// @param script The script content.
+/// @param script The script content
 public record FXMLInlineScript(String script) implements AbstractFXMLValue {
-    /// Compact constructor to validate the inline script.
+
+    /// Initializes a new [FXMLInlineScript] record instance.
     ///
-    /// @param script The script content.
-    /// @throws NullPointerException     if `script` is `null`.
-    /// @throws IllegalArgumentException if `script` is blank.
+    /// @param script The script content
+    /// @throws NullPointerException     If `script` is null
+    /// @throws IllegalArgumentException If `script` is blank
     public FXMLInlineScript {
         Objects.requireNonNull(script, "`script` must not be null");
         if (script.isBlank()) {

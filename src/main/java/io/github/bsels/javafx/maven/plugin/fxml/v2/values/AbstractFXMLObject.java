@@ -9,19 +9,18 @@ import java.util.Optional;
 /// Base interface for FXML objects that can contain properties and generics.
 public sealed interface AbstractFXMLObject extends AbstractFXMLValue permits FXMLCollection, FXMLMap, FXMLObject {
 
-    /// Retrieves the unique FXML identifier associated with this object.
+    /// Returns the unique FXML identifier associated with this object.
     ///
-    /// @return The FXMLIdentifier representing the unique identifier for this object.
+    /// @return The FXML identifier
     FXMLIdentifier identifier();
 
-    /// Retrieves the type of the FXML object.
+    /// Returns the type of the FXML object.
     ///
-    /// @return The FXMLType representing the class or generic type of the object.
+    /// @return The FXML type
     FXMLType type();
 
-    /// Retrieves an optional factory method associated with the FXML object.
-    /// The factory method, if present, is expected to be a valid Java identifier.
+    /// Returns an optional factory method associated with the FXML object.
     ///
-    /// @return An `Optional` containing the factory method if specified, or an empty `Optional` if not present.
+    /// @return An [Optional] containing the factory method
     Optional<FXMLFactoryMethod> factoryMethod();
 }

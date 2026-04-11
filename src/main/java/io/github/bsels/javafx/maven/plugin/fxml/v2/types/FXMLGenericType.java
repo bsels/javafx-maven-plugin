@@ -3,20 +3,18 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.types;
 import java.util.List;
 import java.util.Objects;
 
-/// Represents a generic type in FXML with type arguments.
+/// An FXML type representing a Java generic type.
 ///
-/// This record stores the base class type and its type arguments.
-///
-/// @param type          The base class type. Must not be `null`.
-/// @param typeArguments The list of type arguments. If `null`, an empty list is used.
+/// @param type          The raw class type
+/// @param typeArguments The list of FXML generic type arguments
 public record FXMLGenericType(Class<?> type, List<FXMLType> typeArguments) implements FXMLType {
 
-    /// Compact constructor to validate the generic type components.
+    /// Initializes a new [FXMLGenericType] record instance.
     ///
-    /// @param type          The base class type.
-    /// @param typeArguments The list of type arguments.
-    /// @throws NullPointerException if `type` is `null`.
-    /// @throws IllegalArgumentException if `typeArguments` is empty
+    /// @param type          The raw class type
+    /// @param typeArguments The list of generic type arguments
+    /// @throws NullPointerException     If `type` or `typeArguments` is null
+    /// @throws IllegalArgumentException If `typeArguments` is empty
     public FXMLGenericType {
         Objects.requireNonNull(type, "`type` must not be null");
         typeArguments = List.copyOf(Objects.requireNonNullElseGet(typeArguments, List::of));

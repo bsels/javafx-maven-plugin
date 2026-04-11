@@ -42,141 +42,44 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /// Maven plugin for converting FXML files into Java source code.
-///
-/// This class extends the AbstractMojo class and provides functionality to process FXML files,
-/// generate corresponding Java source code, and manage Maven project configurations for the generated source files.
-/// The plugin's execution process involves reading FXML files, processing their internal structure,
-/// generating source files, and writing them to a configured directory.
-///
-/// Fields:
-/// - `project`: The Maven project instance, used to access project configurations and update source roots.
-/// - `fxmlDirectory`: The directory containing the FXML files to be processed.
-/// - `packageName`: The base package name for the generated Java source code.
-/// - `resourceBundleObject`: The resource bundle configuration, used for localization support in FXML files.
-/// - `generatedSourceDirectory`: The directory where the generated source files will be written.
-/// - `debugInternalModel`: A flag indicating whether to enable debugging for the internal FXML models.
-/// - `fxmlParameterizations`: A list of configuration settings or objects representing FXML parameterization details.
 @Mojo(name = "fxml-source", requiresDependencyResolution = ResolutionScope.RUNTIME)
 @Execute(phase = LifecyclePhase.GENERATE_SOURCES)
 public final class FXMLToSourceCodeMojo extends AbstractMojo {
-    /// Represents the Maven project associated with the plugin execution.
-    ///
-    /// This variable is automatically injected by Maven during the plugin execution and provides access to the current
-    /// Maven project's configuration and metadata.
-    /// It is marked as read-only and cannot be modified by the plugin.
-    ///
-    /// The MavenProject instance contains details such as the project's artifacts, dependencies, build configuration,
-    /// and other metadata.
-    /// It is used throughout the plugin's execution to reference or update project-related settings, such as adding
-    /// generated source directories to the project's compiled source roots.
-    ///
-    /// The value of this field is resolved by Maven using the `${project}` expression and is typically not manually
-    /// configured by users.
+    /// The Maven project.
     @Parameter(defaultValue = "${project}", readonly = true)
     MavenProject project;
-    /// A list of directories containing FXML files to be processed by the Maven plugin.
-    ///
-    /// This field is required and specifies the source directories that are scanned
-    /// for FXML files during the plugin's execution.
-    /// Each directory in the list is expected to contain FXML files that need to be converted into Java source code.
-    ///
-    /// Additional considerations:
-    /// - The field is annotated with `@Parameter(required = true)` to indicate that it must be provided in
-    ///   the plugin configuration.
-    /// - Future improvements may include combining this with a list of package names
-    ///   and supporting exclusion lists for more granular control of which FXML files are processed.
+    /// Directories containing FXML files to process.
     @Parameter(required = true)
     List<FXMLDirectory> fxmlDirectories;
-    /// Represents the resource bundle configuration for FXML processing.
-    ///
-    /// This variable is used to specify the property value for a resource bundle that provides localized strings or
-    /// other resources for use within FXML files.
-    /// If provided, the specified resource bundle is used to resolve keys referenced in the FXML file during
-    /// source code generation or runtime evaluation.
-    ///
-    /// Users can configure this property in the Maven build process via the parameter
-    /// `javafx.fxml.resourceBundleObject`.
-    /// The value of this parameter must indicate the fully qualified class name or resource bundle path that
-    /// corresponds to the required bundle.
-    ///
-    /// It can be used to integrate internationalization (i18n) support or provide additional data resources linked to
-    /// the FXML views being processed.
+    /// Resource bundle configuration for FXML processing.
     @Parameter(property = "javafx.fxml.resourceBundleObject")
     String resourceBundleObject;
-    /// Specifies the directory where the Java source code generated from FXML files will be written.
-    ///
-    /// This directory will contain all the source files derived from the processing of FXML files within the designated
-    /// FXML directory.
-    /// The default location for the generated source directory is in the "generated-sources/fxml" folder inside the
-    /// project's build directory.
-    /// This path can be overridden by configuring the property `javafx.fxml.generatedSourceDirectory`.
-    ///
-    /// It is a required parameter, and the Maven project will include this directory in its compiler source roots to
-    /// ensure that the generated files are accessible during the compilation phase.
+    /// Directory where generated Java source code is written.
     @Parameter(
             property = "javafx.fxml.generatedSourceDirectory",
             required = true,
             defaultValue = "${project.build.directory}/generated-sources/fxml"
     )
     Path generatedSourceDirectory;
-    /// Indicates whether to include source files in the discovery process of classes when processing FXML files.
-    ///
-    /// This parameter controls the behavior of the class discovery mechanism within the plugin.
-    /// When set to `true`, source files that can be compiled without the generated sources are included along
-    /// with compiled classes during the discovery of FXML-related classes.
-    /// This can be useful for scenarios where source files contain classes that are used in the FXML files.
-    /// Setting this to `false` excludes source files from the discovery process, relying solely on compiled classes.
-    ///
-    /// Customizable through the Maven property `javafx.fxml.include.source.discovery`.
-    ///
-    /// Default value: `true`.
+    /// Whether to include project source files in class discovery.
     @Parameter(property = "javafx.fxml.include.source.discovery", defaultValue = "true")
     boolean includeSourceFilesInClassDiscovery = true;
-    /// Specifies the character set to be used when reading FXML files and generating source code.
-    ///
-    /// The default value is UTF-8.
+    /// Character set for reading FXML and generating source code.
     @Parameter(property = "javafx.fxml.charset", defaultValue = "UTF-8", required = true)
     String defaultCharset = "UTF-8";
-    /// Indicates whether the `@Generated` annotation should be added to the generated Java source files.
-    ///
-    /// When set to `true`, the annotation is included, providing metadata about the source of the generated file.
+    /// Whether to add the `@Generated` annotation to generated files.
     @Parameter(property = "javafx.fxml.add.generated.annotation", defaultValue = "true", required = true)
     boolean addGeneratedAnnotation = true;
 
-    /// Constructs a new instance of the [FXMLToSourceCodeMojo] class.
-    ///
-    /// This constructor initializes the object by invoking the superclass constructor of [AbstractMojo].
-    /// The class is responsible for converting FXML files into Java source code through its Maven plugin execution
-    /// logic.
-    /// Initialization of fields and dependencies required for the plugin's functionality
-    /// is performed within the context of the class configuration and execution lifecycle.
+    /// Initializes a new [FXMLToSourceCodeMojo] instance.
     public FXMLToSourceCodeMojo() {
         super();
     }
 
-    /// Executes the Maven plugin logic for generating FXML source code.
+    /// Executes the mojo to generate source code from FXML files.
     ///
-    /// This method reads FXML files from the specified directory, processes them to create an internal representation
-    /// of their structure, and generates corresponding Java source code based on the processed representation.
-    /// The generated source files are written to a directory determined by configuration.
-    ///
-    /// The execution process involves several steps:
-    /// - Reading the FXML files using the [FXMLReader] component.
-    /// - Generating source code for each processed FXML model.
-    /// - Writing the generated source code to files in the appropriate package directory.
-    ///
-    /// Additional functionality includes logging information at various stages of the execution process and debugging
-    /// the internal models if enabled.
-    /// The Maven project configuration is updated to include the generated source directory in the project's compiler
-    /// source roots.
-    ///
-    /// The method handles potential issues such as:
-    /// - Missing or blank resource bundle configurations.
-    /// - [IOException] or other issues during file writing.
-    /// - JSON processing exceptions for debugging purposes.
-    ///
-    /// @throws MojoExecutionException if an error occurs during any stage of the execution process, such as file I/O operations or failure to process FXML files.
-    /// @throws MojoFailureException   if the execution fails due to configuration issues or other non-recoverable errors.
+    /// @throws MojoExecutionException If an error occurs during execution
+    /// @throws MojoFailureException   If the execution fails due to configuration issues
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         Objects.requireNonNull(fxmlDirectories, "FXML directories must be specified");
@@ -200,17 +103,11 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         }
     }
 
-    /// Executes the given [ThrowableRunner] within a context that optimistically compiles
-    /// and includes source files from the project in the class loader.
+    /// Executes the given runner with an extended class loader that includes compiled source files.
     ///
-    /// This method ensures that the provided `runnable` is executed with a class loader extended to include source
-    /// files discovered in the project's compiler source roots.
-    /// The class loader extension is applied temporarily and is reverted to its original state once the execution
-    /// completes.
-    ///
-    /// @param runnable the [ThrowableRunner] containing the logic to be executed. This runner may throw [MojoExecutionException] or [MojoFailureException], and its execution must comply with the provided contract.
-    /// @throws MojoExecutionException if an error occurs during the extension of the class loader or the execution of the supplied `runnable`.
-    /// @throws MojoFailureException   if the execution fails due to configuration issues or other unrecoverable errors encountered by the `runnable`.
+    /// @param runnable The runner to execute
+    /// @throws MojoExecutionException If an error occurs during execution
+    /// @throws MojoFailureException   If the execution fails due to configuration issues
     private void executeWithOptimisticCompiler(ThrowableRunner runnable)
             throws MojoExecutionException, MojoFailureException {
         try (var _ = new ContextClassLoaderClosable(this::sourceFilesClassLoaderExtender)) {
@@ -218,11 +115,10 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         }
     }
 
-    /// Performs the internal execution logic for generating source code from FXML files.
-    /// This involves reading FXML files, parsing them, and generating Java source files in the specified directory.
+    /// Performs the internal execution logic for generating source code.
     ///
-    /// @param charset the character set to use for reading and parsing FXML files.
-    /// @throws MojoExecutionException if any error occurs during FXML reading, parsing, or source code writing.
+    /// @param charset The character set to use for reading and parsing FXML files
+    /// @throws MojoExecutionException If an error occurs during generation
     private void executeInternal(Charset charset) throws MojoExecutionException {
         Log log = getLog();
         FXMLReader fxmlReader = new FXMLReader(log);
@@ -275,13 +171,11 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         log.info("FXML source code generation completed successfully");
     }
 
-    /// Constructs an [ClassLoader] instance that includes all runtime and compile classpath dependencies of
-    /// the Maven project.
-    /// This allows loading of classes from the project's dependencies during execution.
+    /// Constructs a [ClassLoader] that includes all project dependencies.
     ///
-    /// @param currentClassLoader the parent class loader to be used for delegating class loading. It is typically the current thread context class loader or a class loader passed to the method.
-    /// @return a new [ClassLoader] that has access to the project's runtime and compile classpath elements.
-    /// @throws MojoFailureException if there is a failure in resolving the required dependencies for constructing the class loader.
+    /// @param currentClassLoader The parent class loader
+    /// @return A new [ClassLoader] with project dependencies
+    /// @throws MojoFailureException If dependencies cannot be resolved
     private ClassLoader constructClasspathDependenciesClassLoader(ClassLoader currentClassLoader)
             throws MojoFailureException {
         try {
@@ -303,15 +197,11 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         }
     }
 
-    /// Extends the provided [ClassLoader] to include source files in the class discovery process.
+    /// Extends the [ClassLoader] to include project source files compiled in memory.
     ///
-    /// This method retrieves the project's compiler source roots and compiles them using an in-memory compiler.
-    /// The resulting classes are integrated into a new [ClassLoader] which extends the scope of the provided
-    /// `currentClassLoader`.
-    ///
-    /// @param currentClassLoader the parent class loader to extend. Typically, this is the current thread context class loader or another class loader relevant to the Maven plugin's execution context.
-    /// @return a new [ClassLoader] instance that includes the compiled source files from the project's compiler source roots.
-    /// @throws MojoExecutionException if an error occurs during the compilation process, or if it fails to create the extended [ClassLoader].
+    /// @param currentClassLoader The parent class loader
+    /// @return A new [ClassLoader] instance with compiled source files
+    /// @throws MojoExecutionException If compilation or class loading fails
     private ClassLoader sourceFilesClassLoaderExtender(ClassLoader currentClassLoader)
             throws MojoExecutionException {
         Log log = getLog();
@@ -338,14 +228,11 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         }
     }
 
-    /// Creates a directory for the generated package based on the resolved path derived from the configured package name
-    /// and the generated source directory.
-    /// If the directory already exists, it is reused.
-    /// If the directory cannot be created due to an [IOException], a [MojoExecutionException] is thrown.
+    /// Creates a directory for the generated package.
     ///
-    /// @param fxmlDirectory the FXML directory configuration containing the package name and the generated source directory.
-    /// @return the path to the generated package directory
-    /// @throws MojoExecutionException if the directory creation fails
+    /// @param fxmlDirectory The FXML directory configuration
+    /// @return The path to the generated package directory
+    /// @throws MojoExecutionException If the directory cannot be created
     private Path createGeneratedPackageDirectory(FXMLDirectory fxmlDirectory) throws MojoExecutionException {
         Log log = getLog();
         Path generatedPackageDirectory;
@@ -366,13 +253,11 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         }
     }
 
-    /// Scans the specified directory for FXML files and returns a list of paths to the files found.
-    /// Only regular files with the ".fxml" extension are included in the result.
-    /// Logs the count and details of the FXML files detected.
+    /// Scans the specified directory for FXML files.
     ///
-    /// @param fxmlDirectory the directory to scan for FXML files
-    /// @return a list of paths to the FXML files found in the directory
-    /// @throws MojoExecutionException if an error occurs while accessing the directory or reading its contents
+    /// @param fxmlDirectory The directory to scan
+    /// @return A list of paths to FXML files
+    /// @throws MojoExecutionException If the directory cannot be read
     private List<Path> findFXMLFiles(FXMLDirectory fxmlDirectory) throws MojoExecutionException {
         Log log = getLog();
         List<Path> excluded = fxmlDirectory.getExcludedFiles();

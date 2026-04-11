@@ -9,12 +9,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/// Represents an object instantiated from FXML.
+/// An object instantiated from FXML.
 ///
-/// @param identifier    The identifier of the object.
-/// @param type          The type of the object.
-/// @param factoryMethod The factory method, if any.
-/// @param properties    The list of properties of the object.
+/// @param identifier    The identifier of the object
+/// @param type          The type of the object
+/// @param factoryMethod The optional factory method
+/// @param properties    The list of properties
 public record FXMLObject(
         FXMLIdentifier identifier,
         FXMLType type,
@@ -22,13 +22,13 @@ public record FXMLObject(
         List<FXMLProperty> properties
 ) implements AbstractFXMLValue, AbstractFXMLObject {
 
-    /// Compact constructor to validate the FXML object components.
+    /// Initializes a new [FXMLObject] record instance.
     ///
-    /// @param identifier    The identifier of the object.
-    /// @param type          The type of the object.
-    /// @param factoryMethod The factory method, if any.
-    /// @param properties    The list of properties of the object.
-    /// @throws NullPointerException if `identifier`, `type`, `factoryMethod`, or `properties` is `null`.
+    /// @param identifier    The identifier of the object
+    /// @param type          The type of the object
+    /// @param factoryMethod The optional factory method
+    /// @param properties    The list of properties
+    /// @throws NullPointerException If any parameter is null
     public FXMLObject {
         Objects.requireNonNull(identifier, "`identifier` must not be null");
         Objects.requireNonNull(type, "`type` must not be null");

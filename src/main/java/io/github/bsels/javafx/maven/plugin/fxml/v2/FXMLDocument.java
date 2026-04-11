@@ -10,15 +10,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/// Represents a parsed FXML document.
+/// A parsed FXML document.
 ///
-/// @param className    The name of the class associated with this document.
-/// @param root         The root object of the document.
-/// @param interfaces   The list of interfaces implemented by the class.
-/// @param controller   The controller class name, if any.
-/// @param scriptEngine The script engine name, if any.
-/// @param definitions  The list of objects defined within this object.
-/// @param scripts      The list of scripts associated with this object.
+/// @param className    The name of the class associated with this document
+/// @param root         The root object of the document
+/// @param interfaces   The list of interfaces implemented by the class
+/// @param controller   The controller class, if any
+/// @param scriptEngine The script engine name, if any
+/// @param definitions  The list of objects defined within this object
+/// @param scripts      The list of scripts associated with this object
 public record FXMLDocument(
         String className,
         AbstractFXMLObject root,
@@ -28,16 +28,17 @@ public record FXMLDocument(
         List<AbstractFXMLValue> definitions,
         List<FXMLScript> scripts
 ) {
-    /// Compact constructor to validate the FXML document components.
+
+    /// Initializes a new [FXMLDocument] record instance.
     ///
-    /// @param className    The name of the class associated with this document.
-    /// @param root         The root object of the document.
-    /// @param interfaces   The list of interfaces implemented by the class.
-    /// @param controller   The controller class name, if any.
-    /// @param scriptEngine The script engine name, if any.
-    /// @param definitions  The list of objects defined within this object.
-    /// @param scripts      The list of scripts associated with this object.
-    /// @throws NullPointerException if `className`, `root`, `controller`, or `scriptEngine` is `null`.
+    /// @param className    The name of the class associated with this document
+    /// @param root         The root object of the document
+    /// @param interfaces   The list of interfaces implemented by the class
+    /// @param controller   The controller class, if any
+    /// @param scriptEngine The script engine name, if any
+    /// @param definitions  The list of objects defined within this object
+    /// @param scripts      The list of scripts associated with this object
+    /// @throws NullPointerException If `className`, `root`, `controller`, or `scriptEngine` is null
     public FXMLDocument {
         Objects.requireNonNull(className, "`className` must not be null");
         Objects.requireNonNull(root, "`root` must not be null");

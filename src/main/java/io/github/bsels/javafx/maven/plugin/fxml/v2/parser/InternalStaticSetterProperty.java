@@ -4,23 +4,21 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 
 import java.util.Objects;
 
-/// Represents an internal static setter property.
+/// An internal static setter property.
 ///
-/// @param name        The name of the property.
-/// @param staticClass The static class containing the setter.
-/// @param setter      The name of the setter method.
-/// @param fxmlType    The FXML type of the property.
+/// @param name        The name of the property
+/// @param staticClass The static class containing the setter
+/// @param setter      The name of the setter method
+/// @param fxmlType    The FXML type of the property
 record InternalStaticSetterProperty(String name, Class<?> staticClass, String setter, FXMLType fxmlType) {
 
-    /// Compact constructor for [InternalStaticSetterProperty].
+    /// Initializes a new [InternalStaticSetterProperty] record instance.
     ///
-    /// The logic ensures that all components are not `null`.
-    ///
-    /// @param name        The name of the property.
-    /// @param staticClass The static class containing the setter.
-    /// @param setter      The name of the setter method.
-    /// @param fxmlType    The FXML type of the property.
-    /// @throws NullPointerException if any parameter is `null`.
+    /// @param name        The name of the property
+    /// @param staticClass The static class containing the setter
+    /// @param setter      The name of the setter method
+    /// @param fxmlType    The FXML type of the property
+    /// @throws NullPointerException If any parameter is null
     InternalStaticSetterProperty {
         Objects.requireNonNull(name, "`name` must not be null");
         Objects.requireNonNull(staticClass, "`staticClass` must not be null");

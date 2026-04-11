@@ -8,11 +8,11 @@ public sealed interface FXMLProperty
                 FXMLStaticObjectProperty {
     /// Returns the name of the property.
     ///
-    /// @return The property name.
+    /// @return The property name
     String name();
 
     /// Returns the type of the property.
     ///
-    /// @return The property type.
+    /// @return The property type
     FXMLType type();
 }

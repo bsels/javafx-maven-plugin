@@ -47,17 +47,10 @@ import java.util.stream.Gatherer;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-/// A helper class designed to assist in counting and managing FXML-related classes.
-/// This class serves as a utility for performing operations related to FXML class counting.
-/// It does not accept parameters in its constructor and provides functionality related to FXML class analysis
-/// and handling.
+/// Helper for counting and managing FXML-related classes.
+/// Utility for performing operations related to FXML class counting and analysis.
 final class FXMLSourceCodeBuilderImportHelper {
-    /// Creates and returns a gatherer for aggregating class counts into a map and producing [ClassCount] objects
-    /// for downstream processing.
-    ///
-    /// The gatherer operates sequentially, collecting the full class name and its associated count from input lines
-    /// and aggregating them into a map.
-    /// Once complete, the gathered data is pushed as [ClassCount] objects to the downstream consumer.
+    /// Creates a gatherer for aggregating class counts into a map and producing [ClassCount] objects.
     private static final Gatherer<ClassCount, Map<String, Integer>, ClassCount> CLASS_COUNT_MERGER = Gatherer.ofSequential(
             HashMap::new,
             (state, line, _) -> {
@@ -68,24 +61,20 @@ final class FXMLSourceCodeBuilderImportHelper {
                     state.forEach((key, value) -> downstream.push(new ClassCount(key, value)))
     );
 
-    /// Helper instance used for managing and resolving recursive property bindings when working with FXML.
-    /// This ensures proper handling of nested property structures and prevents infinite recursion during the binding
-    /// and lookup process.
+    /// Helper for managing and resolving recursive property bindings.
     private final FXMLPropertyRecursionHelper propertyRecursionHelper;
 
-    /// A helper class designed to assist in counting and managing FXML-related classes.
-    /// This class serves as a utility for performing operations related to FXML class counting.
-    /// It does not accept parameters in its constructor and provides functionality related to FXML class analysis and handling.
+    /// Initializes a new [FXMLSourceCodeBuilderImportHelper] instance.
     FXMLSourceCodeBuilderImportHelper() {
         this.propertyRecursionHelper = new FXMLPropertyRecursionHelper();
     }
 
-    /// Finds and organizes the class imports required for the given FXML document.
+    /// Finds and organizes the class imports required for the specified [FXMLDocument].
     ///
-    /// @param document               the FXMLDocument to process. Must not be null.
-    /// @param addGeneratedAnnotation a boolean flag indicating whether to include a generated annotation in the processing logic.
-    /// @return an Imports object containing the list of import statements and a mapping of inline class names.
-    /// @throws NullPointerException if the provided document is null.
+    /// @param document               The [FXMLDocument] to process
+    /// @param addGeneratedAnnotation Whether to include the `@Generated` annotation
+    /// @return An [Imports] object containing the list of import statements and a mapping of inline class names
+    /// @throws NullPointerException If `document` is null
     public Imports findImports(FXMLDocument document, boolean addGeneratedAnnotation) throws NullPointerException {
         Objects.requireNonNull(document, "`document` must not be null");
         String rootDocumentClassName = document.className();
@@ -133,10 +122,10 @@ final class FXMLSourceCodeBuilderImportHelper {
         return new Imports(imports, inlineClassNames);
     }
 
-    /// Retrieves a stream of class names associated with the given FXML document.
+    /// Retrieves a stream of class names associated with the specified [FXMLDocument].
     ///
-    /// @param document the [FXMLDocument] object whose class names are to be retrieved
-    /// @return a [Stream] of class names as Strings, including the document's own class name, the class names from its root, and the class names from its definitions
+    /// @param document The [FXMLDocument] whose class names are to be retrieved
+    /// @return A [Stream] of class names
     private Stream<String> getDocumentClassNames(FXMLDocument document) {
         return Stream.concat(
                 Stream.of(document.className()),
@@ -149,12 +138,11 @@ final class FXMLSourceCodeBuilderImportHelper {
         );
     }
 
-    /// Extracts a stream of class names from an [AbstractFXMLValue] instance.
-    /// The method traverses various types of FXML structures, such as collections, maps, objects,
-    /// and included documents, recursively collecting relevant class names.
+    /// Extracts class names from an [AbstractFXMLValue] instance.
+    /// Traverses various FXML structures recursively to collect relevant class names.
     ///
-    /// @param value the [AbstractFXMLValue] instance to process, which can represent different FXML constructs such as collections, maps, objects, includes, or individual elements.
-    /// @return a stream of class names extracted from the given [AbstractFXMLValue] instance, or an empty stream if no class names are present.
+    /// @param value The [AbstractFXMLValue] instance to process
+    /// @return A stream of extracted class names
     private Stream<String> getDocumentClassNames(AbstractFXMLValue value) {
         return switch (value) {
             case FXMLCollection(_, _, _, List<AbstractFXMLValue> values) -> values.stream()
@@ -175,14 +163,13 @@ final class FXMLSourceCodeBuilderImportHelper {
         };
     }
 
-    /// Finds and returns a list of class counts derived from the provided FXML document.
-    /// The method aggregates and processes class counts from the root element, controller elements,
-    /// and definitions in the FXML document, sorts them in descending order of count, and then by class name.
+    /// Finds and returns a list of class counts derived from the specified [FXMLDocument].
+    /// Aggregates and processes class counts from the root element, controller, and definitions.
     ///
-    /// @param document               the [FXMLDocument] to analyze; must not be null
-    /// @param addGeneratedAnnotation whether to include generated annotation in class counts
-    /// @return a list of [ClassCount] objects representing the count of occurrences for each class within the provided [FXMLDocument]
-    /// @throws NullPointerException if the provided document is null
+    /// @param document               The [FXMLDocument] to analyze
+    /// @param addGeneratedAnnotation Whether to include the `@Generated` annotation in class counts
+    /// @return A list of [ClassCount] objects representing the occurrence count for each class
+    /// @throws NullPointerException If `document` is null
     private List<ClassCount> findClassCounts(FXMLDocument document, boolean addGeneratedAnnotation)
             throws NullPointerException {
         Objects.requireNonNull(document, "`document` must not be null");
@@ -210,11 +197,10 @@ final class FXMLSourceCodeBuilderImportHelper {
                 .toList();
     }
 
-    /// Builds an [GroupedClassCount] object based on the provided entry containing group information and a list of
-    /// [ClassCount] objects.
+    /// Builds a [GroupedClassCount] based on the specified entry containing group information.
     ///
-    /// @param entry a map entry where the key is the group identifier as a [String] and the value is a list of [ClassCount] objects representing the counts associated with the group.
-    /// @return a [GroupedClassCount] object containing the group identifier, the total count of all associated [ClassCount] objects, and the list of [ClassCount] objects.
+    /// @param entry A map entry where the key is the group identifier and the value is a list of [ClassCount] objects
+    /// @return A [GroupedClassCount] object
     private GroupedClassCount buildGroupedClassCount(Map.Entry<String, List<ClassCount>> entry) {
         List<ClassCount> classCountsForGroup = entry.getValue();
         int count = classCountsForGroup.stream()
@@ -223,13 +209,10 @@ final class FXMLSourceCodeBuilderImportHelper {
         return new GroupedClassCount(entry.getKey(), count, classCountsForGroup);
     }
 
-    /// Groups a list of [ClassCount] objects based on their class name prefixes.
-    /// If a class's name shares a prefix with an existing group, it will be added to that group.
-    /// If no matching prefix is found, a new group will be created using the current class name.
-    /// Additionally, if the new class name is a prefix of existing groups, those groups are merged.
+    /// Groups a list of [ClassCount] objects based on class name prefixes.
     ///
-    /// @param classCounts the list of [ClassCount] objects to be grouped.
-    /// @return a map where the keys are class name prefixes and the values are lists of [ClassCount] objects belonging to the respective group.
+    /// @param classCounts The list of [ClassCount] objects to be grouped
+    /// @return A map where keys are class name prefixes and values are lists of [ClassCount] objects
     private Map<String, List<ClassCount>> groupClassCountsBasedOnClassPrefix(List<ClassCount> classCounts) {
         Map<String, List<ClassCount>> groupedClassCounts = new HashMap<>();
         for (ClassCount classCount : classCounts) {
@@ -247,11 +230,10 @@ final class FXMLSourceCodeBuilderImportHelper {
         return Map.copyOf(groupedClassCounts);
     }
 
-    /// Creates a new group for the given class count and merges it with existing groups in the map that have keys
-    /// which are prefixes of the specified class's full name.
+    /// Creates a new group for the given class count and merges it with existing groups.
     ///
-    /// @param classCount         the [ClassCount] object containing the class information to be grouped and merged
-    /// @param groupedClassCounts a map where keys are class name prefixes and values are lists of [ClassCount] objects grouped by those prefixes
+    /// @param classCount         The [ClassCount] object to be grouped and merged
+    /// @param groupedClassCounts Map where keys are class name prefixes and values are lists of [ClassCount] objects
     private void createNewAndMergeExistingClassCountPrefixes(
             ClassCount classCount,
             Map<String, List<ClassCount>> groupedClassCounts
@@ -269,23 +251,10 @@ final class FXMLSourceCodeBuilderImportHelper {
         groupedClassCounts.put(className, classes);
     }
 
-    /// Computes a stream of [ClassCount] objects representing the occurrence counts of class names associated with
-    /// the provided [AbstractFXMLValue].
+    /// Computes a stream of [ClassCount] objects for the specified [AbstractFXMLValue].
     ///
-    /// This method handles multiple cases of [AbstractFXMLValue]:
-    /// - For [FXMLCollection], it delegates analysis to [#findFXMLCollectionClassCount].
-    /// - For [FXMLMap], it delegates analysis to [#findFXMLMapClassCount].
-    /// - For [FXMLMethod], it delegates analysis to [#findFXMLMethodClassCount].
-    /// - For [FXMLObject], it delegates analysis to [#findFXMLObjectClassCount].
-    /// - For [FXMLValue], it processes the associated [FXMLType].
-    /// - For [FXMLConstant], it processes the associated [FXMLClassType].
-    /// - For other types, such as [FXMLCopy], [FXMLExpression], [FXMLInclude], and others, an empty stream is returned.
-    ///
-    /// Each case analyzes relevant components of the value and aggregates discovered class names and their occurrence
-    /// counts into a unified stream.
-    ///
-    /// @param value The [AbstractFXMLValue] to analyze. Must not be `null`.
-    /// @return A [Stream] of [ClassCount] objects, where each object contains a class name and its corresponding occurrence count. If no class names are found, the stream will be empty.
+    /// @param value The [AbstractFXMLValue] to analyze
+    /// @return A stream of [ClassCount] objects
     private Stream<ClassCount> findAbstractFXMLValueClassCount(AbstractFXMLValue value) {
         return (switch (value) {
             case FXMLCollection collection -> findFXMLCollectionClassCount(collection);
@@ -310,11 +279,10 @@ final class FXMLSourceCodeBuilderImportHelper {
         }).gather(CLASS_COUNT_MERGER);
     }
 
-    /// Recursively computes a stream of [ClassCount] for the given [FXMLProperty].
-    /// Traverses the structure of the property and its nested components to aggregate class count data.
+    /// Recursively computes a stream of [ClassCount] for the specified [FXMLProperty].
     ///
-    /// @param property the [FXMLProperty] instance for which the class counts need to be computed
-    /// @return a [Stream] of [ClassCount] representing the class count information derived from the property
+    /// @param property The [FXMLProperty] for which class counts should be computed
+    /// @return A stream of [ClassCount] objects
     private Stream<ClassCount> findFXMLPropertyClassCount(FXMLProperty property) {
         return (switch (property) {
             case FXMLCollectionProperties(
@@ -353,18 +321,10 @@ final class FXMLSourceCodeBuilderImportHelper {
         }).gather(CLASS_COUNT_MERGER);
     }
 
-    /// Computes a stream of [ClassCount] objects representing the occurrence counts of class names associated with
-    /// the provided [FXMLObject].
+    /// Computes a stream of [ClassCount] objects for the specified [FXMLObject].
     ///
-    /// The method processes the following components within the [FXMLObject]:
-    /// - The type of the object itself.
-    /// - Class names derived from the factory method of the object, if present.
-    /// - Class names derived from the object's properties.
-    ///
-    /// All encountered class names and their occurrence counts are aggregated into a unified stream.
-    ///
-    /// @param object The [FXMLObject] to analyze. Must not be `null`.
-    /// @return A [Stream] of [ClassCount] objects, where each object contains a class name and its corresponding occurrence count.
+    /// @param object The [FXMLObject] to analyze
+    /// @return A stream of [ClassCount] objects
     private Stream<ClassCount> findFXMLObjectClassCount(FXMLObject object) {
         return Stream.concat(
                 Stream.concat(
@@ -379,19 +339,10 @@ final class FXMLSourceCodeBuilderImportHelper {
         ).gather(CLASS_COUNT_MERGER);
     }
 
-    /// Computes a stream of [ClassCount] objects representing the occurrence counts of class names associated with
-    /// the provided [FXMLMap].
+    /// Computes a stream of [ClassCount] objects for the specified [FXMLMap].
     ///
-    /// The method processes the following components of the [FXMLMap]:
-    /// - The type of the map itself.
-    /// - Class names derived from the factory method of the map, if present.
-    /// - Class names derived from the values within the map entries.
-    ///
-    /// Aggregates all encountered class names and their occurrence counts into a unified stream using the
-    /// [#CLASS_COUNT_MERGER].
-    ///
-    /// @param map The [FXMLMap] to analyze. Must not be `null`.
-    /// @return A [Stream] of [ClassCount] objects, where each object contains a class name and its corresponding occurrence count.
+    /// @param map The [FXMLMap] to analyze
+    /// @return A stream of [ClassCount] objects
     private Stream<ClassCount> findFXMLMapClassCount(FXMLMap map) {
         return Stream.concat(
                 Stream.concat(
@@ -408,18 +359,10 @@ final class FXMLSourceCodeBuilderImportHelper {
         ).gather(CLASS_COUNT_MERGER);
     }
 
-    /// Computes a stream of [ClassCount] objects representing the occurrence counts of various class names associated
-    /// with the provided [FXMLCollection].
+    /// Computes a stream of [ClassCount] objects for the specified [FXMLCollection].
     ///
-    /// The method processes the following components of the [FXMLCollection]:
-    /// - The class type of the collection itself.
-    /// - The class names derived from the collection's factory method, if present.
-    /// - The class names derived from the values within the collection.
-    ///
-    /// Aggregates all encountered class names and their occurrence counts into a unified stream.
-    ///
-    /// @param collection The [FXMLCollection] to analyze. Must not be `null`.
-    /// @return A stream of [ClassCount] objects, where each object contains a class name and its corresponding occurrence count.
+    /// @param collection The [FXMLCollection] to analyze
+    /// @return A stream of [ClassCount] objects
     private Stream<ClassCount> findFXMLCollectionClassCount(FXMLCollection collection) {
         return Stream.concat(
                 Stream.concat(
@@ -434,29 +377,18 @@ final class FXMLSourceCodeBuilderImportHelper {
         ).gather(CLASS_COUNT_MERGER);
     }
 
-    /// Computes a stream of [ClassCount] objects representing the occurrence counts of classes associated with
-    /// he provided [FXMLFactoryMethod].
+    /// Computes a stream of [ClassCount] objects for the specified [FXMLFactoryMethod].
     ///
-    /// The method analyzes the class defined in the [FXMLFactoryMethod].
-    /// All encountered class names and their occurrence counts are aggregated into a unified stream.
-    ///
-    /// @param factoryMethod The [FXMLFactoryMethod] to analyze. Must not be `null`.
-    /// @return A stream of [ClassCount] objects, where each object contains a class name and its corresponding occurrence count.
+    /// @param factoryMethod The [FXMLFactoryMethod] to analyze
+    /// @return A stream of [ClassCount] objects
     private Stream<ClassCount> findFXMLFactoryMethodClassCount(FXMLFactoryMethod factoryMethod) {
         return findFXMLTypeClassCounts(factoryMethod.clazz());
     }
 
-    /// Computes a stream of [ClassCount] objects representing the occurrence counts of classes
-    /// associated with the provided [FXMLMethod].
+    /// Computes a stream of [ClassCount] objects for the specified [FXMLMethod].
     ///
-    /// The method includes analysis of:
-    /// - The return type is of the given [FXMLMethod].
-    /// - The parameter types are of the given [FXMLMethod].
-    ///
-    /// All encountered class names and their occurrence counts are aggregated into a unified stream.
-    ///
-    /// @param method The [FXMLMethod] to analyze. Must not be `null`.
-    /// @return A stream of [ClassCount] objects, where each object contains a class name and its corresponding occurrence count.
+    /// @param method The [FXMLMethod] to analyze
+    /// @return A stream of [ClassCount] objects
     private Stream<ClassCount> findFXMLMethodClassCount(FXMLMethod method) {
         return Stream.concat(
                 findFXMLTypeClassCounts(method.returnType()),
@@ -466,18 +398,10 @@ final class FXMLSourceCodeBuilderImportHelper {
         ).gather(CLASS_COUNT_MERGER);
     }
 
-    /// Computes a stream of [ClassCount] objects representing the occurrence counts of various class names associated
-    /// with the provided [FXMLController].
+    /// Computes a stream of [ClassCount] objects for the specified [FXMLController].
     ///
-    /// The method processes the following components of the [FXMLController]:
-    /// - The controller's class type.
-    /// - The types of its fields.
-    /// - The return and parameter types of its methods.
-    ///
-    /// Each encountered class name is analyzed, and its occurrence count is aggregated.
-    ///
-    /// @param controller The [FXMLController] to analyze. Must not be `null`.
-    /// @return A stream of [ClassCount] objects, where each object contains a class name and the corresponding number of occurrences.
+    /// @param controller The [FXMLController] to analyze
+    /// @return A stream of [ClassCount] objects
     private Stream<ClassCount> findControllerClassCounts(FXMLController controller) {
         return Stream.concat(
                 Stream.concat(
@@ -493,17 +417,10 @@ final class FXMLSourceCodeBuilderImportHelper {
         ).gather(CLASS_COUNT_MERGER);
     }
 
-    /// Computes a stream of [ClassCount] objects representing the occurrence counts of various class names associated
-    /// with the return type and parameter types of the specified [FXMLControllerMethod].
+    /// Computes a stream of [ClassCount] objects for the specified [FXMLControllerMethod].
     ///
-    /// This method processes the following components:
-    /// - The method's return type.
-    /// - The types of the method's parameters.
-    ///
-    /// Class names and their occurrence counts are aggregated into a unified stream for analysis.
-    ///
-    /// @param method The [FXMLControllerMethod] to analyze. Must not be `null`.
-    /// @return A stream of [ClassCount] objects, where each object contains a class name and its corresponding occurrence count.
+    /// @param method The [FXMLControllerMethod] to analyze
+    /// @return A stream of [ClassCount] objects
     private Stream<ClassCount> findClassCountControllerMethod(FXMLControllerMethod method) {
         return Stream.concat(
                 findFXMLTypeClassCounts(method.returnType()),
@@ -513,16 +430,10 @@ final class FXMLSourceCodeBuilderImportHelper {
         ).gather(CLASS_COUNT_MERGER);
     }
 
-    /// Analyzes the specified [FXMLType] and generates a stream of [ClassCount] objects,
-    /// where each [ClassCount] represents a type name and its associated occurrence count.
+    /// Analyzes the specified [FXMLType] and generates a stream of [ClassCount] objects.
     ///
-    /// The method handles various forms of [FXMLType], including class types,
-    /// generic types (both compiled and uncompiled), and wildcard types.
-    /// Depending on the specific `FXMLType`, it recursively processes nested type arguments if applicable,
-    /// combining the results to provide a consolidated count of class names.
-    ///
-    /// @param type The [FXMLType] to process. Must not be `null`.
-    /// @return A stream of [ClassCount] objects, representing the class names and their corresponding counts. If the input type does not represent valid classes (e.g., wildcard), the stream will be empty.
+    /// @param type The [FXMLType] to process
+    /// @return A stream of [ClassCount] objects
     private Stream<ClassCount> findFXMLTypeClassCounts(FXMLType type) {
         return (switch (type) {
             case FXMLClassType(Class<?> clazz) -> Stream.of(new ClassCount(clazz.getCanonicalName(), 1));
@@ -543,9 +454,9 @@ final class FXMLSourceCodeBuilderImportHelper {
 
     /// Checks if the given prefix is a prefix of the specified full class name.
     ///
-    /// @param fullClassName the full class name to check against, represented as a string with parts separated by dots.
-    /// @param prefix        the prefix to verify, represented as a string with parts separated by dots.
-    /// @return true if the prefix matches the beginning parts of the full class name; false otherwise.
+    /// @param fullClassName The full class name to check
+    /// @param prefix        The prefix to verify
+    /// @return `true` if the prefix matches; `false` otherwise
     private boolean isPrefix(String fullClassName, String prefix) {
         List<String> fullClassNameParts = splitClassName(fullClassName);
         List<String> prefixParts = splitClassName(prefix);
@@ -554,10 +465,10 @@ final class FXMLSourceCodeBuilderImportHelper {
                 .allMatch(i -> prefixParts.get(i).equals(fullClassNameParts.get(i)));
     }
 
-    /// Splits a fully qualified class name into its individual parts (packages and class name).
+    /// Splits a fully qualified class name into its individual parts.
     ///
-    /// @param className the fully qualified class name to be split, with parts separated by dots.
-    /// @return a list of strings where each element is a part of the class name, split by dots.
+    /// @param className The fully qualified class name to split
+    /// @return A list of parts
     private List<String> splitClassName(String className) {
         List<String> parts = new ArrayList<>();
         int lastDotIndex = -1;
@@ -574,8 +485,8 @@ final class FXMLSourceCodeBuilderImportHelper {
 
     /// Extracts the simple class name from a fully qualified class name.
     ///
-    /// @param className the fully qualified name of the class
-    /// @return the simple class name, or the original string if no package is present
+    /// @param className The fully qualified name of the class
+    /// @return The simple class name
     private String getSimpleClassName(String className) {
         int lastDotIndex = className.lastIndexOf('.');
         return lastDotIndex == -1 ? className : className.substring(lastDotIndex + 1);

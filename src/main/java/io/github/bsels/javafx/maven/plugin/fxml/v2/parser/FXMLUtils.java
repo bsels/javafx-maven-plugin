@@ -50,11 +50,11 @@ public final class FXMLUtils {
         // No instances needed
     }
 
-    /// Determines the raw type of the given [FXMLType] instance.
+    /// Determines the raw type of an [FXMLType] instance.
     ///
-    /// @param type the [FXMLType] instance whose raw type is to be identified
-    /// @return the raw [Class] type corresponding to the FXMLType instance; returns `Object.class` for unsupported or wildcard types
-    /// @throws NullPointerException if `type` is null
+    /// @param type The [FXMLType] instance
+    /// @return The raw [Class] type; returns `Object.class` for unsupported or wildcard types
+    /// @throws NullPointerException If `type` is null
     public static Class<?> findRawType(FXMLType type) throws NullPointerException {
         Objects.requireNonNull(type, "`type` must not be null");
         return findTypeInformation(
@@ -65,22 +65,16 @@ public final class FXMLUtils {
         );
     }
 
-    /// Determines the element type of the given [FXMLType] when it represents a [Collection].
+    /// Determines the element type of an [FXMLType] representing a [Collection].
     ///
-    /// The logic:
-    /// 1. For [FXMLWildcardType], [FXMLUncompiledClassType], and [FXMLUncompiledGenericType],
-    ///    returns `Object` as the element type.
-    /// 2. For [FXMLClassType], traverses the class hierarchy via [Utils#findCollectionValueTypeFromHierarchy(Class)] to find
-    ///    the [Collection] interface and extract the concrete element type from its type parameter,
-    ///    defaulting to `Object` if not found.
-    /// 3. For [FXMLGenericType], builds an initial type mapping from the class's own type parameters to the provided
-    ///    generic arguments, then traverses the full class hierarchy via [#resolveTypeMapping(Type, Map, Set)]
-    ///    to propagate type variable bindings down to the [Collection] interface's type parameter.
-    ///    The element type (`E`, at index 0 of [Collection]'s type parameters) is then looked up in the resolved mapping.
+    /// Logic:
+    /// 1. For [FXMLWildcardType], [FXMLUncompiledClassType], and [FXMLUncompiledGenericType], returns `Object`.
+    /// 2. For [FXMLClassType], traverses the hierarchy to find the element type.
+    /// 3. For [FXMLGenericType], builds a type mapping and traverses the hierarchy to resolve the element type.
     ///
-    /// @param type The [FXMLType] representing the collection type.
-    /// @return The [FXMLType] of the collection's element type, or `FXMLType.of(Object.class)` if it cannot be determined.
-    /// @throws NullPointerException if `type` is null
+    /// @param type The [FXMLType] representing the collection
+    /// @return The [FXMLType] of the collection's elements, or `Object` if undetermined
+    /// @throws NullPointerException If `type` is null
     public static FXMLType findCollectionValueType(FXMLType type) throws NullPointerException {
         Objects.requireNonNull(type, "`type` must not be null");
         return findTypeInformation(
@@ -97,23 +91,16 @@ public final class FXMLUtils {
         );
     }
 
-    /// Determines the key and value types of the given [FXMLType] when it represents a [Map].
+    /// Determines the key and value types of an [FXMLType] representing a [Map].
     ///
-    /// The logic:
-    /// 1. For [FXMLWildcardType], [FXMLUncompiledClassType], and [FXMLUncompiledGenericType],
-    ///    returns `Object` as both the key and value types.
-    /// 2. For [FXMLClassType], traverses the class hierarchy via [Utils#findMapKeyTypeFromHierarchy(Class)] and
-    ///    [Utils#findMapValueTypeFromHierarchy(Class)] to find the [Map] interface and extract the concrete key and
-    ///    value types from its type parameters, defaulting to `Object` if not found.
-    /// 3. For [FXMLGenericType], builds an initial type mapping from the class's own type parameters to the provided
-    ///    generic arguments, then traverses the full class hierarchy via [#resolveTypeMapping(Type, Map, Set)]
-    ///    to propagate type variable bindings down to the [Map] interface's type parameters.
-    ///    The key type (`K`, at index 0) and value type (`V`, at index 1) of [Map]'s type parameters are then
-    ///    looked up in the resolved mapping.
+    /// Logic:
+    /// 1. For [FXMLWildcardType], [FXMLUncompiledClassType], and [FXMLUncompiledGenericType], returns `Object` for both.
+    /// 2. For [FXMLClassType], traverses the hierarchy to find concrete key and value types.
+    /// 3. For [FXMLGenericType], builds a type mapping and traverses the hierarchy to resolve key and value types.
     ///
-    /// @param type The [FXMLType] representing the map type.
-    /// @return A [Map.Entry] where the key is the [FXMLType] of the map's key type and the value is the [FXMLType] of the map's value type, both defaulting to `FXMLType.of(Object.class)` if they cannot be determined.
-    /// @throws NullPointerException if `type` is null
+    /// @param type The [FXMLType] representing the map
+    /// @return A [Map.Entry] containing the key and value types, both defaulting to `Object` if undetermined
+    /// @throws NullPointerException If `type` is null
     public static Map.Entry<FXMLType, FXMLType> findMapKeyAndValueTypes(FXMLType type)
             throws NullPointerException {
         Objects.requireNonNull(type, "`type` must not be null");
@@ -138,17 +125,12 @@ public final class FXMLUtils {
         );
     }
 
-    /// Recursively resolves the type mapping for a given type and updates the mapping,
-    /// traversing the class hierarchy to propagate type variable bindings.
+    /// Recursively resolves the type mapping for a type and updates the mapping.
+    /// Traverses the class hierarchy to propagate type variable bindings.
     ///
-    /// The logic handles:
-    /// - [Class]: Recursively calls for superclass and interfaces.
-    /// - [ParameterizedType]: Maps actual type arguments to the raw class's type parameters.
-    /// It avoids infinite recursion by tracking visited types.
-    ///
-    /// @param type    The type to resolve.
-    /// @param mapping The mapping to update.
-    /// @param visited The set of visited types to avoid infinite recursion.
+    /// @param type    The type to resolve
+    /// @param mapping The mapping to update
+    /// @param visited The set of visited types to avoid infinite recursion
     public static void resolveTypeMapping(Type type, Map<String, FXMLType> mapping, Set<Type> visited) {
         if (type == null || type == Object.class || !visited.add(type)) {
             return;
@@ -195,36 +177,31 @@ public final class FXMLUtils {
         }
     }
 
-    /// Checks if the provided name is an invalid Java identifier.
+    /// Checks if the specified name is an invalid Java identifier.
     ///
-    /// @param name The name to check.
-    /// @return `true` if the name is invalid, `false` otherwise.
-    /// @throws NullPointerException if `name` is `null`.
+    /// @param name The name to check
+    /// @return `true` if the name is invalid; `false` otherwise
+    /// @throws NullPointerException If `name` is null
     public static boolean isInvalidIdentifierName(String name) {
         Objects.requireNonNull(name, "`name` must not be null");
         return !VALID_NAME_PATTERN.test(name);
     }
 
-    /// Checks whether the given class is or extends `javafx.event.EventHandler`.
+    /// Checks whether the specified class is or extends `javafx.event.EventHandler`.
     ///
-    /// @param clazz The class to check.
-    /// @return `true` if the class is assignable to `javafx.event.EventHandler`; `false` otherwise.
-    /// @throws NullPointerException if `clazz` is `null`.
+    /// @param clazz The class to check
+    /// @return `true` if assignable to `javafx.event.EventHandler`; `false` otherwise
+    /// @throws NullPointerException If `clazz` is null
     public static boolean isEventHandlerType(Class<?> clazz) throws NullPointerException {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         return EventHandler.class.isAssignableFrom(clazz);
     }
 
-    /// Checks whether the given class is a functional interface.
+    /// Checks whether the specified class is a functional interface.
     ///
-    /// The logic:
-    /// 1. Verifies the class is an interface.
-    /// 2. Checks for the [@FunctionalInterface] annotation.
-    /// 3. Alternatively, counts the number of abstract methods; if exactly one, it's considered a functional interface.
-    ///
-    /// @param clazz The class to check.
-    /// @return `true` if the class is a functional interface; `false` otherwise.
-    /// @throws NullPointerException if `clazz` is `null`.
+    /// @param clazz The class to check
+    /// @return `true` if a functional interface; `false` otherwise
+    /// @throws NullPointerException If `clazz` is null
     public static boolean isFunctionalInterface(Class<?> clazz) throws NullPointerException {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         if (!clazz.isInterface()) {
@@ -240,18 +217,13 @@ public final class FXMLUtils {
         return abstractMethodCount == 1;
     }
 
-    /// Resolves the [Type] of a constant field on the given class.
+    /// Resolves the [Type] of a constant field on the specified class.
     ///
-    /// The logic:
-    /// 1. Attempts to find a public field with the given name.
-    /// 2. Verifies that the field is static.
-    /// 3. Returns the field's generic type.
-    ///
-    /// @param clazz        The class defining the constant.
-    /// @param constantName The name of the constant field.
-    /// @return The [Type] of the constant field.
-    /// @throws IllegalArgumentException if the field does not exist or is not static.
-    /// @throws NullPointerException     if `clazz` or `constantName` is `null`.
+    /// @param clazz        The class defining the constant
+    /// @param constantName The name of the constant field
+    /// @return The [Type] of the constant field
+    /// @throws IllegalArgumentException If the field does not exist or is not static
+    /// @throws NullPointerException     If `clazz` or `constantName` is null
     public static Type resolveConstantType(Class<?> clazz, String constantName)
             throws IllegalArgumentException, NullPointerException {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
@@ -262,18 +234,13 @@ public final class FXMLUtils {
         );
     }
 
-    /// Finds the return type of the static factory method.
+    /// Finds the return type of a static factory method.
     ///
-    /// The logic searches for a static method on the given class that:
-    /// - Matches the provided `factoryMethodName`.
-    /// - Has no parameters.
-    /// - Is public and accessible.
-    ///
-    /// @param clazz             The class declaring the factory method.
-    /// @param factoryMethodName The name of the factory method.
-    /// @return The return [Type] of the factory method.
-    /// @throws IllegalArgumentException if the factory method cannot be found.
-    /// @throws NullPointerException     if either `clazz` or `factoryMethodName` is null.
+    /// @param clazz             The class declaring the factory method
+    /// @param factoryMethodName The name of the factory method
+    /// @return The return [Type] of the factory method
+    /// @throws IllegalArgumentException If the factory method cannot be found
+    /// @throws NullPointerException     If `clazz` or `factoryMethodName` is null
     public static Type findFactoryMethodReturnType(Class<?> clazz, String factoryMethodName)
             throws IllegalArgumentException, NullPointerException {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
@@ -284,14 +251,11 @@ public final class FXMLUtils {
         );
     }
 
-    /// Resolves the default property name for a class using the [DefaultProperty] annotation.
+    /// Resolves the default property name for a class.
     ///
-    /// The logic traverses the class hierarchy (including superclasses) to find the first
-    /// occurrence of the [DefaultProperty] annotation and returns its value.
-    ///
-    /// @param clazz The class to inspect for a [DefaultProperty] annotation.
-    /// @return The default property name if found, or an empty [Optional] if not found.
-    /// @throws NullPointerException if `clazz` is null.
+    /// @param clazz The class to inspect
+    /// @return An [Optional] containing the default property name
+    /// @throws NullPointerException If `clazz` is null
     public static Optional<String> resolveDefaultPropertyName(Class<?> clazz) throws NullPointerException {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         return CLASS_TO_DEFAULT_PROPERTY_NAME_CACHE.computeIfAbsent(
@@ -300,13 +264,11 @@ public final class FXMLUtils {
         );
     }
 
-    /// Determines if the given string has a non-skippable prefix.
+    /// Checks if the specified string has a non-skippable prefix.
     ///
-    /// The logic checks if the string starts with `fx:` or `xmlns`.
-    ///
-    /// @param key The string to check for skippable prefixes.
-    /// @return `true` if the string starts with a non skippable prefix; `false` otherwise.
-    /// @throws NullPointerException if `key` is null.
+    /// @param key The string to check
+    /// @return `true` if the string has a non-skippable prefix; `false` otherwise
+    /// @throws NullPointerException If `key` is null
     public static boolean hasNonSkippablePrefix(String key) throws NullPointerException {
         Objects.requireNonNull(key, "`key` must not be null");
         return !key.startsWith(FXMLConstants.FX_PREFIX) && !key.startsWith(FXMLConstants.XML_NAMESPACE_PREFIX);

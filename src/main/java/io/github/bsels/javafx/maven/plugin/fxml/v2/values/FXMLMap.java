@@ -13,15 +13,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/// Represents an FXML map structure, which consists of a type, an optional factory method,
-/// and a collection of key-value entries.
+/// An FXML map structure.
 ///
-/// @param identifier    The identifier of the map.
-/// @param type          The type of the map.
-/// @param rawKeyClass   The raw key class of the map.
-/// @param rawValueClass The raw value class of the map.
-/// @param factoryMethod The optional factory method.
-/// @param entries       A collection of key-value mappings representing the entries in the map.
+/// @param identifier    The identifier of the map
+/// @param type          The type of the map
+/// @param rawKeyClass   The raw key class of the map
+/// @param rawValueClass The raw value class of the map
+/// @param factoryMethod The optional factory method
+/// @param entries       The map entries
 public record FXMLMap(
         FXMLIdentifier identifier,
         FXMLType type,
@@ -31,15 +30,16 @@ public record FXMLMap(
         Map<FXMLLiteral, AbstractFXMLValue> entries
 ) implements AbstractFXMLValue, AbstractFXMLObject {
 
-    /// Compact constructor to validate the map components.
+    /// Initializes a new [FXMLMap] record instance.
     ///
-    /// @param identifier    The identifier of the map.
-    /// @param type          The type of the map.
-    /// @param rawKeyClass   The raw key class of the map.
-    /// @param rawValueClass The raw value class of the map.
-    /// @param factoryMethod The optional factory method name.
-    /// @param entries       The collection of entries.
-    /// @throws NullPointerException if `identifier`, `type`, `rawKeyClass`, `rawValueClass`, or `factoryMethod` is `null`.
+    /// @param identifier    The identifier of the map
+    /// @param type          The type of the map
+    /// @param rawKeyClass   The raw key class of the map
+    /// @param rawValueClass The raw value class of the map
+    /// @param factoryMethod The optional factory method
+    /// @param entries       The collection of entries
+    /// @throws NullPointerException     If any parameter is null
+    /// @throws IllegalArgumentException If `type` is not a [Map]
     public FXMLMap {
         Objects.requireNonNull(identifier, "`identifier` must not be null");
         Objects.requireNonNull(type, "`type` must not be null");

@@ -63,41 +63,34 @@ import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeB
 import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilder.INTERNAL_STRING_TO_URI_METHOD;
 import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilder.INTERNAL_STRING_TO_URL_METHOD;
 
-/// A helper class for handling [FXMLType]s and their conversion to Java source code.
-/// It provides methods for creating type mappings, encoding literals, and generating class names.
+/// Helper for handling [FXMLType]s and their conversion to Java source code.
+/// Provides methods for creating type mappings, encoding literals, and generating class names.
 final class FXMLSourceCodeBuilderTypeHelper {
     /// The [FXMLClassType] for [Object].
     private static final FXMLClassType OBJECT_TYPE = new FXMLClassType(Object.class);
     /// The [FXMLClassType] for [String].
     private static final FXMLClassType STRING_TYPE = new FXMLClassType(String.class);
 
-    /// A cache for storing and reusing [FXMLConstructor]s associated with a particular [Class].
-    /// This helps avoid repeated reflective lookups of constructors.
+    /// Cache for storing and reusing [FXMLConstructor]s associated with a [Class].
     private final Map<Class<?>, List<FXMLConstructor>> constructorCache;
-    /// A cache for storing and reusing [FXMLConstructor]s associated with a particular [FXMLFactoryMethod].
-    /// This helps avoid repeated reflective lookups of factory methods.
+    /// Cache for storing and reusing [FXMLConstructor]s associated with an [FXMLFactoryMethod].
     private final Map<FXMLFactoryMethod, List<FXMLConstructor>> factoryMethodCache;
 
-    /// Helper instance used for managing and resolving recursive property bindings when working with FXML.
-    /// This ensures proper handling of nested property structures and prevents infinite recursion during the binding
-    /// and lookup process.
+    /// Helper for managing and resolving recursive property bindings.
     private final FXMLPropertyRecursionHelper propertyRecursionHelper;
 
-    /// Constructs a new `FXMLSourceCodeBuilderTypeHelper` instance.
+    /// Initializes a new [FXMLSourceCodeBuilderTypeHelper] instance.
     FXMLSourceCodeBuilderTypeHelper() {
         this.propertyRecursionHelper = new FXMLPropertyRecursionHelper();
         this.constructorCache = new HashMap<>();
         this.factoryMethodCache = new HashMap<>();
     }
 
-    /// Returns the default value of a given [FXMLType] as a string representation.
-    /// For primitive types,
-    /// the method returns their zero-equivalent value (e.g., `0` for integers, `false` for booleans).
-    /// For non-primitive types, the method returns `"null"`.
+    /// Returns the default value of an [FXMLType] as a string representation.
     ///
-    /// @param type the [FXMLType] whose default value is to be determined
-    /// @return a string representation of the default value corresponding to the given [FXMLType]
-    /// @throws NullPointerException if `type` is null
+    /// @param type The [FXMLType] whose default value is to be determined.
+    /// @return A string representation of the default value corresponding to the [FXMLType].
+    /// @throws NullPointerException If `type` is null.
     public String defaultTypeValue(FXMLType type) throws NullPointerException {
         Objects.requireNonNull(type, "`type` must not be null");
         Class<?> rawClass = FXMLUtils.findRawType(type);
@@ -128,11 +121,11 @@ final class FXMLSourceCodeBuilderTypeHelper {
         return "null";
     }
 
-    /// Creates a mapping from FXML identifiers to their corresponding [FXMLType]s for the given document.
+    /// Creates a mapping from FXML identifiers to their corresponding [FXMLType]s for the specified document.
     ///
     /// @param document The [FXMLDocument] to process.
     /// @return A map associating FXML identifiers with their resolved types.
-    /// @throws NullPointerException if `document` is null
+    /// @throws NullPointerException If `document` is null.
     public Map<String, FXMLType> createIdentifierToTypeMap(FXMLDocument document) throws NullPointerException {
         Objects.requireNonNull(document, "`document` must not be null");
         Map<String, Wrapper> identifierTypeMap = Stream.concat(

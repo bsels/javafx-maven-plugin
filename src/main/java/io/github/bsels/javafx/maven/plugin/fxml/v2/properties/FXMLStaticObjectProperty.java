@@ -6,13 +6,13 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 
 import java.util.Objects;
 
-/// Represents a static (attached) FXML property that has a single value.
+/// A static (attached) FXML property that has a single value.
 ///
-/// @param name   The property name.
-/// @param clazz  The class defining the static property.
-/// @param setter The name of the static setter method.
-/// @param type   The property type.
-/// @param value  The property value.
+/// @param name   The property name
+/// @param clazz  The class defining the static property
+/// @param setter The name of the static setter method
+/// @param type   The property type
+/// @param value  The property value
 public record FXMLStaticObjectProperty(
         String name,
         FXMLClassType clazz,
@@ -21,14 +21,14 @@ public record FXMLStaticObjectProperty(
         AbstractFXMLValue value
 ) implements FXMLProperty {
 
-    /// Compact constructor to validate the static property components.
+    /// Initializes a new [FXMLStaticObjectProperty] record instance.
     ///
-    /// @param name   The property name.
-    /// @param clazz  The class defining the static property.
-    /// @param setter The name of the static setter method.
-    /// @param type   The property type.
-    /// @param value  The property value.
-    /// @throws NullPointerException if `name`, `clazz`, `setter`, `type`, or `value` is `null`.
+    /// @param name   The property name
+    /// @param clazz  The class defining the static property
+    /// @param setter The name of the static setter method
+    /// @param type   The property type
+    /// @param value  The property value
+    /// @throws NullPointerException If any parameter is null
     public FXMLStaticObjectProperty {
         Objects.requireNonNull(name, "`name` must not be null");
         Objects.requireNonNull(clazz, "`clazz` must not be null");

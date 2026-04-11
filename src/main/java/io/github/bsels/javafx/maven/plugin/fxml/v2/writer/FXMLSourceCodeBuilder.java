@@ -63,25 +63,25 @@ import java.util.stream.Stream;
 /// This class handles the conversion of FXML elements, properties, and values into a corresponding Java class
 /// that can be instantiated to create the defined object graph.
 public final class FXMLSourceCodeBuilder {
-    /// Internal constant for the controller field name.
+    /// Internal controller field name.
     static final String INTERNAL_CONTROLLER_FIELD = "$internalField$controller$";
-    /// Internal constant for the resource bundle field name.
+    /// Internal resource bundle field name.
     static final String INTERNAL_RESOURCE_BUNDLE = "$INTERNAL$RESOURCE$BUNDLE$";
-    /// Internal constant for the string-to-file conversion method name.
+    /// Internal string-to-file conversion method name.
     static final String INTERNAL_STRING_TO_FILE_METHOD = "$internalMethod$stringToFile$";
-    /// Internal constant for the string-to-path conversion method name.
+    /// Internal string-to-path conversion method name.
     static final String INTERNAL_STRING_TO_PATH_METHOD = "$internalMethod$stringToPath$";
-    /// Internal constant for the string-to-uri conversion method name.
+    /// Internal string-to-uri conversion method name.
     static final String INTERNAL_STRING_TO_URI_METHOD = "$internalMethod$stringToURI$";
-    /// Internal constant for the string-to-url conversion method name.
+    /// Internal string-to-url conversion method name.
     static final String INTERNAL_STRING_TO_URL_METHOD = "$internalMethod$stringToURL$";
-    /// Internal constant for constructor variable prefix.
+    /// Internal constructor variable prefix.
     private static final String CONSTRUCTOR_VARIABLE_PREFIX = "$$";
     /// A set of Java primitive types.
     private static final Set<String> PRIMITIVE_TYPES = Set.of(
             "boolean", "byte", "char", "short", "int", "long", "float", "double", "void"
     );
-    /// The method body for internal string-to-file conversion.
+    /// Internal string-to-file conversion method body.
     private static final String INTERNAL_STRING_TO_FILE_METHOD_BODY = """
             private java.io.File %s(String value) {
                 try {
@@ -95,7 +95,7 @@ public final class FXMLSourceCodeBuilder {
                 }
             }
             """.formatted(INTERNAL_STRING_TO_FILE_METHOD);
-    /// The method body for internal string-to-path conversion.
+    /// Internal string-to-path conversion method body.
     private static final String INTERNAL_STRING_TO_PATH_METHOD_BODY = """
             private java.nio.file.Path %s(String value) {
                 try {
@@ -109,7 +109,7 @@ public final class FXMLSourceCodeBuilder {
                 }
             }
             """.formatted(INTERNAL_STRING_TO_PATH_METHOD);
-    /// The method body for internal string-to-URI conversion.
+    /// Internal string-to-URI conversion method body.
     private static final String INTERNAL_STRING_TO_URI_METHOD_BODY = """
             private java.net.URI %s(String value) {
                 try {
@@ -121,7 +121,7 @@ public final class FXMLSourceCodeBuilder {
                 }
             }
             """.formatted(INTERNAL_STRING_TO_URI_METHOD);
-    /// The method body for internal string-to-URL conversion.
+    /// Internal string-to-URL conversion method body.
     private static final String INTERNAL_STRING_TO_URL_METHOD_BODY = """
             private java.net.URL %s(String value) {
                 return java.util.Objects.requireNonNull(
@@ -130,9 +130,9 @@ public final class FXMLSourceCodeBuilder {
                 );
             }
             """.formatted(INTERNAL_STRING_TO_URL_METHOD);
-    /// The controller suffix for FXML exposed identifiers.
+    /// Controller suffix for FXML exposed identifiers.
     private static final String CONTROLLER_SUFFIX = "Controller";
-    /// The logger for outputting generation information and debugging messages.
+    /// Logger for outputting generation information and debugging messages.
     private final Log log;
     /// Helper for managing and adding imports to the generated source code.
     private final FXMLSourceCodeBuilderImportHelper builderImportHelper;
@@ -140,16 +140,15 @@ public final class FXMLSourceCodeBuilder {
     private final FXMLSourceCodeBuilderTypeHelper typeHelper;
     /// Flag indicating whether the `@Generated` annotation should be added.
     private final boolean addGeneratedAnnotation;
-    /// The time at which the build started, used for the `@Generated` annotation.
+    /// Build start time, used for the `@Generated` annotation.
     private final ZonedDateTime buildTime;
-    /// The default resource bundle to use for translations.
+    /// Default resource bundle to use for translations.
     private final String defaultResourceBundle;
-    /// Helper instance used for managing and resolving recursive property bindings when working with FXML.
-    /// This ensures proper handling of nested property structures and prevents infinite recursion during the binding
-    /// and lookup process.
+    /// Helper instance for managing and resolving recursive property bindings.
+    /// Ensures proper handling of nested property structures and prevents infinite recursion.
     private final FXMLPropertyRecursionHelper propertyRecursionHelper;
 
-    /// Constructs a new `FXMLSourceCodeBuilder`.
+    /// Initializes a new [FXMLSourceCodeBuilder] instance.
     ///
     /// @param log                    The Maven plugin logger.
     /// @param defaultResourceBundle  The default resource bundle to use for translations.
@@ -169,7 +168,7 @@ public final class FXMLSourceCodeBuilder {
         this.buildTime = ZonedDateTime.now(ZoneOffset.UTC);
     }
 
-    /// Generates the Java source code for the given [FXMLDocument].
+    /// Generates the Java source code for the specified [FXMLDocument].
     ///
     /// @param document    The [FXMLDocument] to process.
     /// @param packageName The package name for the generated class.
@@ -190,9 +189,9 @@ public final class FXMLSourceCodeBuilder {
         return internalGenerateSourceCode(document, context, true);
     }
 
-    /// Internal method to generate source code, allowing for recursive processing of nested FXML documents.
+    /// Generates source code internally, allowing for recursive processing of nested FXML documents.
     ///
-    /// @param document       The [FXMLDocument] being processed.
+    /// @param document       The [FXMLDocument] to process.
     /// @param context        The current [SourceCodeGeneratorContext].
     /// @param isRootDocument Whether this is the root FXML document or an included one.
     /// @return The generated Java source code.
@@ -982,12 +981,11 @@ public final class FXMLSourceCodeBuilder {
         };
     }
 
-    /// Adds methods to the source code being generated for the given FXML document.
-    /// This method processes the root node of the document as well as its definitions to generate the corresponding
-    /// methods in the source code.
+    /// Adds methods to the source code being generated for the given [FXMLDocument].
+    /// Processes the root node of the document as well as its definitions.
     ///
-    /// @param document The FXML document being processed.
-    /// @param context  The context for the source code generation, providing access to utilities and the code builder.
+    /// @param document The [FXMLDocument] to process.
+    /// @param context  The [SourceCodeGeneratorContext].
     private void addMethods(FXMLDocument document, SourceCodeGeneratorContext context) {
         List<FXMLInterface> interfaces = document.interfaces();
         FXMLController controller = document.controller()
@@ -1001,14 +999,13 @@ public final class FXMLSourceCodeBuilder {
                 .append('\n');
     }
 
-    /// Adds methods or processes FXML values recursively by traversing different types of FXML value structures,
-    /// generating a stream of result strings depending on the specific type.
+    /// Adds methods or processes FXML values recursively by traversing FXML structures.
     ///
-    /// @param value      the FXML value to process. This can be an FXML collection, map, object, method, or other FXML-related value types.
-    /// @param context    the source code generator context that provides context-specific utilities needed for processing values.
-    /// @param controller the FXML controller instance associated with the current operation, which may influence how methods are added or processed.
-    /// @param interfaces the list of FXML interfaces to consider when generating method source code.
-    /// @return a stream of strings derived from rendering methods or processing specific FXML value types. If no actionable methods or values are found, an empty stream is returned.
+    /// @param value      The FXML value to process
+    /// @param context    The generator context
+    /// @param controller The FXML controller instance
+    /// @param interfaces The list of FXML interfaces
+    /// @return A stream of rendered method strings
     private Stream<String> addMethods(
             AbstractFXMLValue value,
             SourceCodeGeneratorContext context,

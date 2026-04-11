@@ -18,81 +18,35 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/// Executes a Maven goal to run a JavaFX application.
-/// This class extends the functionality of the base JavaFX Mojo, providing the capability
-/// to execute a JavaFX application during a Maven build lifecycle. The goal is configured
-/// to execute during the `process-classes` lifecycle phase and requires runtime dependency
-/// resolution.
-/// The class is responsible for validating configurations, constructing the execution
-/// command, and launching the JavaFX application using the specified executable. It
-/// ensures that the working directory is properly set and utilizes system environment
-/// variables during process execution. The goal execution process is logged at various
-/// stages to provide feedback on its operation.
-/// Key operations include:
-/// - Verifying mandatory configurations such as the JavaFX executable and base directory.
-/// - Preparing the execution environment, including resolving required paths.
-/// - Constructing the command for launching the JavaFX application.
-/// - Launching and managing the execution of the process.
-/// - Handling execution-related exceptions.
+/// Mojo for running a JavaFX application.
 @Mojo(name = "run", requiresDependencyResolution = ResolutionScope.RUNTIME)
 @Execute(phase = LifecyclePhase.PROCESS_CLASSES)
 public final class JavaFXRunMojo extends BaseJavaFXMojo {
 
-    /// Specifies the executable to be used for running the JavaFX application.
-    /// This variable holds the name or path of the executable (e.g., "java").
-    /// It is a required field and defaults to "java" if not explicitly configured.
-    /// The value for this variable can be defined in the Maven build configuration
-    /// using the property `javafx.executable`.
-    /// This property is used in constructing the command for executing the JavaFX application.
+    /// Executable to use for running the application.
     @Parameter(property = "javafx.executable", defaultValue = "java", required = true)
     String executable;
 
-    /// Indicates whether debugging mode is enabled for the JavaFX application.
-    /// This variable is a Maven parameter that can be configured using the `javafx.debug` property.
-    /// When set to `true`, it is expected to enable detailed debugging information
-    /// or related behavior to assist with diagnosing issues during application runtime.
-    /// The default value is `false`, and this parameter is mandatory.
+    /// Whether to enable debugging mode.
     @Parameter(property = "javafx.attachDebugger", defaultValue = "false")
     boolean attachDebugger;
 
-    /// Represents the port used for debugging purposes when running a JavaFX application.
-    /// This allows developers to attach a debugger to the application by connecting to
-    /// the specified port. By default, the port is set to 5005 but can be overridden via
-    /// the `javafx.debuggerPort` property.
-    /// The debugger port is useful for diagnosing and resolving issues during the
-    /// development and testing phases of JavaFX applications.
-    /// Property: `javafx.debuggerPort`
-    /// Default Value: `5005`
+    /// Port used for debugging.
     @Parameter(property = "javafx.debuggerPort", defaultValue = "5005")
     int debuggerPort = 5005;
 
-    /// Constructs a new instance of `JavaFXRunMojo`.
+    /// Initializes a new [JavaFXRunMojo] instance.
     ///
-    /// @param locationManager  the `LocationManager` instance responsible for locating and managing paths and resources.
-    /// @param toolchainManager the `ToolchainManager` instance responsible for managing and resolving toolchains.
+    /// @param locationManager  The manager for paths and resources
+    /// @param toolchainManager The manager for toolchains
     @Inject
     public JavaFXRunMojo(LocationManager locationManager, ToolchainManager toolchainManager) {
         super(locationManager, toolchainManager);
     }
 
-    /// Executes the main logic for running a JavaFX application using Maven.
-    /// This method performs several tasks:
-    /// 1. Skips execution if the "skip" flag is set to true.
-    /// 2. Validates that mandatory configurations, such as the JavaFX executable
-    ///    and base directory, are properly defined. Throws a [MojoExecutionException]
-    ///    if any required configuration is missing.
-    /// 3. Initializes the environment and resolves necessary paths by calling the `init` method.
-    /// 4. Configures the working directory using the `handleWorkingDirectory` method,
-    ///    ensuring that the directory exists.
-    /// 5. Constructs the command to execute the JavaFX application by invoking `getCommand`.
-    /// 6. Starts the constructed command using a [ProcessBuilder], inheriting the current
-    ///    I/O streams and configuring system environment variables.
-    /// 7. Waits for the process to complete and handles any exceptions that may occur
-    ///    during the execution.
-    /// Log messages are generated to provide feedback throughout the execution process,
-    /// detailing the status of key actions, configurations, and errors if they occur.
+    /// Executes the mojo to run the JavaFX application.
     ///
-    /// @throws MojoExecutionException if there is an error during validation, initialization, handling of the working directory, or execution of the process.
+    /// @throws MojoExecutionException If an error occurs during execution
     @Override
     public void execute() throws MojoExecutionException {
         if (skip) {
@@ -131,15 +85,9 @@ public final class JavaFXRunMojo extends BaseJavaFXMojo {
         }
     }
 
-    /// Generates and returns a command list for executing a JavaFX application.
-    /// The command includes the executable, optional arguments, module path elements,
-    /// classpath elements, the main class, and any additional command-line arguments.
-    /// The method constructs the list by conditionally appending various components
-    /// based on their availability and relevance. If optional arguments, module path
-    /// elements, or command-line arguments are non-empty, they are processed and added
-    /// accordingly.
+    /// Constructs the command list for running the application.
     ///
-    /// @return a list of strings representing the complete command to execute the JavaFX application.
+    /// @return A list of command arguments
     private List<String> getJavaRunCommand() {
         List<String> command = new ArrayList<>(getExecutable(executable));
         if (!isEmpty(loggingFormat)) {

@@ -2,16 +2,16 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
 import java.util.Objects;
 
-/// Represents an FXML resource (e.g., using @resourcePath).
+/// An FXML resource (e.g., using `@resourcePath`).
 ///
-/// @param path The relative path to the resource according to the resources root (single /).
+/// @param path The relative path to the resource
 public record FXMLResource(String path) implements AbstractFXMLValue {
 
-    /// Compact constructor to validate the resource path.
+    /// Initializes a new [FXMLResource] record instance.
     ///
-    /// @param path The relative path to the resource according to the resources root (single /).
-    /// @throws NullPointerException     if `path` is `null`.
-    /// @throws IllegalArgumentException if `path` is blank.
+    /// @param path The relative path to the resource
+    /// @throws NullPointerException     If `path` is null
+    /// @throws IllegalArgumentException If `path` is blank
     public FXMLResource {
         Objects.requireNonNull(path, "`path` must not be null");
         if (path.isBlank()) {

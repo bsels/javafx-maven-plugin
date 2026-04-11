@@ -11,17 +11,15 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/// Holds the state and context during the FXML document building process.
+/// Holds state and context during the FXML document building process.
+/// Maintains internal state such as identifier counter, imports, definitions, scripts, and the resource path.
 ///
-/// This record maintains the internal state such as identifier counter, imports,
-/// definitions, scripts, and the resource path during the parsing process.
-///
-/// @param internalCounter The counter for generating internal identifiers.
-/// @param imports         The list of imports.
-/// @param definitions     The list of definitions.
-/// @param scripts         The list of scripts.
-/// @param typeMapping     The map for resolving type variables.
-/// @param resourcePath    The path of the FXML file relative to the resources folder root. A single `/` denotes the root of the resource directory.
+/// @param internalCounter The counter for generating internal identifiers
+/// @param imports         The list of imports
+/// @param definitions     The list of definitions
+/// @param scripts         The list of scripts
+/// @param typeMapping     The map for resolving type variables
+/// @param resourcePath    The path of the FXML file relative to the resources folder root
 record BuildContext(
         AtomicInteger internalCounter,
         List<String> imports,
@@ -31,17 +29,15 @@ record BuildContext(
         String resourcePath
 ) {
 
-    /// Compact constructor to validate the build context components.
+    /// Initializes a new [BuildContext] record instance.
     ///
-    /// The logic ensures that all components of the build context are not `null`.
-    ///
-    /// @param internalCounter The counter for generating internal identifiers.
-    /// @param imports         The list of imports.
-    /// @param definitions     The list of definitions.
-    /// @param scripts         The list of scripts.
-    /// @param typeMapping     The map for resolving type variables.
-    /// @param resourcePath    The path of the FXML file relative to the resources folder root.
-    /// @throws NullPointerException if any parameter is `null`.
+    /// @param internalCounter The counter for generating internal identifiers
+    /// @param imports         The list of imports
+    /// @param definitions     The list of definitions
+    /// @param scripts         The list of scripts
+    /// @param typeMapping     The map for resolving type variables
+    /// @param resourcePath    The path of the FXML file relative to the resources folder root
+    /// @throws NullPointerException If any parameter is null
     public BuildContext {
         Objects.requireNonNull(internalCounter, "`internalCounter` must not be null");
         Objects.requireNonNull(imports, "`imports` must not be null");
@@ -52,12 +48,10 @@ record BuildContext(
         resourcePath = resourcePath.endsWith("/") ? resourcePath : resourcePath + "/";
     }
 
-    /// Constructs a new build context with the provided imports and resource path.
+    /// Initializes a new [BuildContext] instance with the provided imports and resource path.
     ///
-    /// The logic initializes a new build context with default empty lists and a new atomic counter.
-    ///
-    /// @param imports      The list of imports.
-    /// @param resourcePath The path of the FXML file relative to the resources folder root. A single `/` denotes the root of the resource directory.
+    /// @param imports      The list of imports
+    /// @param resourcePath The path of the FXML file relative to the resources folder root
     public BuildContext(List<String> imports, String resourcePath) {
         this(
                 new AtomicInteger(),
@@ -69,14 +63,12 @@ record BuildContext(
         );
     }
 
-    /// Constructs a new `BuildContext` by copying the properties of an existing `BuildContext`
+    /// Initializes a new [BuildContext] by copying the properties of an existing [BuildContext]
     /// and replacing the `typeMapping` with the provided mapping.
     ///
-    /// The logic performs a shallow copy of the other fields from the `original` context.
-    ///
-    /// @param original    The original `BuildContext` instance.
-    /// @param typeMapping The new map for resolving type variables.
-    /// @throws NullPointerException if `original` or `typeMapping` is `null`.
+    /// @param original    The original [BuildContext] instance
+    /// @param typeMapping The new map for resolving type variables
+    /// @throws NullPointerException If `original` or `typeMapping` is null
     public BuildContext(
             BuildContext original,
             Map<String, FXMLType> typeMapping
@@ -93,11 +85,9 @@ record BuildContext(
         );
     }
 
-    /// Generates the next internal identifier for tracking purposes.
+    /// Generates the next internal identifier.
     ///
-    /// The logic increments the internal atomic counter and returns the value.
-    ///
-    /// @return The next incremental identifier as an integer.
+    /// @return The next incremental identifier
     int nextInternalId() {
         return internalCounter.getAndIncrement();
     }

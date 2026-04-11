@@ -24,50 +24,20 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/// The [OptimisticInMemoryCompiler] class facilitates the in-memory compilation of Java source files.
-/// It performs iterative compilation, filtering out files with errors to allow partial success,
-/// and optionally supports defining successfully compiled classes into a specified class loader.
+/// Facilitates in-memory compilation of Java source files.
+/// Performs iterative compilation, filtering out files with errors to allow partial success.
 public final class OptimisticInMemoryCompiler {
-    /// Represents the file name "module-info.java" as a constant.
-    /// This constant is used to identify and exclude module descriptor files during the in-memory compilation process
-    /// performed by the [OptimisticInMemoryCompiler] class.
-    /// Files named "module-info.java" are not considered for compilation, as they serve a specific purpose in the
-    /// module system and are not standard Java class files.
+    /// Constant for "module-info.java".
     private static final String MODULE_INFO_JAVA = "module-info.java";
-    /// A constant representing the special Java source file "package-info.java".
-    /// This file is typically used to provide package-level annotations and documentation in Java projects.
-    ///
-    /// Within the context of the `OptimisticInMemoryCompiler` class, files with this name are specifically excluded
-    /// from the in-memory compilation process because they do not contain class definitions that can be compiled into
-    /// executable bytecode.
+    /// Constant for "package-info.java".
     private static final String PACKAGE_INFO_JAVA = "package-info.java";
 
-    /// A collection of options that may influence the behavior of the in-memory compilation process.
-    ///
-    /// This list contains strings representing various configuration options
-    /// or compiler arguments that can be applied during the compilation of Java source files.
-    /// These options are passed to the underlying Java compiler and may include flags, optimization settings,
-    /// or other compiler-specific parameters.
-    ///
-    /// The options do not include file-specific or error-related filters,
-    /// as those are handled separately within the compilation workflow.
-    /// It is intended to be immutable and is initialized during the creation of an [OptimisticInMemoryCompiler] instance.
+    /// Compiler options.
     private final List<String> options;
 
-    /// Constructs a new instance of [OptimisticInMemoryCompiler].
+    /// Initializes a new [OptimisticInMemoryCompiler] instance.
     ///
-    /// This class facilitates the compilation of Java source files using an in-memory approach.
-    /// It supports iterative compilation of source files, filtering out files with compilation errors until
-    /// all possible files are successfully compiled or no further files can be processed.
-    ///
-    /// By using this compiler, users can dynamically compile Java source files
-    /// and optionally load the compiled classes into a class loader at runtime.
-    /// The in-memory compilation process excludes files named "module-info.java"
-    /// and "package-info.java" from consideration.
-    ///
-    /// This constructor initializes the compiler without additional configuration.
-    ///
-    /// @param classpath The classpath that needs to be added to the compiler
+    /// @param classpath The classpath to use for compilation
     public OptimisticInMemoryCompiler(List<URL> classpath) {
         classpath = Objects.requireNonNullElseGet(classpath, List::of);
         super();
@@ -81,15 +51,13 @@ public final class OptimisticInMemoryCompiler {
         }
     }
 
-    /// Attempts to compile Java source files located in the specified source folders using
-    /// an in-memory compilation approach.
-    /// The method iterates through the compilation process and filters out files with compilation errors,
-    /// until either all files are successfully compiled or no compilable files remain.
+    /// Compiles Java source files in the specified folders in memory.
+    /// Filters out files with errors until either all files compile or no compilable files remain.
     ///
-    /// @param logger        the logger to use for logging compilation progress and errors. Must not be null.
-    /// @param sourceFolders a list of paths representing the directories containing Java source files to be compiled. Each folder in the list is scanned for `.java` files, excluding files named "module-info.java" or "package-info.java". Must not be null or empty.
-    /// @return a map where the keys are the fully qualified names of the successfully compiled classes, and the values are their corresponding `InMemoryCompiledClass` instances containing the compiled bytecode, or an empty map if no files were successfully compiled.
-    /// @throws IOException if an I/O error occurs while accessing the source folders or their contents.
+    /// @param logger        The logger instance
+    /// @param sourceFolders The directories containing Java source files
+    /// @return A map of fully qualified class names to [InMemoryCompiledClass] instances
+    /// @throws IOException If an I/O error occurs
     public Map<String, InMemoryCompiledClass> optimisticCompile(Log logger, List<Path> sourceFolders) throws IOException {
         Objects.requireNonNull(logger, "`logger` cannot be null");
         if (sourceFolders == null || sourceFolders.isEmpty()) {
@@ -126,26 +94,22 @@ public final class OptimisticInMemoryCompiler {
         }
     }
 
-    /// Attempts to compile Java source files from the specified source directories using an in-memory compilation
-    /// strategy and returns a function that, when invoked with a class loader, defines the compiled classes into it.
-    /// This method compiles source files iteratively, removing files with errors until all compilable files
-    /// are successfully processed or no further files can be compiled.
+    /// Compiles Java source files and returns a function to define them in a [ClassLoader].
     ///
-    /// @param logger        the logger to use for logging compilation progress and errors. Must not be null.
-    /// @param sourceFolders a list of paths representing the source directories containing Java source files to be compiled. Each directory is scanned for `.java` files, excluding "module-info.java" and "package-info.java". Must not be null or empty.
-    /// @return a unary operator that takes a class loader, defines the compiled classes into it, and returns the updated class loader.
-    /// @throws IOException if an I/O error occurs while accessing the source directories or processing their contents.
+    /// @param logger        The logger instance
+    /// @param sourceFolders The directories containing Java source files
+    /// @return A function that defines the compiled classes into a [ClassLoader]
+    /// @throws IOException If an I/O error occurs
     public UnaryOperator<ClassLoader> optimisticCompileIntoClassLoader(Log logger, List<Path> sourceFolders) throws IOException {
         Map<String, InMemoryCompiledClass> compiledClasses = optimisticCompile(logger, sourceFolders);
         return classLoader -> new InMemoryClassLoader(compiledClasses, classLoader);
     }
 
-    /// Extracts and returns a set of file paths corresponding to diagnostics with an error or other severe kind.
-    /// Filters diagnostics to include only those of kind ERROR or OTHER, and maps their sources to file paths.
+    /// Extracts file paths from diagnostics with an error or other severe kind.
     ///
-    /// @param logger      the logger to use for logging diagnostics. Must not be null.
-    /// @param diagnostics a `DiagnosticCollector<JavaFileObject>` instance that contains the diagnostic information of a compilation process. Must not be null. Each diagnostic may provide details such as its severity and the associated source file.
-    /// @return a `Set<Path>` containing the file paths of source files associated with error or other severe diagnostics. Returns an empty set if there are no such diagnostics or if their sources are unavailable.
+    /// @param logger      The logger instance
+    /// @param diagnostics The diagnostic information
+    /// @return A set of source file paths with errors
     private Set<Path> getFailedFilesFromDiagnostics(Log logger, DiagnosticCollector<JavaFileObject> diagnostics) {
         return diagnostics.getDiagnostics()
                 .stream()
@@ -160,13 +124,11 @@ public final class OptimisticInMemoryCompiler {
                 .collect(Collectors.toSet());
     }
 
-    /// Scans the specified source folders for Java source files and returns a list of file paths.
-    /// Only regular files with a `.java` extension are included,
-    /// excluding files named "module-info.java" and "package-info.java".
+    /// Scans the specified folders for Java source files.
     ///
-    /// @param sourceFolders a list of paths representing the source folders to scan for source files. This list must not be null, but individual folders within the list may be empty.
-    /// @return a list of `Path` objects representing the discovered source files that meet the criteria (e.g., `.java` files excluding "module-info.java" and "package-info.java").
-    /// @throws IOException if an I/O error occurs while accessing any of the source folders or traversing their contents.
+    /// @param sourceFolders The folders to scan
+    /// @return A list of paths to `.java` files
+    /// @throws IOException If an I/O error occurs
     private List<Path> getSourceFiles(List<Path> sourceFolders) throws IOException {
         List<Path> sourceFilesGrouped = new ArrayList<>();
         for (Path sourceFolder : sourceFolders) {

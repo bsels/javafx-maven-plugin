@@ -14,12 +14,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/// Represents a collection of FXML values.
+/// A collection of FXML values.
 ///
-/// @param identifier    The unique identifier associated with this FXML collection.
-/// @param type          The class type of the values stored in this collection. It may be an [FXMLClassType], [FXMLGenericType], or [FXMLUncompiledGenericType].
-/// @param factoryMethod An optional factory method used for instantiation.
-/// @param values        The collection of values.
+/// @param identifier    The unique identifier associated with this FXML collection
+/// @param type          The type of the collection
+/// @param factoryMethod An optional factory method
+/// @param values        The list of values
 public record FXMLCollection(
         FXMLIdentifier identifier,
         FXMLType type,
@@ -27,13 +27,14 @@ public record FXMLCollection(
         List<AbstractFXMLValue> values
 ) implements AbstractFXMLValue, AbstractFXMLObject {
 
-    /// Compact constructor to validate the identifier, type, factory method, and values.
+    /// Initializes a new [FXMLCollection] record instance.
     ///
-    /// @param identifier    The unique identifier associated with this FXML collection.
-    /// @param type          The class type of the values stored in this collection.
-    /// @param factoryMethod An optional factory method used for instantiation.
-    /// @param values        The collection of values.
-    /// @throws NullPointerException if `identifier`, `type`, `factoryMethod`, or `values` is `null`.
+    /// @param identifier    The unique identifier associated with this FXML collection
+    /// @param type          The type of the collection
+    /// @param factoryMethod An optional factory method
+    /// @param values        The list of values
+    /// @throws NullPointerException     If any parameter is null
+    /// @throws IllegalArgumentException If `type` is not a [Collection]
     public FXMLCollection {
         Objects.requireNonNull(identifier, "`identifier` must not be null");
         Objects.requireNonNull(type, "`type` must not be null");

@@ -13,18 +13,18 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/// Represents the context used during Java source code generation for an FXML document.
-/// It maintains the generated source code parts, imports, features, and other necessary metadata.
+/// Context used during Java source code generation for an FXML document.
+/// Maintains the generated source code parts, imports, features, and other necessary metadata.
 ///
-/// @param sourceCode          A map containing `StringBuilder` instances for each [SourcePart].
-/// @param resourceBundle      The resource bundle expression used for translations.
-/// @param imports             The [Imports] needed for the generated source code.
-/// @param fieldDefinitions    A list of field definition strings.
-/// @param features            A set of [Feature]s identified as necessary for the generated code.
-/// @param identifierToTypeMap A map from FXML identifiers to their corresponding [FXMLType]s.
-/// @param seenNestedFXMLFiles A set of paths to FXML files that have already been processed as nested `includes`.
-/// @param seenFXMLMethods     A set of FXML methods that have already been processed.
-/// @param packageName         The package name for the generated Java class.
+/// @param sourceCode          Map containing `StringBuilder` instances for each [SourcePart]
+/// @param resourceBundle      The resource bundle expression used for translations
+/// @param imports             The [Imports] needed for the generated source code
+/// @param fieldDefinitions    List of field definition strings
+/// @param features            Set of [Feature]s identified as necessary for the generated code
+/// @param identifierToTypeMap Map from FXML identifiers to their corresponding [FXMLType]s
+/// @param seenNestedFXMLFiles Set of paths to FXML files already processed as nested `includes`
+/// @param seenFXMLMethods     Set of FXML methods already processed
+/// @param packageName         The package name for the generated Java class
 record SourceCodeGeneratorContext(
         Map<SourcePart, StringBuilder> sourceCode,
         String resourceBundle,
@@ -37,18 +37,18 @@ record SourceCodeGeneratorContext(
         Optional<String> packageName
 ) {
 
-    /// Constructs a `SourceCodeGeneratorContext` and validates that all parameters are non-null.
+    /// Initializes a new [SourceCodeGeneratorContext] instance.
     ///
-    /// @param sourceCode          A map containing `StringBuilder` instances for each [SourcePart].
-    /// @param resourceBundle      The resource bundle expression used for translations.
-    /// @param imports             The [Imports] needed for the generated source code.
-    /// @param fieldDefinitions    A list of field definition strings.
-    /// @param features            A set of [Feature]s identified as necessary for the generated code.
-    /// @param identifierToTypeMap A map from FXML identifiers to their corresponding [FXMLType]s.
-    /// @param seenNestedFXMLFiles A set of paths to FXML files that have already been processed as nested `includes`.
-    /// @param seenFXMLMethods     A set of FXML methods that have already been processed.
-    /// @param packageName         The package name for the generated Java class.
-    /// @throws NullPointerException If any of the parameters is null.
+    /// @param sourceCode          Map containing `StringBuilder` instances for each [SourcePart]
+    /// @param resourceBundle      The resource bundle expression used for translations
+    /// @param imports             The [Imports] needed for the generated source code
+    /// @param fieldDefinitions    List of field definition strings
+    /// @param features            Set of [Feature]s identified as necessary for the generated code
+    /// @param identifierToTypeMap Map from FXML identifiers to their corresponding [FXMLType]s
+    /// @param seenNestedFXMLFiles Set of paths to FXML files already processed as nested `includes`
+    /// @param seenFXMLMethods     Set of FXML methods already processed
+    /// @param packageName         The package name for the generated Java class
+    /// @throws NullPointerException If any parameter is null
     public SourceCodeGeneratorContext {
         Objects.requireNonNull(sourceCode, "`sourceCode` must not be null");
         Objects.requireNonNull(resourceBundle, "`resourceBundle` must not be null");
@@ -61,12 +61,12 @@ record SourceCodeGeneratorContext(
         Objects.requireNonNull(packageName, "`packageName` must not be null");
     }
 
-    /// Creates a new `SourceCodeGeneratorContext` with default empty collections.
+    /// Initializes a new [SourceCodeGeneratorContext] instance with default empty collections.
     ///
-    /// @param imports             The [Imports] for the generated source code.
-    /// @param resourceBundle      The initial resource bundle expression.
-    /// @param identifierToTypeMap A map from FXML identifiers to their corresponding [FXMLType]s.
-    /// @param packageName         The package name for the generated Java class.
+    /// @param imports             The [Imports] for the generated source code
+    /// @param resourceBundle      The initial resource bundle expression
+    /// @param identifierToTypeMap Map from FXML identifiers to their corresponding [FXMLType]s
+    /// @param packageName         The package name for the generated Java class
     public SourceCodeGeneratorContext(
             Imports imports,
             String resourceBundle,
@@ -98,25 +98,25 @@ record SourceCodeGeneratorContext(
         return Collections.unmodifiableMap(sourceCode);
     }
 
-    /// Retrieves the [StringBuilder] for the specified [SourcePart].
+    /// Returns the [StringBuilder] for the specified [SourcePart].
     ///
-    /// @param part The `SourcePart` for which to get the `StringBuilder`.
-    /// @return The `StringBuilder` associated with the given `SourcePart`.
+    /// @param part The source part
+    /// @return The corresponding [StringBuilder]
     public StringBuilder sourceCode(SourcePart part) {
         return sourceCode.get(part);
     }
 
     /// Checks if a [Feature] is present in this context.
     ///
-    /// @param feature The `Feature` to check.
-    /// @return `true` if the feature is present, `false` otherwise.
+    /// @param feature The feature to check
+    /// @return `true` if the feature is present; `false` otherwise
     public boolean hasFeature(Feature feature) {
         return features.contains(feature);
     }
 
     /// Adds a [Feature] to this context.
     ///
-    /// @param feature The `Feature` to add.
+    /// @param feature The feature to add
     public void addFeature(Feature feature) {
         features.add(feature);
     }

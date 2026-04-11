@@ -6,19 +6,20 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 
 import java.util.Objects;
 
-/// Represents an FXML constant (e.g., using fx:constant).
+/// An FXML constant (e.g., using `fx:constant`).
 ///
-/// @param clazz        The class defining the constant.
-/// @param identifier   The constant identifier.
-/// @param constantType The type of the constant.
+/// @param clazz        The class defining the constant
+/// @param identifier   The constant identifier
+/// @param constantType The type of the constant
 public record FXMLConstant(FXMLClassType clazz, String identifier, FXMLType constantType) implements AbstractFXMLValue {
-    /// Compact constructor to validate the constant components.
+
+    /// Initializes a new [FXMLConstant] record instance.
     ///
-    /// @param clazz        The class defining the constant.
-    /// @param identifier   The constant identifier.
-    /// @param constantType The type of the constant.
-    /// @throws NullPointerException     if `clazz`, `identifier`, or `constantType` is `null`.
-    /// @throws IllegalArgumentException if `identifier` is not a valid Java identifier.
+    /// @param clazz        The class defining the constant
+    /// @param identifier   The constant identifier
+    /// @param constantType The type of the constant
+    /// @throws NullPointerException     If `clazz`, `identifier`, or `constantType` is null
+    /// @throws IllegalArgumentException If `identifier` is not a valid Java identifier
     public FXMLConstant {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         Objects.requireNonNull(identifier, "`identifier` must not be null");

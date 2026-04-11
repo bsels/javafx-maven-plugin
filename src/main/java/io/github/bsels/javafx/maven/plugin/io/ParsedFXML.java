@@ -4,16 +4,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/// Represents a parsed FXML file structure. It consists of the import statements used in the FXML file
-/// and the root element of the FXML document parsed into a [ParsedXMLStructure].
+/// Results of parsing an FXML file.
 ///
-/// This class encapsulates the structure of an FXML file in an immutable format, providing access to
-/// its import declarations and root XML hierarchy.
-///
-/// @param scriptNamespace the namespace of the scripts inside the FXML file
-/// @param imports         a list of import statements associated with the FXML file. The list is defensively copied to ensure immutability.
-/// @param root            the root element of the FXML file, represented as a [ParsedXMLStructure]. Must not be null.
-/// @param className       the name of the Java class generated from the FXML file.
+/// @param scriptNamespace The script language name
+/// @param imports         The list of import statements
+/// @param root            The root XML structure
+/// @param className       The derived Java class name
 public record ParsedFXML(
         Optional<String> scriptNamespace,
         List<String> imports,
@@ -21,13 +17,13 @@ public record ParsedFXML(
         String className
 ) {
 
-    /// Constructs an instance of the [ParsedFXML] record.
+    /// Initializes a new [ParsedFXML] record instance.
     ///
-    /// @param scriptNamespace the namespace of the scripts inside the FXML file.
-    /// @param imports         a list of import statements associated with the FXML file. The list is defensively copied to ensure immutability.
-    /// @param root            the root element of the FXML file, represented as a [ParsedXMLStructure]. Must not be null.
-    /// @param className       the name of the Java class generated from the FXML file.
-    /// @throws NullPointerException if the root element is null.
+    /// @param scriptNamespace The script language name
+    /// @param imports         The list of import statements
+    /// @param root            The root XML structure
+    /// @param className       The derived Java class name
+    /// @throws NullPointerException If `root` is null
     public ParsedFXML {
         Objects.requireNonNull(scriptNamespace);
         imports = List.copyOf(Objects.requireNonNullElseGet(imports, List::of));

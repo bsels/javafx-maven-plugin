@@ -6,7 +6,7 @@ public sealed interface FXMLIdentifier
 
     /// Returns a string representation of the FXML identifier.
     ///
-    /// @return The string representation.
+    /// @return The string representation
     @Override
     String toString();
 }

@@ -45,23 +45,21 @@ public final class InMemoryCompiledClassOutputJavaFileManager extends Forwarding
         super(javaFileManager);
     }
 
-    /// Retrieves an immutable map containing the compiled classes stored in memory.
-    /// The map is keyed by the fully qualified class name, and the values are instances of [InMemoryCompiledClass],
-    /// which encapsulates the compiled bytecode.
+    /// Returns the map of compiled classes.
     ///
-    /// @return an immutable [Map] where keys are the class names as [String], and values are the associated [InMemoryCompiledClass] objects.
+    /// @return A map of fully qualified class names to [InMemoryCompiledClass] instances
     public Map<String, InMemoryCompiledClass> getCompiledClasses() {
         return Map.copyOf(compiledClasses);
     }
 
-    /// Generates a [JavaFileObject] for a given class, allowing in-memory storage of compiled classes when needed.
+    /// Returns a [JavaFileObject] for the specified file name and kind.
     ///
-    /// @param location  the location for which the file is being generated. This is typically used to indicate where the file resides in the context of a compilation process.
-    /// @param className the fully qualified name of the class for which the Java file is to be generated. This is used as the identifier for the output file.
-    /// @param kind      the type of the file being generated, which can be `SOURCE`, `CLASS`, `HTML`, or `OTHER`. For `CLASS` kind, an in-memory compiled class is returned.
-    /// @param sibling   a file object associated with the originating source file. Can be used for context but may be null.
-    /// @return a [JavaFileObject] representing the requested file. If the kind is CLASS, an instance of [InMemoryCompiledClass] is returned and stored in the internal map, allowing for in-memory storage of compiled bytecode. For other kinds, the result is delegated to the superclass.
-    /// @throws IOException if an IO error occurs during file creation while handling non-CLASS kinds.
+    /// @param location  The location of the file
+    /// @param className The fully qualified class name
+    /// @param kind      The type of the file
+    /// @param sibling   The originating source file
+    /// @return The requested [JavaFileObject]
+    /// @throws IOException If an I/O error occurs
     @Override
     public JavaFileObject getJavaFileForOutput(Location location, String className, JavaFileObject.Kind kind, FileObject sibling) throws IOException {
         return switch (kind) {

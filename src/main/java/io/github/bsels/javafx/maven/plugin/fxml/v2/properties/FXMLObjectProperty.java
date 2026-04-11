@@ -5,12 +5,12 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 
 import java.util.Objects;
 
-/// Represents an FXML property that has a single value.
+/// An FXML property that has a single value.
 ///
-/// @param name   The property name.
-/// @param setter The name of the getter method, if any.
-/// @param type   The property type.
-/// @param value  The property value.
+/// @param name   The property name
+/// @param setter The name of the setter method
+/// @param type   The property type
+/// @param value  The property value
 public record FXMLObjectProperty(
         String name,
         String setter,
@@ -18,13 +18,13 @@ public record FXMLObjectProperty(
         AbstractFXMLValue value
 ) implements FXMLProperty {
 
-    /// Compact constructor to validate the property components.
+    /// Initializes a new [FXMLObjectProperty] record instance.
     ///
-    /// @param name   The property name.
-    /// @param setter The name of the getter method, if any.
-    /// @param type   The property type.
-    /// @param value  The property value.
-    /// @throws NullPointerException if `name`, `getter`, `type`, or `value` is `null`.
+    /// @param name   The property name
+    /// @param setter The name of the setter method
+    /// @param type   The property type
+    /// @param value  The property value
+    /// @throws NullPointerException If `name`, `setter`, `type`, or `value` is null
     public FXMLObjectProperty {
         Objects.requireNonNull(name, "`name` must not be null");
         Objects.requireNonNull(setter, "`getter` must not be null");

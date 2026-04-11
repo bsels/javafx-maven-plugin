@@ -7,14 +7,14 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import java.util.List;
 import java.util.Objects;
 
-/// Represents an FXML property that can have multiple values (a list).
+/// An FXML property that can have multiple values (a list).
 ///
-/// @param name           The property name.
-/// @param getter         The name of the getter method that returns the collection.
-/// @param type           The property type.
-/// @param rawElementType The raw element type.
-/// @param value          The list of values.
-/// @param properties     The list of properties.
+/// @param name           The property name
+/// @param getter         The name of the getter method that returns the collection
+/// @param type           The property type
+/// @param rawElementType The raw element type
+/// @param value          The list of values
+/// @param properties     The list of properties
 public record FXMLCollectionProperties(
         String name,
         String getter,
@@ -24,15 +24,15 @@ public record FXMLCollectionProperties(
         List<FXMLProperty> properties
 ) implements FXMLProperty {
 
-    /// Compact constructor to validate the property components.
+    /// Initializes a new [FXMLCollectionProperties] record instance.
     ///
-    /// @param name           The property name.
-    /// @param getter         The name of the getter method.
-    /// @param type           The property type.
-    /// @param rawElementType The raw element type.
-    /// @param value          The list of values.
-    /// @param properties     The list of properties.
-    /// @throws NullPointerException if `name`, `getter`, `type`, or `value` is `null`.
+    /// @param name           The property name
+    /// @param getter         The name of the getter method
+    /// @param type           The property type
+    /// @param rawElementType The raw element type
+    /// @param value          The list of values
+    /// @param properties     The list of properties
+    /// @throws NullPointerException If `name`, `getter`, `type`, or `rawElementType` is null
     public FXMLCollectionProperties {
         Objects.requireNonNull(name, "`name` must not be null");
         Objects.requireNonNull(getter, "`getter` must not be null");
