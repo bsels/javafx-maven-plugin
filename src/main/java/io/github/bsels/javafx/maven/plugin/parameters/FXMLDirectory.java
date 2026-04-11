@@ -100,30 +100,52 @@ public class FXMLDirectory {
         this();
     }
 
+    /// Returns the file system directory associated with the current FXML parameter configuration.
+    ///
+    /// @return the base path for FXML files
     public Path getDirectory() {
         return directory;
     }
 
+    /// Sets the file system directory associated with the current FXML parameter configuration.
+    ///
+    /// @param directory the base path for FXML files
     public void setDirectory(Path directory) {
         this.directory = directory;
     }
 
+    /// Returns the package name associated with the FXML resources.
+    ///
+    /// @return the Java package name for the FXML files
     public String getPackageName() {
         return packageName;
     }
 
+    /// Sets the package name associated with the FXML resources.
+    ///
+    /// @param packageName the Java package name for the FXML files
     public void setPackageName(String packageName) {
         this.packageName = packageName;
     }
 
+    /// Returns the list of file paths that are excluded from processing.
+    ///
+    /// @return a list of excluded file paths
     public List<Path> getExcludedFiles() {
         return excludedFiles;
     }
 
+    /// Sets the list of file paths that are excluded from processing.
+    ///
+    /// @param excludedFiles a list of paths representing the files to exclude
     public void setExcludedFiles(List<Path> excludedFiles) {
         this.excludedFiles = List.copyOf(Objects.requireNonNullElseGet(excludedFiles, List::of));
     }
 
+    /// Validates the FXML directory configuration.
+    /// Ensures that the directory is not null and resolves excluded files as absolute paths.
+    ///
+    /// @throws NullPointerException if the directory is null
     public void validate() throws NullPointerException {
         Objects.requireNonNull(directory, "`directory` must not be null");
         directory = directory.toAbsolutePath();

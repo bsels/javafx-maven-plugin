@@ -37,6 +37,10 @@ public final class ObjectMapperProvider {
     /// By maintaining a single instance, this ensures consistent configuration and improves
     /// performance by avoiding the overhead of creating multiple [ObjectMapper] instances.
     private static ObjectMapper OBJECT_MAPPER;
+    /// A static field that holds the singleton instance of the [ObjectWriter].
+    ///
+    /// This instance is configured with a default pretty printer and is used for generating
+    /// human-readable JSON representations of objects.
     private static ObjectWriter OBJECT_WRITER;
 
     /// Private constructor to prevent instantiation of the [ObjectMapperProvider] class.
@@ -59,9 +63,13 @@ public final class ObjectMapperProvider {
         return OBJECT_MAPPER;
     }
 
+    /// Provides access to the shared [ObjectWriter] instance.
+    ///
+    /// @return the shared static instance of [ObjectWriter]
     private static ObjectWriter getWriter() {
-        return Optional.ofNullable(OBJECT_WRITER)
+        OBJECT_WRITER = Optional.ofNullable(OBJECT_WRITER)
                 .orElseGet(() -> OBJECT_MAPPER.writerWithDefaultPrettyPrinter());
+        return OBJECT_WRITER;
     }
 
     /// Escapes the provided object by converting it into a JSON-compliant format.
@@ -77,6 +85,11 @@ public final class ObjectMapperProvider {
         }
     }
 
+    /// Converts the given object into a pretty-printed JSON string.
+    ///
+    /// @param value the object to be pretty printed
+    /// @return the pretty-printed JSON string
+    /// @throws IllegalArgumentException if the object cannot be pretty printed
     public static String prettyPrint(Object value) {
         try {
             return getWriter().writeValueAsString(value);

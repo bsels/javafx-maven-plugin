@@ -132,8 +132,14 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     /// Default value: `true`.
     @Parameter(property = "javafx.fxml.include.source.discovery", defaultValue = "true")
     boolean includeSourceFilesInClassDiscovery = true;
+    /// Specifies the character set to be used when reading FXML files and generating source code.
+    ///
+    /// The default value is UTF-8.
     @Parameter(property = "javafx.fxml.charset", defaultValue = "UTF-8", required = true)
     Charset defaultCharset = StandardCharsets.UTF_8;
+    /// Indicates whether the `@Generated` annotation should be added to the generated Java source files.
+    ///
+    /// When set to `true`, the annotation is included, providing metadata about the source of the generated file.
     @Parameter(property = "javafx.fxml.add.generated.annotation", defaultValue = "true", required = true)
     boolean addGeneratedAnnotation = true;
 
@@ -211,6 +217,10 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         }
     }
 
+    /// Performs the internal execution logic for generating source code from FXML files.
+    /// This involves reading FXML files, parsing them, and generating Java source files in the specified directory.
+    ///
+    /// @throws MojoExecutionException if any error occurs during FXML reading, parsing, or source code writing.
     private void executeInternal() throws MojoExecutionException {
         Log log = getLog();
         FXMLReader fxmlReader = new FXMLReader(log);
