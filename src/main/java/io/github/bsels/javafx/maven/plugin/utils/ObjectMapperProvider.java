@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
@@ -57,6 +58,7 @@ public final class ObjectMapperProvider {
         OBJECT_MAPPER = Optional.ofNullable(OBJECT_MAPPER)
                 .orElseGet(
                         () -> new ObjectMapper()
+                                .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
                                 .registerModule(new Jdk8Module())
                                 .registerModule(new SimpleModule().addSerializer(Type.class, new TypeJsonSerializer()))
                 );
@@ -68,7 +70,7 @@ public final class ObjectMapperProvider {
     /// @return the shared static instance of [ObjectWriter]
     private static ObjectWriter getWriter() {
         OBJECT_WRITER = Optional.ofNullable(OBJECT_WRITER)
-                .orElseGet(() -> OBJECT_MAPPER.writerWithDefaultPrettyPrinter());
+                .orElseGet(() -> getObjectMapper().writerWithDefaultPrettyPrinter());
         return OBJECT_WRITER;
     }
 

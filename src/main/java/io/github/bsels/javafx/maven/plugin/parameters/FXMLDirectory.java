@@ -149,7 +149,7 @@ public class FXMLDirectory {
     public void validate() throws NullPointerException {
         Objects.requireNonNull(directory, "`directory` must not be null");
         directory = directory.toAbsolutePath();
-        excludedFiles = Stream.of(excludedFiles)
+        excludedFiles = Stream.ofNullable(excludedFiles)
                 .flatMap(List::stream)
                 .filter(Objects::nonNull)
                 .map(directory::resolve)

@@ -136,7 +136,7 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     ///
     /// The default value is UTF-8.
     @Parameter(property = "javafx.fxml.charset", defaultValue = "UTF-8", required = true)
-    Charset defaultCharset = StandardCharsets.UTF_8;
+    String defaultCharset = "UTF-8";
     /// Indicates whether the `@Generated` annotation should be added to the generated Java source files.
     ///
     /// When set to `true`, the annotation is included, providing metadata about the source of the generated file.
@@ -183,6 +183,7 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         Objects.requireNonNull(project, "Maven project must be specified");
         Objects.requireNonNull(generatedSourceDirectory, "Generated source directory must be specified");
         Objects.requireNonNull(defaultCharset, "Default charset must be specified");
+        Charset charset = Charset.forName(defaultCharset);
         resourceBundleObject = Optional.ofNullable(resourceBundleObject)
                 .filter(Predicate.not(String::isBlank))
                 .orElse(null);
@@ -193,9 +194,9 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         fxmlDirectories.forEach(FXMLDirectory::validate);
         try (var _ = new ContextClassLoaderClosable(this::constructClasspathDependenciesClassLoader)) {
             if (includeSourceFilesInClassDiscovery) {
-                executeWithOptimisticCompiler(this::executeInternal);
+                executeWithOptimisticCompiler(() -> executeInternal(charset));
             }
-            executeInternal();
+            executeInternal(charset);
         }
     }
 
@@ -220,11 +221,12 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     /// Performs the internal execution logic for generating source code from FXML files.
     /// This involves reading FXML files, parsing them, and generating Java source files in the specified directory.
     ///
+    /// @param charset the character set to use for reading and parsing FXML files.
     /// @throws MojoExecutionException if any error occurs during FXML reading, parsing, or source code writing.
-    private void executeInternal() throws MojoExecutionException {
+    private void executeInternal(Charset charset) throws MojoExecutionException {
         Log log = getLog();
         FXMLReader fxmlReader = new FXMLReader(log);
-        FXMLDocumentParser fxmlDocumentParser = new FXMLDocumentParser(log, defaultCharset);
+        FXMLDocumentParser fxmlDocumentParser = new FXMLDocumentParser(log, charset);
         FXMLSourceCodeBuilder fxmlSourceCodeBuilder = new FXMLSourceCodeBuilder(
                 log,
                 resourceBundleObject,
@@ -250,7 +252,11 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
                         fxmlDocument,
                         fxmlDirectory.getPackageName()
                 );
-                Path sourceCodeFile = generatedDirectory.resolve(fxmlFile.getFileName());
+                String fxmlFileName = fxmlFile.getFileName().toString();
+                Path sourceCodeFile = generatedDirectory.resolve(fxmlFileName.substring(
+                        0,
+                        fxmlFileName.length() - 5
+                ) + ".java");
                 try {
                     Files.writeString(
                             sourceCodeFile,
