@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
@@ -36,6 +37,7 @@ public final class ObjectMapperProvider {
     /// By maintaining a single instance, this ensures consistent configuration and improves
     /// performance by avoiding the overhead of creating multiple [ObjectMapper] instances.
     private static ObjectMapper OBJECT_MAPPER;
+    private static ObjectWriter OBJECT_WRITER;
 
     /// Private constructor to prevent instantiation of the [ObjectMapperProvider] class.
     /// This ensures that the class cannot be instantiated as it is designed to provide
@@ -57,6 +59,11 @@ public final class ObjectMapperProvider {
         return OBJECT_MAPPER;
     }
 
+    private static ObjectWriter getWriter() {
+        return Optional.ofNullable(OBJECT_WRITER)
+                .orElseGet(() -> OBJECT_MAPPER.writerWithDefaultPrettyPrinter());
+    }
+
     /// Escapes the provided object by converting it into a JSON-compliant format.
     ///
     /// @param value the object to be escaped
@@ -67,6 +74,14 @@ public final class ObjectMapperProvider {
             return ObjectMapperProvider.getObjectMapper().writeValueAsString(value);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Unable to escape the object value", e);
+        }
+    }
+
+    public static String prettyPrint(Object value) {
+        try {
+            return getWriter().writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Unable to pretty print the object value", e);
         }
     }
 

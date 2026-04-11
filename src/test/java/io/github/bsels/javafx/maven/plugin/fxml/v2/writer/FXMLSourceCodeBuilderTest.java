@@ -91,7 +91,10 @@ public class FXMLSourceCodeBuilderTest {
                 "/examples/MyButtonWithConstants.fxml",
                 "/examples/MyHashMap.fxml",
                 "/examples/NodeProperties.fxml",
-                "/examples/FXInclude.fxml"
+                "/examples/FXInclude.fxml",
+                "/examples/ButtonWithNoControllerAction.fxml",
+                "/examples/ButtonWithControllerAction.fxml",
+                "/examples/FXIncludeNestedController.fxml",
         })
         @Disabled("working on it")
         void dummy(String file) throws MojoExecutionException {
