@@ -110,7 +110,7 @@ final class FXMLDocumentParserHelper {
     ///   falling back to a wildcard if unresolved.
     /// - **WildcardType**: Extracts the first upper bound (if not [Object])
     ///   or the first lower bound to represent the type; otherwise returns a wildcard.
-    /// - **Default**: Fallback to standard class resolution using [Utils.getClassType].
+    /// - **Default**: Fallback to standard class resolution using [Utils#getClassType(Type)].
     ///
     /// @param type         The base Java [Type] to convert
     /// @param buildContext The build context used for class resolution and type mapping
@@ -234,11 +234,11 @@ final class FXMLDocumentParserHelper {
     ///
     /// The method checks for potential properties in the following priority order:
     /// 1. **Setter**: Looks for a public `set<Name>(Type)` method. If a single setter is found,
-    ///    it is returned as a [ObjectProperty.MethodType.SETTER].
+    ///    it is returned as a [ObjectProperty.MethodType#SETTER].
     /// 2. **Constructor Parameter**: Checks if the property name matches a named parameter in any of the class's
     ///    constructors (requiring `@NamedArg` or similar mechanism supported by [Utils]).
     /// 3. **Getter**: Looks for a public `get<Name>()` or `is<Name>()` method.
-    ///    If found, it is returned as a [ObjectProperty.MethodType.GETTER],
+    ///    If found, it is returned as a [ObjectProperty.MethodType#GETTER],
     ///    often used for read-only collections that are populated rather than replaced.
     ///
     /// @param buildContext The build context used for type resolution of the property's type
@@ -449,7 +449,7 @@ final class FXMLDocumentParserHelper {
     /// 4. Extracts all methods (including private ones) and converts them to [FXMLControllerMethod]s.
     ///
     /// Fields and methods are gathered from the class and its entire superclass hierarchy,
-    /// ensuring uniqueness using [Utils.unique].
+    /// ensuring uniqueness using [Utils#unique()].
     ///
     /// @param clazz        The controller [Class] to introspect
     /// @param buildContext The build context for type resolution of members

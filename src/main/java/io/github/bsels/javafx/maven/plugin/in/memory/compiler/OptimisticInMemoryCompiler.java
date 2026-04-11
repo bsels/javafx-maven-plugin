@@ -130,7 +130,7 @@ public final class OptimisticInMemoryCompiler {
 
     /// Extracts the file paths of all source files that caused compilation errors or other failures.
     ///
-    /// It filters the collected diagnostics to find those of kind [Diagnostic.Kind.ERROR] or [Diagnostic.Kind.OTHER].
+    /// It filters the collected diagnostics to find those of kind [Diagnostic.Kind#ERROR] or [Diagnostic.Kind#OTHER].
     /// For each such diagnostic, it extracts the associated source file path.
     ///
     /// @param logger      The Maven logger used to log diagnostic details at the debug level.
