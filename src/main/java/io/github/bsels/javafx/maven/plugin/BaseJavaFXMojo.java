@@ -100,20 +100,35 @@ public abstract sealed class BaseJavaFXMojo extends AbstractMojo permits JavaFXJ
     @Parameter(property = "javafx.additionalBinaries")
     protected List<AdditionalBinary> additionalBinaries;
 
-    /// Initializes a new [BaseJavaFXMojo] instance.
+    /// Initializes a new [BaseJavaFXMojo] instance with the required managers.
     ///
-    /// @param locationManager  The manager for paths and resources
-    /// @param toolchainManager The manager for toolchains
-    protected BaseJavaFXMojo(LocationManager locationManager, ToolchainManager toolchainManager) {
+    /// This constructor ensures that the [LocationManager] is not null and initializes the [ToolchainManager].
+    /// It also logs a debug message indicating the start of the initialization process.
+    ///
+    /// @param locationManager  The manager for resolving paths and resources, used for JPMS module path resolution
+    /// @param toolchainManager The manager for locating specific JDK toolchains from the Maven environment
+    /// @throws NullPointerException if `locationManager` is null
+    protected BaseJavaFXMojo(LocationManager locationManager, ToolchainManager toolchainManager)
+            throws NullPointerException {
         this.locationManager = Objects.requireNonNull(locationManager, "`locationManager` cannot be null");
         this.toolchainManager = toolchainManager;
         getLog().debug("Initializing BaseJavaFXMojo...");
     }
 
-    /// Determines the command to execute the Java executable.
+    /// Determines the correct path to the Java executable to be used for execution.
     ///
-    /// @param executable The name or path of the Java executable
-    /// @return A list of strings representing the execution command
+    /// The selection process follows this hierarchy:
+    /// 1. If the provided `executable` is an existing regular file, it is used directly.
+    /// 2. If a [ToolchainManager] is available, it attempts to find the `java` tool from the Maven toolchain.
+    /// 3. If no toolchain is found, it looks for `java` in the `java.home` system property.
+    /// 4. On Windows, it searches for `java` in the system `PATH` using common executable extensions.
+    /// 5. If all else fails, it defaults to the provided `executable` string.
+    ///
+    /// If the OS is Windows and the executable requires a command shell (e.g., a `.bat` or `.cmd` file),
+    /// the command is wrapped with `cmd /c`.
+    ///
+    /// @param executable The name or path of the Java executable (e.g., "java", "java.exe", or a full path)
+    /// @return A list of strings representing the command to execute (e.g., `["java"]` or `["cmd", "/c", "path/to/script.bat"]`)
     protected List<String> getExecutable(String executable) {
         final Path executablePath = Path.of(executable);
         Path finalExecutablePath = null;
@@ -166,23 +181,29 @@ public abstract sealed class BaseJavaFXMojo extends AbstractMojo permits JavaFXJ
         return List.of(exec);
     }
 
-    /// Checks whether the current operating system is Windows.
+    /// Checks whether the current operating system belongs to the Windows family.
     ///
-    /// @return `true` if Windows; `false` otherwise
+    /// This uses the `Os.isFamily(Os.FAMILY_WINDOWS)` utility from Plexus.
+    ///
+    /// @return `true` if the OS is Windows; `false` otherwise
     protected final boolean isWindowsOs() {
         return Os.isFamily(Os.FAMILY_WINDOWS);
     }
 
-    /// Checks whether the specified file has a native Windows executable extension.
+    /// Checks whether the specified file name has a native Windows executable extension (`.exe` or `.com`).
+    ///
+    /// The comparison is case-insensitive.
     ///
     /// @param exec The file name or path to check
-    /// @return `true` if it has a native extension; `false` otherwise
+    /// @return `true` if it ends with a native Windows extension; `false` otherwise
     private boolean hasWindowsNativeExtension(final String exec) {
         final String lowerCase = exec.toLowerCase();
         return lowerCase.endsWith(".exe") || lowerCase.endsWith(".com");
     }
 
-    /// Checks whether the specified file has an executable extension.
+    /// Checks whether the specified file name has any of the system's defined executable extensions.
+    ///
+    /// It compares the file name against the list of extensions retrieved via [getExecutableExtensions].
     ///
     /// @param exec The file name or path to check
     /// @return `true` if it has an executable extension; `false` otherwise
@@ -196,9 +217,12 @@ public abstract sealed class BaseJavaFXMojo extends AbstractMojo permits JavaFXJ
         return false;
     }
 
-    /// Returns the list of executable file extensions for the current OS.
+    /// Returns the list of valid executable file extensions for the current environment.
     ///
-    /// @return A list of executable extensions
+    /// On most systems, this reads the `PATHEXT` environment variable.
+    /// If `PATHEXT` is not defined, it defaults to `.bat` and `.cmd`.
+    ///
+    /// @return A list of lowercase executable extensions, including the leading dot
     private List<String> getExecutableExtensions() {
         return Optional.ofNullable(System.getProperty("PATHEXT"))
                 .map(pathExt -> StringUtils.split(pathExt.toLowerCase(), File.pathSeparator))
@@ -206,10 +230,19 @@ public abstract sealed class BaseJavaFXMojo extends AbstractMojo permits JavaFXJ
                 .orElse(List.of(".bat", ".cmd"));
     }
 
-    /// Initializes the JavaFX plugin and its dependencies.
+    /// Initializes the JavaFX plugin by resolving module paths and dependencies.
     ///
-    /// @param jdkHome The path to the JDK home directory
-    /// @throws MojoExecutionException If initialization fails
+    /// This method performs the following steps:
+    /// 1. Verifies the existence of the project output directory.
+    /// 2. Scans the output directory for a `module-info.class` file to identify the main module.
+    /// 3. Collects all project dependencies (artifacts, system dependencies, and output directories).
+    /// 4. Resolves the paths for these dependencies using the [LocationManager],
+    ///    distinguishing between module path and classpath elements based on the main module's descriptor.
+    /// 5. Populates the `modulePathElements`, `classPathElements`, and `pathElements` maps.
+    /// 6. Logs warnings for any path resolution exceptions or filename-based automatic modules.
+    ///
+    /// @param jdkHome The path to the JDK home directory, used for resolving system modules. Can be `null`.
+    /// @throws MojoExecutionException If the output directory or `module-info.class` is missing, or if path resolution fails.
     protected final void init(Path jdkHome) throws MojoExecutionException {
         getLog().info("Initializing JavaFX plugin...");
         getLog().info("Project: " + project);
@@ -305,9 +338,16 @@ public abstract sealed class BaseJavaFXMojo extends AbstractMojo permits JavaFXJ
         getLog().debug("Path elements: " + pathElements);
     }
 
-    /// Returns the classpath elements required for compilation.
+    /// Collects and returns all dependencies required for the Java execution.
     ///
-    /// @return A list of distinct classpath paths
+    /// This includes:
+    /// - The project's build output directory.
+    /// - Any system-scoped dependencies that have a defined path.
+    /// - All project artifacts, sorted to ensure consistent ordering.
+    ///
+    /// The result is a list of distinct [Path] objects.
+    ///
+    /// @return A list of unique paths representing the project's dependencies and output
     protected final List<Path> getDependencies() {
         Stream<Path> outputDirectoryStream = Optional.ofNullable(project.getBuild())
                 .map(Build::getOutputDirectory)
@@ -328,11 +368,15 @@ public abstract sealed class BaseJavaFXMojo extends AbstractMojo permits JavaFXJ
                 .toList();
     }
 
-    /// Compares two [Artifact] objects for ordering.
+    /// Compares two Maven artifacts to determine their relative order in the dependency list.
     ///
-    /// @param a The first artifact
-    /// @param b The second artifact
-    /// @return A comparison result
+    /// The comparison first uses the default `Artifact.compareTo(Artifact)` logic.
+    /// If the artifacts are equal, according to that logic,
+    /// it breaks the tie by comparing whether they have classifiers.
+    ///
+    /// @param a The first artifact to compare
+    /// @param b The second artifact to compare
+    /// @return A negative integer, zero, or a positive integer as the first artifact is less than, equal to, or greater than the second
     private int compareArtifact(Artifact a, Artifact b) {
         int result = a.compareTo(b);
         if (result == 0) {
@@ -341,9 +385,13 @@ public abstract sealed class BaseJavaFXMojo extends AbstractMojo permits JavaFXJ
         return result;
     }
 
-    /// Ensures the working directory is set and exists.
+    /// Ensures that the working directory for the execution is properly set and created.
     ///
-    /// @throws MojoExecutionException If the working directory cannot be created
+    /// If `workingDirectory` is not explicitly configured, it defaults to the project's `baseDirectory`.
+    /// If the directory does not exist on disk, this method attempts to create it,
+    /// including any necessary parent directories.
+    ///
+    /// @throws MojoExecutionException If the directory does not exist and cannot be created
     protected final void handleWorkingDirectory() throws MojoExecutionException {
         if (workingDirectory == null) {
             workingDirectory = baseDirectory;
@@ -386,10 +434,13 @@ public abstract sealed class BaseJavaFXMojo extends AbstractMojo permits JavaFXJ
         return map == null || map.isEmpty();
     }
 
-    /// Splits a complex string of arguments, respecting quotes.
+    /// Splits a command-line argument string into a list of individual arguments,
+    /// correctly handling quoted sections (both single and double quotes).
     ///
-    /// @param argumentString The input string
-    /// @return A list of arguments
+    /// This method preserves characters inside quotes and treats whitespace as the delimiter outside quoted segments.
+    ///
+    /// @param argumentString The raw string of command-line arguments to split
+    /// @return A list of individual argument strings, with empty strings filtered out
     protected final List<String> splitComplexArgumentString(String argumentString) {
         argumentString = argumentString.strip();
         List<String> splitArguments = new ArrayList<>();
@@ -418,9 +469,13 @@ public abstract sealed class BaseJavaFXMojo extends AbstractMojo permits JavaFXJ
                 .toList();
     }
 
-    /// Creates a comma-separated string of JavaFX modules to be added.
+    /// Constructs a string suitable for the `--add-modules` JVM option.
     ///
-    /// @return A comma-separated string of module names
+    /// If a main `moduleDescriptor` is available, its name is returned.
+    /// Otherwise, it scans all resolved `pathElements` and collects the names of modules that start with the `javafx`
+    /// prefix and do not have an "Empty" state.
+    ///
+    /// @return A comma-separated string of module names to be added at runtime
     protected final String createAddModulesString() {
         if (moduleDescriptor != null) {
             return moduleDescriptor.name();

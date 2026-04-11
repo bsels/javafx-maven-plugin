@@ -1,6 +1,6 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
-import io.github.bsels.javafx.maven.plugin.CheckAndCast;
+import io.github.bsels.javafx.maven.plugin.utils.CheckAndCast;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;

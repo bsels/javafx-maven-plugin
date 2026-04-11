@@ -1,5 +1,6 @@
 package io.github.bsels.javafx.maven.plugin;
 
+import io.github.bsels.javafx.maven.plugin.utils.CheckAndCast;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Execute;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -35,10 +36,10 @@ public final class JavaFXRunMojo extends BaseJavaFXMojo {
     @Parameter(property = "javafx.debuggerPort", defaultValue = "5005")
     int debuggerPort = 5005;
 
-    /// Initializes a new [JavaFXRunMojo] instance.
+    /// Initializes a new [JavaFXRunMojo] instance with required dependencies.
     ///
-    /// @param locationManager  The manager for paths and resources
-    /// @param toolchainManager The manager for toolchains
+    /// @param locationManager  The manager for resolving paths and JPMS modules
+    /// @param toolchainManager The manager for locating the JDK toolchain
     @Inject
     public JavaFXRunMojo(LocationManager locationManager, ToolchainManager toolchainManager) {
         super(locationManager, toolchainManager);
@@ -46,7 +47,15 @@ public final class JavaFXRunMojo extends BaseJavaFXMojo {
 
     /// Executes the mojo to run the JavaFX application.
     ///
-    /// @throws MojoExecutionException If an error occurs during execution
+    /// The execution follows these steps:
+    /// 1. Skips execution if the `skip` parameter is set.
+    /// 2. Validates that the `executable` and `baseDirectory` are specified.
+    /// 3. Initializes the plugin by resolving dependencies and module paths.
+    /// 4. Ensures the working directory exists.
+    /// 5. Constructs the full Java execution command using [getJavaRunCommand].
+    /// 6. Launches the application in a separate process and waits for it to finish.
+    ///
+    /// @throws MojoExecutionException If an error occurs during initialization or process execution
     @Override
     public void execute() throws MojoExecutionException {
         if (skip) {
@@ -85,9 +94,20 @@ public final class JavaFXRunMojo extends BaseJavaFXMojo {
         }
     }
 
-    /// Constructs the command list for running the application.
+    /// Constructs the full command-line arguments for running the JavaFX application.
     ///
-    /// @return A list of command arguments
+    /// The command includes:
+    /// - The path to the Java executable.
+    /// - Custom logging format if specified.
+    /// - Debugger agent configuration if `attachDebugger` is enabled.
+    /// - System properties for additional binaries.
+    /// - Native access flag for `javafx.graphics`.
+    /// - User-provided JVM options.
+    /// - Module path and classpath configuration.
+    /// - The main class (and main module if applicable).
+    /// - Command-line arguments for the application.
+    ///
+    /// @return A list of command arguments for the [ProcessBuilder]
     private List<String> getJavaRunCommand() {
         List<String> command = new ArrayList<>(getExecutable(executable));
         if (!isEmpty(loggingFormat)) {

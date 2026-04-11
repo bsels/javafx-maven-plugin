@@ -1,4 +1,4 @@
-package io.github.bsels.javafx.maven.plugin;
+package io.github.bsels.javafx.maven.plugin.utils;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

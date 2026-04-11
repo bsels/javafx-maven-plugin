@@ -27,11 +27,12 @@ public record ParsedXMLStructure(
     /// @param children   The child elements
     /// @param comments   The associated comments
     /// @param textValue  The combined text content
+    /// @throws NullPointerException If `name`, `properties`, `children`, `comments`, or `textValue` is null
     public ParsedXMLStructure {
         Objects.requireNonNull(name, "`name` must not be null");
-        properties = Map.copyOf(properties);
-        children = List.copyOf(children);
-        comments = List.copyOf(comments);
+        properties = Map.copyOf(Objects.requireNonNull(properties, "`properties` must not be null"));
+        children = List.copyOf(Objects.requireNonNull(children, "`children` must not be null"));
+        comments = List.copyOf(Objects.requireNonNull(comments, "`comments` must not be null"));
         Objects.requireNonNull(textValue, "`textValue` must not be null");
     }
 }

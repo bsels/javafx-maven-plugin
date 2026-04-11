@@ -268,7 +268,7 @@ public final class Utils {
     }
 
     /// Finds parameterized types for a property name in public constructors.
-    /// Inspects constructor parameters annotated with [@NamedArg].
+    /// Inspects constructor parameters annotated with `@NamedArg`.
     ///
     /// @param clazz        The class to inspect
     /// @param propertyName The property name to match
@@ -292,12 +292,13 @@ public final class Utils {
                 .toList();
     }
 
-    /// Retrieves static setter methods that take exactly two parameters and are assignable from `Node`.
+    /// Retrieves static setter methods that take exactly two parameters and are assignable from [Node].
     ///
     /// @param staticClass      The class to search
     /// @param staticSetterName The name of the static setter
     /// @return A list of matching methods
     public static List<Method> findStaticSettersForNode(Class<?> staticClass, String staticSetterName) {
+        // TODO: Don't force Node type here
         return Stream.of(staticClass.getMethods())
                 .filter(method -> Modifier.isStatic(method.getModifiers()))
                 .filter(method -> staticSetterName.equals(method.getName()))

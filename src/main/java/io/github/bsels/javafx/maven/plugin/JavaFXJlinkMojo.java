@@ -1,6 +1,7 @@
 package io.github.bsels.javafx.maven.plugin;
 
 import io.github.bsels.javafx.maven.plugin.parameters.AdditionalBinary;
+import io.github.bsels.javafx.maven.plugin.utils.CheckAndCast;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Execute;
@@ -54,7 +55,7 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
             IntStream.rangeClosed(0, 2).mapToObj(String::valueOf),
             IntStream.rangeClosed(0, 9).mapToObj(index -> String.format("zip-%d", index))
     ).collect(Collectors.toSet());
-    /// Default name for the binaries directory.
+    /// Default name for the binaries' directory.
     private static final String BIN_DIRECTORY = "bin";
     /// Default name for the configuration directory.
     private static final String CONF_DIRECTORY = "conf";
@@ -109,11 +110,11 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
     @Parameter(property = "javafx.jlinkVerbose", defaultValue = "false")
     boolean jlinkVerbose;
 
-    /// Initializes a new [JavaFXJlinkMojo] instance.
+    /// Initializes a new [JavaFXJlinkMojo] instance with required dependencies.
     ///
-    /// @param locationManager  The manager for paths and resources
-    /// @param toolchainManager The manager for toolchains
-    /// @param zipArchiver      The archiver for ZIP files
+    /// @param locationManager  The manager for resolving paths and JPMS modules
+    /// @param toolchainManager The manager for locating the JDK toolchain
+    /// @param zipArchiver      The archiver used for creating the optional ZIP distribution
     @Inject
     public JavaFXJlinkMojo(
             LocationManager locationManager,
@@ -125,10 +126,21 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
         this.zipArchiver = zipArchiver;
     }
 
-    /// Executes the `jlink` mojo to create a JavaFX runtime image.
+    /// Executes the mojo to link the JavaFX application into a standalone runtime image.
     ///
-    /// @throws MojoExecutionException If an error occurs during execution
-    /// @throws MojoFailureException   If the linking process fails
+    /// The execution follows these steps:
+    /// 1. Skips execution if the `skip` parameter is set.
+    /// 2. Validates that the `jlinkExecutable` and `baseDirectory` are specified.
+    /// 3. Initializes the plugin by resolving dependencies and module paths.
+    /// 4. Ensures the working directory exists.
+    /// 5. Constructs and executes the `jlink` command to create the runtime image.
+    /// 6. Copies any configured additional binaries to the image's `bin` directory.
+    /// 7. Patches the generated launcher scripts to include custom JVM options and arguments.
+    /// 8. Patches the logging configuration in the image's `conf` directory if a custom format is provided.
+    /// 9. Packages the entire runtime image into a ZIP file if `jlinkZipName` is configured.
+    ///
+    /// @throws MojoExecutionException If an error occurs during path resolution, process execution, or file I/O
+    /// @throws MojoFailureException   If the `jlink` process returns a non-zero exit code
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         if (skip) {
@@ -175,9 +187,12 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
         zipApplication();
     }
 
-    /// Copies additional binaries to the runtime image's bin directory.
+    /// Copies additional binary files to the `bin` directory of the generated runtime image.
     ///
-    /// @throws MojoExecutionException If an I/O error occurs during copying
+    /// This method iterates through the `additionalBinaries` list,
+    /// copying each file to the target image's binary folder while preserving file attributes.
+    ///
+    /// @throws MojoExecutionException If a file copy operation fails
     private void copyAdditionalBinariesToBinaryFolder() throws MojoExecutionException {
         if (isEmpty(additionalBinaries)) {
             return;
@@ -201,10 +216,18 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
         }
     }
 
-    /// Constructs the `jlink` execution command.
+    /// Constructs the full command-line for the `jlink` tool based on the plugin configuration.
     ///
-    /// @return A list of command arguments
-    /// @throws MojoExecutionException If a required configuration is missing
+    /// This includes:
+    /// - The path to the `jlink` executable.
+    /// - The module path (project dependencies + optional `jmodsPath`).
+    /// - The main module and its dependencies via `--add-modules`.
+    /// - The output directory for the image.
+    /// - Optimization flags like `--strip-debug`, `--compress`, etc.
+    /// - Launcher configuration for starting the application.
+    ///
+    /// @return A list of arguments for the `jlink` process
+    /// @throws MojoExecutionException If a required configuration (like the module descriptor) is missing or invalid
     private List<String> getJLinkCommand() throws MojoExecutionException {
         List<String> command = new ArrayList<>(getExecutable(jlinkExecutable));
         if (!isEmpty(modulePathElements)) {
@@ -273,10 +296,12 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
         return command;
     }
 
-    /// Deletes the specified output directory and its contents.
+    /// Deletes the output directory and all its contents to ensure a clean link process.
     ///
-    /// @param outputDirectory The directory to clean up
-    /// @throws MojoExecutionException If deletion fails
+    /// This method performs a recursive deletion of all files and folders within the specified `outputDirectory`.
+    ///
+    /// @param outputDirectory The directory to be removed
+    /// @throws MojoExecutionException If any file or directory cannot be deleted
     private void cleanupOutputDirectory(Path outputDirectory) throws MojoExecutionException {
         try (Stream<Path> filesToRemove = Files.walk(outputDirectory)) {
             filesToRemove.sorted(Comparator.reverseOrder())
@@ -296,9 +321,11 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
         }
     }
 
-    /// Patches launcher scripts to include custom JVM options and arguments.
+    /// Patches the launcher scripts generated by `jlink` to include custom configuration.
     ///
-    /// @throws MojoExecutionException If patching fails
+    /// It updates the shell script on Unix-like systems and the `.bat` file on Windows.
+    ///
+    /// @throws MojoExecutionException If patching any of the scripts fails
     private void patchLauncherScripts() throws MojoExecutionException {
         if (isEmpty(launcher)) {
             return;
@@ -312,10 +339,14 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
         getLog().info("Launcher scripts patched successfully");
     }
 
-    /// Updates the specified launcher script.
+    /// Modifies a specific launcher script to inject custom JVM options and application arguments.
     ///
-    /// @param launcher The name of the launcher script file
-    /// @throws MojoExecutionException If an I/O error occurs
+    /// The method reads the script, identifies the locations for JVM options and command-line arguments,
+    /// and inserts the project-specific values.
+    /// The modified content is then written back to the file.
+    ///
+    /// @param launcher The file name of the launcher script to patch
+    /// @throws MojoExecutionException If the script cannot be read or written
     private void patchLauncherScript(String launcher) throws MojoExecutionException {
         Path launcherScript = buildDirectory.resolve(jlinkImageName, BIN_DIRECTORY, launcher);
         if (!Files.exists(launcherScript)) {
@@ -368,19 +399,24 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
         }
     }
 
-    /// Extracts a formatted file path property for an [AdditionalBinary].
+    /// Extracts a Java system property string for an additional binary to be used in JVM options.
     ///
-    /// @param additionalBinary The binary object
-    /// @return A formatted property string
+    /// The property is formatted as `-DpropertyName=./fileName`.
+    ///
+    /// @param additionalBinary The binary configuration object
+    /// @return A formatted JVM system property string
     private String extractPropertyForBinary(AdditionalBinary additionalBinary) {
         getLog().debug("Adding %s to additional binaries".formatted(additionalBinary.getName()));
         Path fileName = additionalBinary.getLocation().getFileName();
         return "-D%s=./%s".formatted(additionalBinary.getMappedJavaProperty(), fileName);
     }
 
-    /// Updates the logging configuration file with the desired log format.
+    /// Patches the `conf/logging.properties` file in the runtime image to set a custom log format.
     ///
-    /// @throws MojoExecutionException If an I/O error occurs
+    /// It searches for the `java.util.logging.SimpleFormatter.format` property.
+    /// If found, it replaces its value; otherwise, it appends the property to the end of the file.
+    ///
+    /// @throws MojoExecutionException If the configuration file cannot be updated
     private void patchLoggingFormat() throws MojoExecutionException {
         if (isEmpty(loggingFormat)) {
             return;
@@ -408,10 +444,10 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
         }
     }
 
-    /// Replaces the logging format in a line if it matches the pattern.
+    /// Replaces the logging format in a line if it matches the `SimpleFormatter` pattern.
     ///
-    /// @param line The input line
-    /// @return The updated line
+    /// @param line The original line from the properties file
+    /// @return The line with the updated format, or the original line if no match was found
     private String replaceLoggingFormat(String line) {
         if (LOG_FORMAT_REGEX.test(line)) {
             return JAVA_UTIL_LOGGING_SIMPLE_FORMATTER_FORMAT.formatted(loggingFormat);
@@ -419,10 +455,10 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
         return line;
     }
 
-    /// Substitutes command-line argument placeholders in a script line.
+    /// Injects custom command-line arguments into a launcher script line that uses `$@` or `%*`.
     ///
-    /// @param line The input line
-    /// @return The updated line
+    /// @param line The original script line
+    /// @return The line with custom arguments inserted before the original argument variable
     private String handleCommandLineArgs(String line) {
         if (line.stripTrailing().endsWith(COMMAND_ARGS_VAR)) {
             return line.replace(COMMAND_ARGS_VAR, commandlineArgs + " " + COMMAND_ARGS_VAR);
@@ -430,11 +466,14 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
         return line;
     }
 
-    /// Appends custom options to a JVM option line.
+    /// Appends custom JVM options to the appropriate line in the launcher script.
     ///
-    /// @param line          The original line
-    /// @param optionsString The options to append
-    /// @return The updated line
+    /// This method identifies lines that define JVM options for either Unix or Windows
+    /// and appends the provided options string.
+    ///
+    /// @param line          The original script line
+    /// @param optionsString The JVM options to be appended
+    /// @return The updated script line
     private String handleJvmOption(String line, String optionsString) {
         boolean unixOptionsLine = JLINK_VM_OPTIONS.equals(line);
         boolean winOptionsLine = WIN_JLINK_VM_OPTIONS.equals(line);
@@ -446,9 +485,11 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
         return line;
     }
 
-    /// Creates a ZIP archive of the application.
+    /// Packages the generated runtime image into a ZIP archive if configured.
     ///
-    /// @throws MojoExecutionException If an error occurs during zipping
+    /// The resulting ZIP file is then attached as the main artifact for the Maven project.
+    ///
+    /// @throws MojoExecutionException If the ZIP creation fails
     private void zipApplication() throws MojoExecutionException {
         if (isEmpty(jlinkZipName)) {
             return;
@@ -461,10 +502,10 @@ public final class JavaFXJlinkMojo extends BaseJavaFXMojo {
         getLog().info("Application zipped successfully");
     }
 
-    /// Creates a ZIP archive of the JavaFX runtime image.
+    /// Creates a ZIP archive containing all files from the generated runtime image directory.
     ///
-    /// @return The path to the created ZIP archive
-    /// @throws MojoExecutionException If an I/O error occurs
+    /// @return [Path] to the newly created ZIP archive
+    /// @throws MojoExecutionException If an I/O error occurs during archive creation
     private Path createApplicationZipArchive() throws MojoExecutionException {
         Path imageDirectory = buildDirectory.resolve(jlinkImageName);
         zipArchiver.addFileSet(

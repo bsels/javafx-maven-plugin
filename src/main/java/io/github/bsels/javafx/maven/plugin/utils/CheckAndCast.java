@@ -1,4 +1,4 @@
-package io.github.bsels.javafx.maven.plugin;
+package io.github.bsels.javafx.maven.plugin.utils;
 
 import java.util.Objects;
 import java.util.stream.Gatherer;

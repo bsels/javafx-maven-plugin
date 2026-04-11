@@ -82,7 +82,7 @@ public final class ObjectMapperProvider {
         private TypeJsonSerializer() {
         }
 
-        /// Serializes a [Type] object into its string representation.
+        /// Serializes an [Type] object into its string representation.
         ///
         /// @param type               The [Type] object to serialize
         /// @param jsonGenerator      The [JsonGenerator]

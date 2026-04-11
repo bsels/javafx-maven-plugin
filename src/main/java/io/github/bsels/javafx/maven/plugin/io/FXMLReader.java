@@ -28,44 +28,62 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-/// Parses FXML files, extracting import statements and XML structure.
+/// Parses FXML files, extracting import statements, language declarations, and the full XML structure.
 ///
-/// @param log The logger instance
+/// This class handles the initial phase of FXML processing by reading the file's header information
+/// (like imports and script language) and then performing a full XML parse of the document's content to build
+/// an internal representation.
+///
+/// @param log The logger instance used for reporting parsing progress and debugging information
 public record FXMLReader(Log log) {
-    /// Pattern to match FXML import statements.
+    /// Pattern to match FXML import statements, supporting both single classes and wildcard imports.
     private static final Pattern IMPORT_PATTERN = Pattern.compile("<\\?import\\s+((\\w+\\.)*(\\w+|\\*))\\s*\\?>");
-    /// Pattern to match FXML language declarations.
+    /// Pattern to match FXML language declarations, identifying the script language used in the file.
     private static final Pattern LANGUAGE_PATTERN = Pattern.compile("<\\?language\\s+(\\w+)\\s*\\?>");
-    /// Pattern to match non-word characters.
+    /// Pattern to match characters that are not valid in a Java identifier, used when deriving class names.
     private static final Pattern NON_NAME_CHAR_PATTERN = Pattern.compile("\\W");
-    /// Set of XML node types considered as text content.
+    /// Set of XML node types that are treated as textual content, including standard text and CDATA sections.
     private static final Set<Short> TEXT_NODE_TYPES = Set.of(Node.TEXT_NODE, Node.CDATA_SECTION_NODE);
 
-    /// Initializes a new [FXMLReader] instance.
+    /// Initializes a new [FXMLReader] instance with the provided Maven logger.
     ///
-    /// @param log The logger instance
-    /// @throws NullPointerException If `log` is null
-    public FXMLReader(Log log) {
-        this.log = Objects.requireNonNull(log);
+    /// @param log The logger instance to use for all logging operations during FXML parsing
+    /// @throws NullPointerException If the provided `log` is `null`
+    public FXMLReader {
+        Objects.requireNonNull(log, "`log` must not be null");
     }
 
-    /// Reads and parses an FXML file using UTF-8 encoding.
+    /// Reads and parses an FXML file from the specified path using the default UTF-8 encoding.
     ///
-    /// @param fxmlFile The path to the FXML file
-    /// @return A [ParsedFXML] instance
-    /// @throws MojoExecutionException If the file cannot be read or parsed
-    /// @throws NullPointerException   If `fxmlFile` is null
+    /// This is a convenience method that delegates to [#readFXML(Path, Charset)] with [StandardCharsets#UTF_8].
+    ///
+    /// @param fxmlFile The path to the FXML file to be read and parsed
+    /// @return A [ParsedFXML] instance containing the extracted headers, structure, and derived class name
+    /// @throws MojoExecutionException If an I/O error occurs while reading the file or if XML parsing fails
+    /// @throws NullPointerException   If the provided `fxmlFile` is `null`
     public ParsedFXML readFXML(Path fxmlFile) throws MojoExecutionException {
         return readFXML(fxmlFile, StandardCharsets.UTF_8);
     }
 
-    /// Reads and parses an FXML file with the specified charset.
+    /// Reads and parses an FXML file with the specified character set.
     ///
-    /// @param fxmlFile The path to the FXML file
-    /// @param charset  The character set to use
-    /// @return A [ParsedFXML] instance
-    /// @throws MojoExecutionException If the file cannot be read or parsed
-    /// @throws NullPointerException   If `fxmlFile` or `charset` is null
+    /// This method performs the parsing in two distinct passes:
+    /// 1. **Header Extraction**: It first streams the file lines to find and extract `<?import ... ?>`
+    ///    and `<?language ... ?>` processing instructions.
+    ///    It uses an optimized stream approach that skips empty lines and stops processing headers once it finds
+    ///    the first non-header element.
+    /// 2. **XML Structure Parsing**: It then performs a full XML parse using a `DocumentBuilder`.
+    ///    The parser is configured to be namespace-aware and to preserve comments while ignoring element-content
+    ///    whitespace.
+    ///
+    /// Finally, it derives a Java-compatible class name from the FXML filename and returns all information in
+    /// a [ParsedFXML] record.
+    ///
+    /// @param fxmlFile The path to the FXML file to be read and parsed
+    /// @param charset  The character set to use for reading the file content
+    /// @return A [ParsedFXML] instance containing all the information extracted from the FXML document
+    /// @throws MojoExecutionException If the file cannot be read, or if the XML content is malformed
+    /// @throws NullPointerException   If either `fxmlFile` or `charset` is `null`
     public ParsedFXML readFXML(Path fxmlFile, Charset charset) throws MojoExecutionException, NullPointerException {
         Objects.requireNonNull(fxmlFile, "`fxmlFile` must not be null");
         Objects.requireNonNull(charset, "`charset` must not be null");
@@ -112,11 +130,21 @@ public record FXMLReader(Log log) {
         return new ParsedFXML(headers.language(), headers.imports(), data, deriveClassName(fxmlFile));
     }
 
-    /// Parses an XML node and its subtree recursively.
+    /// Parses a standard XML node and its entire subtree recursively into an internal model.
     ///
-    /// @param node  The XML `Node` to parse
-    /// @param depth The current depth in the XML tree
-    /// @return A [ParsedXMLStructure] representing the node and its subtree
+    /// The processing logic for each node follows these steps:
+    /// 1. **Name Extraction**: Retrieves the XML tag name.
+    /// 2. **Property Extraction**: Iterates through the node's attributes,
+    ///    filtering out XML namespace declarations (`xmlns`), and maps them to a property map.
+    /// 3. **Child Element Processing**: Recursively processes all child nodes that are of type `ELEMENT_NODE` to build
+    ///    the hierarchy of [ParsedXMLStructure] objects.
+    /// 4. **Comment Extraction**: Collects all comments directly nested within this node.
+    /// 5. **Text Content Analysis**: If the node has no child elements,
+    ///    it attempts to extract and combine all direct text and CDATA child nodes.
+    ///
+    /// @param node  The DOM `Node` representing the current XML element being parsed
+    /// @param depth The current recursion depth, primarily used for formatted debug logging
+    /// @return A [ParsedXMLStructure] representing the node, its attributes, child elements, comments, and text content
     private ParsedXMLStructure readDocument(Node node, int depth) {
         String name = node.getNodeName();
         log.debug("Reading node: %s".formatted(name).indent(depth * 2).stripTrailing());
@@ -150,11 +178,17 @@ public record FXMLReader(Log log) {
         return new ParsedXMLStructure(name, properties, children, comments, textValue);
     }
 
-    /// Combines text content from child nodes into a single string.
+    /// Combines the text content from all direct child text nodes into a single string.
     ///
-    /// @param children   The list of parsed child elements
-    /// @param childNodes The raw list of child nodes
-    /// @return An [Optional] containing the combined text content
+    /// This method is only applied to nodes that do not contain any child elements.
+    /// It collects the values from all child nodes whose type is in [TEXT_NODE_TYPES] (standard text or CDATA),
+    /// joins them together, and performs indentation stripping via [Utils#stripIndentNonBlankLines].
+    ///
+    /// If the node has child elements or if the resulting combined text is blank, an empty [Optional] is returned.
+    ///
+    /// @param children   The list of already parsed child elements (used to check if any exist)
+    /// @param childNodes The full list of raw XML child nodes to scan for text content
+    /// @return An [Optional] containing the combined, cleaned text content, or empty if none is available
     private Optional<String> getCombinedTextContent(List<ParsedXMLStructure> children, NodeList childNodes) {
         if (!children.isEmpty()) {
             return Optional.empty();
@@ -168,10 +202,16 @@ public record FXMLReader(Log log) {
                 .filter(Predicate.not(String::isBlank));
     }
 
-    /// Derives a Java class name from the specified FXML file path.
+    /// Derives a valid Java class name from the filename of the specified FXML file.
     ///
-    /// @param fxmlFile The path to the FXML file
-    /// @return The derived class name
+    /// The process involves:
+    /// 1. Extracting the filename from the path.
+    /// 2. Removing the file extension.
+    /// 3. Replacing all non-alphanumeric characters (any character matching `\W`) with an underscore
+    ///    to ensure the resulting name can be used as a Java identifier for the generated class.
+    ///
+    /// @param fxmlFile The path to the FXML file whose name will be used
+    /// @return A string representing the derived Java-compatible class name
     private String deriveClassName(Path fxmlFile) {
         String fileName = fxmlFile.getFileName().toString();
         String baseName = fileName.substring(0, fileName.lastIndexOf('.'));

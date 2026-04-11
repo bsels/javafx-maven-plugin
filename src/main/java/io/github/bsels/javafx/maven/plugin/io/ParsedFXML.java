@@ -23,11 +23,11 @@ public record ParsedFXML(
     /// @param imports         The list of import statements
     /// @param root            The root XML structure
     /// @param className       The derived Java class name
-    /// @throws NullPointerException If `root` is null
+    /// @throws NullPointerException If `root`, `className`, or `scriptNamespace` is null
     public ParsedFXML {
-        Objects.requireNonNull(scriptNamespace);
+        Objects.requireNonNull(scriptNamespace, "`scriptNamespace` must not be null");
         imports = List.copyOf(Objects.requireNonNullElseGet(imports, List::of));
-        Objects.requireNonNull(root);
-        Objects.requireNonNull(className);
+        Objects.requireNonNull(root, "`root` must not be null");
+        Objects.requireNonNull(className, "`className` must not be null");
     }
 }
