@@ -22,11 +22,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import java.util.stream.Gatherer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UtilsTest {
 
@@ -495,6 +499,172 @@ class UtilsTest {
             assertThat(results)
                     .containsExactly(1, 2, 3);
         }
+
+        @Test
+        void testOptionalGathererStopsWhenDownstreamRejects() {
+            // Arrange - limit(1) causes downstream to reject after first element
+            Gatherer<? super Optional<String>, Void, String> gatherer = Utils.optional();
+            List<Optional<String>> optionalList = List.of(
+                    Optional.of("First"),
+                    Optional.of("Second"),
+                    Optional.of("Third")
+            );
+
+            // Act
+            List<String> results = optionalList.stream().gather(gatherer).limit(1).toList();
+
+            // Assert
+            assertThat(results).containsExactly("First");
+        }
+
+        @Test
+        void testOptionalGathererEmptyOptionalWhenDownstreamIsRejecting() {
+            // Arrange - limit(1) causes downstream to reject; empty optional should return !isRejecting()
+            Gatherer<? super Optional<String>, Void, String> gatherer = Utils.optional();
+            List<Optional<String>> optionalList = List.of(
+                    Optional.of("First"),
+                    Optional.empty(),
+                    Optional.of("Second")
+            );
+
+            // Act
+            List<String> results = optionalList.stream().gather(gatherer).limit(1).toList();
+
+            // Assert
+            assertThat(results).containsExactly("First");
+        }
+
+        @Test
+        void testOptionalGathererEmptyOptionalWithRejectingDownstreamViaIntegrator() {
+            // Directly invoke the integrator with a rejecting downstream to cover the
+            // orElseGet(() -> !downstream.isRejecting()) branch when isRejecting() == true
+            Gatherer<Optional<String>, Void, String> gatherer = Utils.optional();
+            Gatherer.Integrator<Void, Optional<String>, String> integrator = gatherer.integrator();
+
+            Gatherer.Downstream<String> rejectingDownstream = new Gatherer.Downstream<>() {
+                @Override
+                public boolean push(String element) {
+                    return false;
+                }
+
+                @Override
+                public boolean isRejecting() {
+                    return true;
+                }
+            };
+
+            // Act - empty optional with rejecting downstream: orElseGet returns !true == false
+            boolean result = integrator.integrate(null, Optional.empty(), rejectingDownstream);
+
+            // Assert
+            assertThat(result).isFalse();
+        }
+
+    }
+
+    @Nested
+    class UniqueGathererTest {
+
+        @Test
+        void shouldPassUniqueElements() {
+            // Given
+            List<String> input = List.of("a", "b", "c");
+
+            // When
+            List<String> result = input.stream().gather(Utils.unique()).toList();
+
+            // Then
+            assertThat(result).containsExactly("a", "b", "c");
+        }
+
+        @Test
+        void shouldFilterDuplicates() {
+            // Given
+            List<String> input = List.of("a", "b", "a", "c", "b");
+
+            // When
+            List<String> result = input.stream().gather(Utils.unique()).toList();
+
+            // Then
+            assertThat(result).containsExactly("a", "b", "c");
+        }
+
+        @Test
+        void shouldFilterNullElements() {
+            // Given
+            List<String> input = new ArrayList<>();
+            input.add("a");
+            input.add(null);
+            input.add("b");
+
+            // When
+            List<String> result = input.stream().gather(Utils.unique()).toList();
+
+            // Then
+            assertThat(result).containsExactly("a", "b");
+        }
+
+        @Test
+        void shouldReturnFalseWhenDownstreamRejectsOnDuplicate() {
+            // Given - "a" is pushed (accepted), then "a" again is a duplicate so
+            // isDownstreamAccepting is called; with limit(1) downstream is rejecting
+            List<String> input = List.of("a", "a", "b");
+
+            // When
+            List<String> result = input.stream()
+                    .gather(Utils.unique())
+                    .limit(1)
+                    .toList();
+
+            // Then
+            assertThat(result).containsExactly("a");
+        }
+
+        @Test
+        void shouldReturnFalseWhenDownstreamRejectsOnNull() {
+            // Given - "a" is pushed (accepted by limit(1)), then null is a duplicate-like
+            // (not added to set), so isDownstreamAccepting is called with rejecting downstream
+            List<String> input = new ArrayList<>();
+            input.add("a");
+            input.add(null);
+            input.add("b");
+
+            // When
+            List<String> result = input.stream()
+                    .gather(Utils.unique())
+                    .limit(1)
+                    .toList();
+
+            // Then
+            assertThat(result).containsExactly("a");
+        }
+
+        @Test
+        void shouldReturnFalseFromIsDownstreamAcceptingWhenRejectingViaIntegrator() {
+            // Directly invoke unique() integrator with a rejecting downstream and a duplicate
+            // to cover the isDownstreamAccepting branch when isRejecting() == true
+            Gatherer<String, Set<String>, String> gatherer = Utils.unique();
+            Gatherer.Integrator<Set<String>, String, String> integrator = gatherer.integrator();
+
+            Gatherer.Downstream<String> rejectingDownstream = new Gatherer.Downstream<>() {
+                @Override
+                public boolean push(String element) {
+                    return false;
+                }
+
+                @Override
+                public boolean isRejecting() {
+                    return true;
+                }
+            };
+
+            Set<String> state = new java.util.HashSet<>();
+            // null element: Optional.ofNullable(null).filter(...) is empty, so orElseGet is called
+            // with isRejecting() == true -> returns false
+            boolean result = integrator.integrate(state, null, rejectingDownstream);
+
+            assertThat(result).isFalse();
+        }
     }
 
     @Nested
@@ -962,6 +1132,199 @@ class UtilsTest {
     }
 
     @Nested
+    class FindObjectGetterTest {
+
+        @Test
+        void shouldFindGetterWithNoParameters() {
+            // Given
+            Class<?> clazz = TestClassWithGetters.class;
+
+            // When
+            Optional<Method> result = Utils.findObjectGetter(clazz, "getName");
+
+            // Then
+            assertThat(result)
+                    .isPresent()
+                    .get()
+                    .hasFieldOrPropertyWithValue("name", "getName")
+                    .hasFieldOrPropertyWithValue("parameterCount", 0);
+        }
+
+        @Test
+        void shouldReturnEmptyWhenGetterHasParameters() {
+            // Given - method named "getWithParam" but takes a parameter, so should be excluded
+            Class<?> clazz = TestClassWithGetters.class;
+
+            // When
+            Optional<Method> result = Utils.findObjectGetter(clazz, "getWithParam");
+
+            // Then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        void shouldReturnEmptyWhenGetterNotFound() {
+            // Given
+            Class<?> clazz = TestClassWithGetters.class;
+
+            // When
+            Optional<Method> result = Utils.findObjectGetter(clazz, "getNonExistent");
+
+            // Then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        void shouldExcludeStaticGetters() {
+            // Given
+            Class<?> clazz = TestClassWithGetters.class;
+
+            // When
+            Optional<Method> result = Utils.findObjectGetter(clazz, "getStaticValue");
+
+            // Then
+            assertThat(result).isEmpty();
+        }
+
+        static class TestClassWithGetters {
+
+            public static String getStaticValue() {
+                return "static";
+            }
+
+            public String getName() {
+                return "name";
+            }
+
+            public String getWithParam(String param) {
+                return param;
+            }
+        }
+    }
+
+    @Nested
+    class FindCollectionValueTypeFromHierarchyTest {
+
+        @Test
+        void shouldReturnElementTypeForDirectCollectionImplementation() {
+            // When
+            Class<?> result = Utils.findCollectionValueTypeFromHierarchy(DirectStringCollection.class);
+
+            // Then
+            assertThat(result).isEqualTo(String.class);
+        }
+
+        @Test
+        void shouldReturnObjectForNullClass() {
+            // When - null clazz triggers the null check in findGenericTypeFromHierarchy
+            Class<?> result = Utils.findMapKeyTypeFromHierarchy(null);
+
+            // Then
+            assertThat(result).isEqualTo(Object.class);
+        }
+
+        @Test
+        void shouldReturnObjectForRawCollection() {
+            // When
+            Class<?> result = Utils.findCollectionValueTypeFromHierarchy(Object.class);
+
+            // Then
+            assertThat(result).isEqualTo(Object.class);
+        }
+
+        @Test
+        void shouldReturnObjectWhenClassIsTargetInterface() {
+            // When - passing Collection.class itself as the clazz
+            Class<?> result = Utils.findCollectionValueTypeFromHierarchy(java.util.Collection.class);
+
+            // Then
+            assertThat(result).isEqualTo(Object.class);
+        }
+
+        @Test
+        void shouldFindTypeViaInterfaceTraversal() {
+            // When - StringCollectionViaInterface implements StringCollection which extends Collection<String>
+            Class<?> result = Utils.findCollectionValueTypeFromHierarchy(StringCollectionViaInterface.class);
+
+            // Then
+            assertThat(result).isEqualTo(String.class);
+        }
+
+        @Test
+        void shouldFindTypeViaSuperclassTraversal() {
+            // When - subclass of DirectStringCollection; superclass directly implements Collection<String>
+            class SubOfDirect extends DirectStringCollection {
+                // inherits Collection<String> via superclass
+                public int size() {
+                    return 0;
+                }
+
+                public boolean isEmpty() {
+                    return true;
+                }
+
+                public boolean contains(Object o) {
+                    return false;
+                }
+
+                public java.util.Iterator<String> iterator() {
+                    return java.util.Collections.emptyIterator();
+                }
+
+                public Object[] toArray() {
+                    return new Object[0];
+                }
+
+                public <T> T[] toArray(T[] a) {
+                    return a;
+                }
+
+                public boolean add(String s) {
+                    return false;
+                }
+
+                public boolean remove(Object o) {
+                    return false;
+                }
+
+                public boolean containsAll(java.util.Collection<?> c) {
+                    return false;
+                }
+
+                public boolean addAll(java.util.Collection<? extends String> c) {
+                    return false;
+                }
+
+                public boolean removeAll(java.util.Collection<?> c) {
+                    return false;
+                }
+
+                public boolean retainAll(java.util.Collection<?> c) {
+                    return false;
+                }
+
+                public void clear() {
+                }
+            }
+
+            Class<?> result = Utils.findCollectionValueTypeFromHierarchy(SubOfDirect.class);
+
+            assertThat(result).isEqualTo(String.class);
+        }
+
+        // Implements an interface that extends Collection<String> - tests interface traversal path
+        interface StringCollection extends java.util.Collection<String> {
+        }
+
+        // Directly implements Collection<String> so generic type info is preserved
+        static abstract class DirectStringCollection implements java.util.Collection<String> {
+        }
+
+        static abstract class StringCollectionViaInterface implements StringCollection {
+        }
+    }
+
+    @Nested
     class FindStaticSettersForNodeTest {
 
         @Test
@@ -971,7 +1334,7 @@ class UtilsTest {
             String setterName = "setNodeProperty";
 
             // When
-            List<Method> result = Utils.findStaticSettersForNode(clazz, setterName);
+            List<Method> result = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
 
             // Then
             assertThat(result).hasSize(1);
@@ -990,7 +1353,7 @@ class UtilsTest {
             String setterName = "setOverloadedProperty";
 
             // When
-            List<Method> result = Utils.findStaticSettersForNode(clazz, setterName);
+            List<Method> result = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
 
             // Then
             assertThat(result).hasSize(2);
@@ -1012,7 +1375,7 @@ class UtilsTest {
             String setterName = "setNonExistentProperty";
 
             // When
-            List<Method> result = Utils.findStaticSettersForNode(clazz, setterName);
+            List<Method> result = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
 
             // Then
             assertThat(result).isEmpty();
@@ -1025,7 +1388,7 @@ class UtilsTest {
             String setterName = "setInstanceProperty";
 
             // When
-            List<Method> result = Utils.findStaticSettersForNode(clazz, setterName);
+            List<Method> result = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
 
             // Then
             assertThat(result).isEmpty();
@@ -1039,8 +1402,8 @@ class UtilsTest {
             String threeParamSetterName = "setThreeParams";
 
             // When
-            List<Method> oneParamResult = Utils.findStaticSettersForNode(clazz, oneParamSetterName);
-            List<Method> threeParamResult = Utils.findStaticSettersForNode(clazz, threeParamSetterName);
+            List<Method> oneParamResult = Utils.findStaticSettersForNode(Node.class, clazz, oneParamSetterName);
+            List<Method> threeParamResult = Utils.findStaticSettersForNode(Node.class, clazz, threeParamSetterName);
 
             // Then
             assertThat(oneParamResult).isEmpty();
@@ -1054,7 +1417,7 @@ class UtilsTest {
             String setterName = "setNonNodeProperty";
 
             // When
-            List<Method> result = Utils.findStaticSettersForNode(clazz, setterName);
+            List<Method> result = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
 
             // Then
             assertThat(result).isEmpty();
@@ -1067,7 +1430,7 @@ class UtilsTest {
             String setterName = "setGenericProperty";
 
             // When
-            List<Method> result = Utils.findStaticSettersForNode(clazz, setterName);
+            List<Method> result = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
 
             // Then
             assertThat(result).hasSize(1);
@@ -1082,7 +1445,7 @@ class UtilsTest {
             String setterName = "setPrimitiveProperty";
 
             // When
-            List<Method> result = Utils.findStaticSettersForNode(clazz, setterName);
+            List<Method> result = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
 
             // Then
             assertThat(result).hasSize(1);
@@ -1097,7 +1460,7 @@ class UtilsTest {
             String setterName = "setArrayProperty";
 
             // When
-            List<Method> result = Utils.findStaticSettersForNode(clazz, setterName);
+            List<Method> result = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
 
             // Then
             assertThat(result).hasSize(1);
@@ -1112,7 +1475,7 @@ class UtilsTest {
             String setterName = "setParentStaticProperty";
 
             // When
-            List<Method> result = Utils.findStaticSettersForNode(clazz, setterName);
+            List<Method> result = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
 
             // Then
             assertThat(result).hasSize(1);
@@ -1127,7 +1490,7 @@ class UtilsTest {
             String setterName = null;
 
             // When & Then
-            assertThatThrownBy(() -> Utils.findStaticSettersForNode(clazz, setterName))
+            assertThatThrownBy(() -> Utils.findStaticSettersForNode(Node.class, clazz, setterName))
                     .isInstanceOf(NullPointerException.class);
         }
 
@@ -1138,7 +1501,7 @@ class UtilsTest {
             String setterName = "";
 
             // When
-            List<Method> result = Utils.findStaticSettersForNode(clazz, setterName);
+            List<Method> result = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
 
             // Then
             assertThat(result).isEmpty();
@@ -1151,8 +1514,8 @@ class UtilsTest {
             String setterName = "setOverloadedProperty";
 
             // When - Call multiple times
-            List<Method> result1 = Utils.findStaticSettersForNode(clazz, setterName);
-            List<Method> result2 = Utils.findStaticSettersForNode(clazz, setterName);
+            List<Method> result1 = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
+            List<Method> result2 = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
 
             // Then - Results should be consistent
             assertThat(result1).hasSize(result2.size());
@@ -1166,7 +1529,7 @@ class UtilsTest {
             String setterName = "setRowIndex";
 
             // When
-            List<Method> result = Utils.findStaticSettersForNode(clazz, setterName);
+            List<Method> result = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
 
             // Then
             assertThat(result).hasSize(1);
@@ -1184,7 +1547,7 @@ class UtilsTest {
             String setterName = "setColumnIndex";
 
             // When
-            List<Method> result = Utils.findStaticSettersForNode(clazz, setterName);
+            List<Method> result = Utils.findStaticSettersForNode(Node.class, clazz, setterName);
 
             // Then
             assertThat(result).hasSize(1);
@@ -1580,6 +1943,319 @@ class UtilsTest {
     }
 
     @Nested
+    class SplitStringTest {
+
+        @Test
+        void shouldSplitByDelimiter() {
+            // Given
+            String input = "a:b:c";
+
+            // When
+            List<String> result = Utils.splitString(input, ':').toList();
+
+            // Then
+            assertThat(result).containsExactly("a", "b", "c");
+        }
+
+        @Test
+        void shouldIgnoreEmptySegmentsBetweenConsecutiveDelimiters() {
+            // Given
+            String input = "a::b";
+
+            // When
+            List<String> result = Utils.splitString(input, ':').toList();
+
+            // Then
+            assertThat(result).containsExactly("a", "b");
+        }
+
+        @Test
+        void shouldIgnoreLeadingDelimiter() {
+            // Given
+            String input = ":a:b";
+
+            // When
+            List<String> result = Utils.splitString(input, ':').toList();
+
+            // Then
+            assertThat(result).containsExactly("a", "b");
+        }
+
+        @Test
+        void shouldIgnoreTrailingDelimiter() {
+            // Given
+            String input = "a:b:";
+
+            // When
+            List<String> result = Utils.splitString(input, ':').toList();
+
+            // Then
+            assertThat(result).containsExactly("a", "b");
+        }
+
+        @Test
+        void shouldReturnSingleElementWhenNoDelimiter() {
+            // Given
+            String input = "abc";
+
+            // When
+            List<String> result = Utils.splitString(input, ':').toList();
+
+            // Then
+            assertThat(result).containsExactly("abc");
+        }
+
+        @Test
+        void shouldReturnEmptyStreamForEmptyString() {
+            // Given
+            String input = "";
+
+            // When
+            List<String> result = Utils.splitString(input, ':').toList();
+
+            // Then
+            assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    class SplitByCommaOutsideBracketsTest {
+
+        @Test
+        void shouldSplitSimpleCommaSeparatedValues() {
+            // Given
+            String input = "a, b, c";
+
+            // When
+            List<String> result = Utils.splitByCommaOutsideBrackets(input).toList();
+
+            // Then
+            assertThat(result).containsExactly("a", "b", "c");
+        }
+
+        @Test
+        void shouldNotSplitCommaInsideAngleBrackets() {
+            // Given
+            String input = "Map<String, Integer>, List<String>";
+
+            // When
+            List<String> result = Utils.splitByCommaOutsideBrackets(input).toList();
+
+            // Then
+            assertThat(result).containsExactly("Map<String, Integer>", "List<String>");
+        }
+
+        @Test
+        void shouldHandleNestedAngleBrackets() {
+            // Given
+            String input = "Map<String, List<Integer>>, String";
+
+            // When
+            List<String> result = Utils.splitByCommaOutsideBrackets(input).toList();
+
+            // Then
+            assertThat(result).containsExactly("Map<String, List<Integer>>", "String");
+        }
+
+        @Test
+        void shouldIgnoreBlankSegments() {
+            // Given
+            String input = "a,  , b";
+
+            // When
+            List<String> result = Utils.splitByCommaOutsideBrackets(input).toList();
+
+            // Then
+            assertThat(result).containsExactly("a", "b");
+        }
+
+        @Test
+        void shouldReturnSingleElementWhenNoComma() {
+            // Given
+            String input = "String";
+
+            // When
+            List<String> result = Utils.splitByCommaOutsideBrackets(input).toList();
+
+            // Then
+            assertThat(result).containsExactly("String");
+        }
+
+        @Test
+        void shouldReturnEmptyStreamForBlankString() {
+            // Given
+            String input = "   ";
+
+            // When
+            List<String> result = Utils.splitByCommaOutsideBrackets(input).toList();
+
+            // Then
+            assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    class SingletonOrEmptyTest {
+
+        @Test
+        void shouldReturnEmptyOptionalForEmptyCollection() {
+            // Given
+            List<String> collection = List.of();
+
+            // When
+            Optional<String> result = Utils.<String, List<String>>singletonOrEmpty().apply(collection);
+
+            // Then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        void shouldReturnSingleElementOptional() {
+            // Given
+            List<String> collection = List.of("only");
+
+            // When
+            Optional<String> result = Utils.<String, List<String>>singletonOrEmpty().apply(collection);
+
+            // Then
+            assertThat(result).contains("only");
+        }
+
+        @Test
+        void shouldThrowWhenCollectionHasMoreThanOneElement() {
+            // Given
+            List<String> collection = List.of("a", "b");
+
+            // When & Then
+            assertThatThrownBy(() -> Utils.<String, List<String>>singletonOrEmpty().apply(collection))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Expected an empty or singleton collection, found 2 elements");
+        }
+    }
+
+    @Nested
+    class DropBlankLinesAtEndTest {
+
+        @Test
+        void shouldDropTrailingBlankLines() {
+            // Given
+            List<String> input = List.of("line1", "line2", "", "");
+
+            // When
+            List<String> result = input.stream()
+                    .gather(Utils.dropBlankLinesAtEnd())
+                    .toList();
+
+            // Then
+            assertThat(result).containsExactly("line1", "line2");
+        }
+
+        @Test
+        void shouldPreserveBlankLinesInMiddle() {
+            // Given
+            List<String> input = List.of("line1", "", "line2", "");
+
+            // When
+            List<String> result = input.stream()
+                    .gather(Utils.dropBlankLinesAtEnd())
+                    .toList();
+
+            // Then
+            assertThat(result).containsExactly("line1", "", "line2");
+        }
+
+        @Test
+        void shouldReturnEmptyForAllBlankLines() {
+            // Given
+            List<String> input = List.of("", "", "");
+
+            // When
+            List<String> result = input.stream()
+                    .gather(Utils.dropBlankLinesAtEnd())
+                    .toList();
+
+            // Then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        void shouldHandleNullLines() {
+            // Given
+            List<String> input = new ArrayList<>();
+            input.add("line1");
+            input.add(null);
+
+            // When
+            List<String> result = input.stream()
+                    .gather(Utils.dropBlankLinesAtEnd())
+                    .toList();
+
+            // Then
+            assertThat(result).containsExactly("line1");
+        }
+
+        @Test
+        void shouldStopWhenDownstreamRejects() {
+            // Given - limit(1) causes downstream to reject after first element
+            List<String> input = List.of("line1", "", "line2");
+
+            // When
+            List<String> result = input.stream()
+                    .gather(Utils.dropBlankLinesAtEnd())
+                    .limit(1)
+                    .toList();
+
+            // Then
+            assertThat(result).containsExactly("line1");
+        }
+
+        @Test
+        void shouldStopWhenDownstreamRejectsDuringQueueFlush() {
+            // Given - blank lines are queued, then a non-blank triggers flush,
+            // but limit(1) causes downstream to reject during the flush of queued blanks
+            List<String> input = List.of("line1", "", "", "line2", "line3");
+
+            // When - limit(2) accepts "line1" then rejects on first queued blank during flush
+            List<String> result = input.stream()
+                    .gather(Utils.dropBlankLinesAtEnd())
+                    .limit(2)
+                    .toList();
+
+            // Then
+            assertThat(result).containsExactly("line1", "");
+        }
+    }
+
+    @Nested
+    class MergeTest {
+
+        @Test
+        void shouldApplyFunctionAndReturnFirstArgument() {
+            // Given
+            List<String> first = new ArrayList<>(List.of("a"));
+            List<String> second = new ArrayList<>(List.of("b"));
+
+            // When
+            List<String> result = Utils.<List<String>>merge(List::addAll).apply(first, second);
+
+            // Then
+            assertThat(result).isSameAs(first).containsExactly("a", "b");
+        }
+    }
+
+    @Nested
+    class DuplicateThrowExceptionTest {
+
+        @Test
+        void shouldThrowIllegalStateExceptionOnDuplicate() {
+            // When & Then
+            assertThatThrownBy(() -> Utils.duplicateThrowException().apply("a", "b"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Duplicate key not allowed in set or map");
+        }
+    }
+
+    @Nested
     class UriToUrlTest {
 
         @Test
@@ -1603,6 +2279,229 @@ class UtilsTest {
                     .hasHost("www.google.com")
                     .hasNoPort()
                     .hasProtocol("https");
+        }
+    }
+
+    @Nested
+    class StripIndentNonBlankLinesTest {
+
+        @Test
+        void shouldStripCommonLeadingWhitespace() {
+            // Given
+            String text = "    hello\n    world\n";
+
+            // When
+            String result = Utils.stripIndentNonBlankLines(text);
+
+            // Then
+            assertThat(result).isEqualTo("hello\nworld\n");
+        }
+
+        @Test
+        void shouldPreserveRelativeIndentation() {
+            // Given
+            String text = "    hello\n        world\n";
+
+            // When
+            String result = Utils.stripIndentNonBlankLines(text);
+
+            // Then
+            assertThat(result).isEqualTo("hello\n    world\n");
+        }
+
+        @Test
+        void shouldDropLeadingBlankLines() {
+            // Given
+            String text = "\n\n    hello\n    world\n";
+
+            // When
+            String result = Utils.stripIndentNonBlankLines(text);
+
+            // Then
+            assertThat(result).isEqualTo("hello\nworld\n");
+        }
+
+        @Test
+        void shouldDropTrailingBlankLines() {
+            // Given
+            String text = "    hello\n    world\n\n\n";
+
+            // When
+            String result = Utils.stripIndentNonBlankLines(text);
+
+            // Then
+            assertThat(result).isEqualTo("hello\nworld\n");
+        }
+
+        @Test
+        void shouldTreatBlankLinesAsHavingMaxIndent() {
+            // Given - blank line should not affect the common indent calculation
+            String text = "    hello\n\n    world\n";
+
+            // When
+            String result = Utils.stripIndentNonBlankLines(text);
+
+            // Then
+            assertThat(result).isEqualTo("hello\n\nworld\n");
+        }
+
+        @Test
+        void shouldHandleEmptyString() {
+            // Given
+            String text = "";
+
+            // When
+            String result = Utils.stripIndentNonBlankLines(text);
+
+            // Then
+            assertThat(result).isEqualTo("\n");
+        }
+
+        @Test
+        void shouldHandleNoIndentation() {
+            // Given
+            String text = "hello\nworld\n";
+
+            // When
+            String result = Utils.stripIndentNonBlankLines(text);
+
+            // Then
+            assertThat(result).isEqualTo("hello\nworld\n");
+        }
+
+        @Test
+        void shouldHandleTrailingWhitespace() {
+            // Given
+            String text = "hello                \nworld                 \n";
+
+            // When
+            String result = Utils.stripIndentNonBlankLines(text);
+
+            // Then
+            assertThat(result).isEqualTo("hello\nworld\n");
+        }
+    }
+
+    @Nested
+    class CollectPatternTest {
+
+        @Test
+        void shouldCollectCapturedGroupsFromMatchingLines() {
+            // Given - collectPattern uses group(1), so pattern must have a capturing group
+            Pattern pattern = Pattern.compile("^import ([\\w.]+)");
+            List<String> lines = List.of("import java.util.List", "class Foo {}", "import java.util.Map");
+
+            // When
+            List<String> result = lines.stream().collect(Utils.collectPattern(pattern));
+
+            // Then - group(1) is captured
+            assertThat(result).containsExactly("java.util.List", "java.util.Map");
+        }
+
+        @Test
+        void shouldReturnEmptyListWhenNoMatches() {
+            // Given
+            Pattern pattern = Pattern.compile("^import ([\\w.]+)");
+            List<String> lines = List.of("class Foo {}", "void bar() {}");
+
+            // When
+            List<String> result = lines.stream().collect(Utils.collectPattern(pattern));
+
+            // Then
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        void shouldReturnImmutableList() {
+            // Given
+            Pattern pattern = Pattern.compile("(\\w+)");
+            List<String> lines = List.of("a", "b");
+
+            // When
+            List<String> result = lines.stream().collect(Utils.collectPattern(pattern));
+
+            // Then
+            assertThatThrownBy(() -> result.add("c"))
+                    .isInstanceOf(UnsupportedOperationException.class);
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullPattern() {
+            // When & Then
+            assertThatThrownBy(() -> Utils.collectPattern(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("pattern must not be null");
+        }
+
+        @Test
+        void shouldCollectMultipleMatchesPerLine() {
+            // Given - pattern matches multiple times per line
+            Pattern pattern = Pattern.compile("(\\w+)");
+            List<String> lines = List.of("hello world");
+
+            // When
+            List<String> result = lines.stream().collect(Utils.collectPattern(pattern));
+
+            // Then - each match's group(1) is collected
+            assertThat(result).containsExactly("hello", "world");
+        }
+    }
+
+    @Nested
+    class FindMapValueTypeFromHierarchyTest {
+
+        @Test
+        void shouldReturnValueTypeForDirectMapImplementation() {
+            // When
+            Class<?> result = Utils.findMapValueTypeFromHierarchy(DirectStringIntegerMap.class);
+
+            // Then
+            assertThat(result).isEqualTo(Integer.class);
+        }
+
+        @Test
+        void shouldReturnValueTypeViaInterfaceTraversal() {
+            // When
+            Class<?> result = Utils.findMapValueTypeFromHierarchy(StringIntegerMapViaInterface.class);
+
+            // Then
+            assertThat(result).isEqualTo(Integer.class);
+        }
+
+        @Test
+        void shouldReturnObjectForNullClass() {
+            // When
+            Class<?> result = Utils.findMapValueTypeFromHierarchy(null);
+
+            // Then
+            assertThat(result).isEqualTo(Object.class);
+        }
+
+        @Test
+        void shouldReturnObjectForRawMap() {
+            // When
+            Class<?> result = Utils.findMapValueTypeFromHierarchy(Object.class);
+
+            // Then
+            assertThat(result).isEqualTo(Object.class);
+        }
+
+        @Test
+        void shouldReturnObjectWhenClassIsMapInterface() {
+            // When
+            Class<?> result = Utils.findMapValueTypeFromHierarchy(Map.class);
+
+            // Then
+            assertThat(result).isEqualTo(Object.class);
+        }
+
+        interface StringIntegerMap extends Map<String, Integer> {
+        }
+
+        static abstract class DirectStringIntegerMap implements Map<String, Integer> {
+        }
+
+        static abstract class StringIntegerMapViaInterface implements StringIntegerMap {
         }
     }
 
@@ -1633,6 +2532,50 @@ class UtilsTest {
             // When & Then
             assertThat(Utils.urlPathToOsPathString(urlOfPath))
                     .isEqualTo(path.toString());
+        }
+    }
+
+    @Nested
+    class CheckRawTypeTest {
+
+        private static Predicate<ParameterizedType> invokeCheckRawType(Class<?> targetInterface) throws Exception {
+            Method method = Utils.class.getDeclaredMethod("checkRawType", Class.class);
+            method.setAccessible(true);
+            //noinspection unchecked
+            return (Predicate<ParameterizedType>) method.invoke(null, targetInterface);
+        }
+
+        @Test
+        void shouldMatchTargetInterface() throws Exception {
+            // Given
+            Predicate<ParameterizedType> predicate = invokeCheckRawType(List.class);
+            // Anonymous class implementing List<String>
+            ParameterizedType listStringType = (ParameterizedType) new ArrayList<String>() {
+            }.getClass().getGenericSuperclass();
+
+            // When
+            boolean result = predicate.test(listStringType);
+
+            // Then - The raw type of ArrayList<String> is ArrayList.class, not List.class
+            assertFalse(result);
+
+            // Let's use a type whose raw type IS List.class
+            Predicate<ParameterizedType> listPredicate = invokeCheckRawType(ArrayList.class);
+            assertTrue(listPredicate.test(listStringType));
+        }
+
+        @Test
+        void shouldNotMatchDifferentInterface() throws Exception {
+            // Given
+            Predicate<ParameterizedType> predicate = invokeCheckRawType(Map.class);
+            ParameterizedType listStringType = (ParameterizedType) new ArrayList<String>() {
+            }.getClass().getGenericSuperclass();
+
+            // When
+            boolean result = predicate.test(listStringType);
+
+            // Then
+            assertFalse(result);
         }
     }
 }

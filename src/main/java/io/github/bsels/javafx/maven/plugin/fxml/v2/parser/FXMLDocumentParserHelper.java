@@ -21,6 +21,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMethod;
 import io.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
 import io.github.bsels.javafx.maven.plugin.utils.InternalClassNotFoundException;
 import io.github.bsels.javafx.maven.plugin.utils.Utils;
+import javafx.scene.Node;
 import org.apache.maven.plugin.logging.Log;
 
 import java.lang.reflect.Constructor;
@@ -204,7 +205,8 @@ final class FXMLDocumentParserHelper {
         List<Method> setters;
         try {
             staticClass = Utils.findType(buildContext.imports(), className);
-            setters = Utils.findStaticSettersForNode(staticClass, setterName);
+            // TODO: Use actual class instead of `Node.class`
+            setters = Utils.findStaticSettersForNode(Node.class, staticClass, setterName);
         } catch (InternalClassNotFoundException e) {
             log.warn("Could not resolve static property class '%s', skipping attribute '%s'".formatted(
                     className,

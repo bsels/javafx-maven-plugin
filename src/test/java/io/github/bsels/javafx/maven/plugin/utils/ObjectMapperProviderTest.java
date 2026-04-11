@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -72,6 +73,49 @@ class ObjectMapperProviderTest {
 
         public String getButThrowsError() {
             throw new RuntimeException("Test exception");
+        }
+    }
+
+    @Nested
+    class PrettyPrintTest {
+
+        @Test
+        void prettyPrintSucceeds() {
+            assertThat(ObjectMapperProvider.prettyPrint(Map.of("key", "value")))
+                    .contains("key")
+                    .contains("value");
+        }
+
+        @Test
+        void prettyPrintReturnsSameInstanceOnSecondCall() throws NoSuchFieldException, IllegalAccessException {
+            // Reset OBJECT_WRITER to null to force re-creation
+            Field field = ObjectMapperProvider.class.getDeclaredField("OBJECT_WRITER");
+            field.setAccessible(true);
+            field.set(null, null);
+
+            // First call creates the writer
+            String first = ObjectMapperProvider.prettyPrint("test");
+            // Second call reuses the writer
+            String second = ObjectMapperProvider.prettyPrint("test");
+
+            assertThat(first).isEqualTo(second);
+        }
+
+        private static class UnserializableClass {
+
+            public String getButThrowsError() {
+                throw new RuntimeException("Pretty print test exception");
+            }
+        }
+
+        @Test
+        void prettyPrintFailsWithIllegalArgumentException() {
+            assertThatThrownBy(() -> ObjectMapperProvider.prettyPrint(new UnserializableClass()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Unable to pretty print the object value")
+                    .cause()
+                    .isInstanceOf(JsonProcessingException.class)
+                    .hasMessageStartingWith("Pretty print test exception");
         }
     }
 

@@ -14,6 +14,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -39,6 +40,9 @@ import java.util.stream.Stream;
 /// Utility class providing helper methods for generating method names and processing types.
 public final class Utils {
     /// Gatherer used to identify and collect class types based on their type names.
+    /// It uses [findTypeForName] to resolve each type name to a [Class] object.
+    /// If the type is found, it is pushed downstream; otherwise, the downstream's
+    /// acceptance status is checked to decide if the stream should continue.
     public static final Gatherer<String, Void, ? extends Class<?>> CLASS_FINDER = Gatherer.of(
             (_, typeName, downstream) -> findTypeForName(typeName)
                     .map(downstream::push)
@@ -50,6 +54,7 @@ public final class Utils {
     }
 
     /// Converts a [URI] to a [URL].
+    /// It attempts to call `uri.toURL()` and wraps any exception in a [RuntimeException].
     ///
     /// @param uri The [URI] to convert
     /// @return The corresponding [URL]
@@ -63,6 +68,7 @@ public final class Utils {
     }
 
     /// Generates the setter method name for a field name.
+    /// It prepends "set" to the field name and capitalizes the first character.
     ///
     /// @param name The name of the field
     /// @return The setter method name
@@ -71,6 +77,7 @@ public final class Utils {
     }
 
     /// Generates the getter method name for a field name.
+    /// It prepends "get" to the field name and capitalizes the first character.
     ///
     /// @param name The name of the field
     /// @return The getter method name
@@ -79,6 +86,8 @@ public final class Utils {
     }
 
     /// Resolves the raw class type associated with a [Type].
+    /// If the type is a [ParameterizedType], it retrieves its raw type.
+    /// If the final type is not a [Class], it throws an [IllegalStateException].
     ///
     /// @param type The type to evaluate
     /// @return The class object associated with the provided type
@@ -92,6 +101,8 @@ public final class Utils {
     }
 
     /// Returns a [Gatherer] instance that works with [Optional] values.
+    /// It pushes the element contained within the [Optional] to the downstream if present.
+    /// If the [Optional] is empty, it returns the downstream's acceptance status.
     ///
     /// @param <T> The type of the element contained within the [Optional]
     /// @return A [Gatherer] instance that processes Optional values
@@ -104,6 +115,8 @@ public final class Utils {
 
     /// Creates a [Gatherer] that removes blank lines at the end of a stream.
     /// Blank lines in the middle of the stream are preserved.
+    /// It uses a [LinkedList] to buffer consecutive blank lines until a non-blank line
+    /// or the end of the stream is encountered.
     ///
     /// @return A [Gatherer] that removes trailing blank lines
     public static Gatherer<String, Queue<String>, String> dropBlankLinesAtEnd() {
@@ -125,6 +138,8 @@ public final class Utils {
     }
 
     /// Creates a [Gatherer] that collects unique items from a stream.
+    /// It maintains a [HashSet] of encountered items and only pushes an item downstream
+    /// if it is not already present in the set.
     ///
     /// @param <T> The type of items to be processed
     /// @return A [Gatherer] instance that pushes unique items to the downstream
@@ -139,6 +154,9 @@ public final class Utils {
     }
 
     /// Removes leading whitespace common to all non-blank lines in the text.
+    /// It first calculates the minimum number of leading whitespace characters across
+    /// all non-blank lines. Then, it strips that amount of leading whitespace from each line,
+    /// trims trailing whitespace from each line, and removes blank lines from the end of the stream.
     ///
     /// @param text The input string
     /// @return A new string with common leading whitespace removed from non-blank lines
@@ -170,6 +188,8 @@ public final class Utils {
     }
 
     /// Identifies the single functional method of a class.
+    /// It filters all public methods of the class using [getFunctionalInterfaceFilter].
+    /// If exactly one method matches, it is returned; otherwise, an [IllegalStateException] is thrown.
     ///
     /// @param clazz The class to analyze
     /// @return The single functional method of the class
@@ -186,6 +206,8 @@ public final class Utils {
     }
 
     /// Attempts to find and load a class by its fully qualified name.
+    /// It uses the current thread's context class loader to load the specified class.
+    /// If the class is not found, an empty [Optional] is returned.
     ///
     /// @param typeName The fully qualified name of the class
     /// @return An [Optional] containing the [Class] if found
@@ -198,6 +220,8 @@ public final class Utils {
     }
 
     /// Attempts to find a class type for the provided type name and imports.
+    /// It delegates the resolution logic to [findTypeOptional] and throws an
+    /// [InternalClassNotFoundException] if the type cannot be found.
     ///
     /// @param imports  The list of imported packages or classes
     /// @param typeName The name of the type to resolve
@@ -210,10 +234,14 @@ public final class Utils {
     }
 
     /// Attempts to find a class type for the provided type name and imports.
+    /// It first checks if the type name is fully qualified. If not, it searches through
+    /// explicit imports for a matching suffix. If still not found, it checks wildcard
+    /// imports. As a last resort, it attempts to load the class from the `java.lang` package.
     ///
     /// @param imports  The list of imported packages or classes
     /// @param typeName The name of the type to resolve
     /// @return An [Optional] containing the resolved [Class]
+    /// @throws InternalClassNotFoundException If multiple matching types are found in wildcard imports
     public static Optional<Class<?>> findTypeOptional(List<String> imports, String typeName) {
         if (typeName.contains(".")) {
             return findTypeForName(typeName);
@@ -246,6 +274,8 @@ public final class Utils {
     }
 
     /// Returns a [BinaryOperator] that throws an [IllegalStateException] on duplicates.
+    /// This is typically used as a merge function for collectors that do not expect
+    /// duplicate keys.
     ///
     /// @param <T> The type of the input arguments
     /// @return A [BinaryOperator] that throws an [IllegalStateException]
@@ -256,6 +286,8 @@ public final class Utils {
     }
 
     /// Returns a binary operator that applies the bi-function and returns the first input.
+    /// It applies the provided [BiFunction] to the two inputs and returns the first one.
+    /// This is useful for merge operations that perform side effects during the merge.
     ///
     /// @param <T>      The type of the input arguments and result
     /// @param function The bi-function to apply
@@ -268,7 +300,8 @@ public final class Utils {
     }
 
     /// Finds parameterized types for a property name in public constructors.
-    /// Inspects constructor parameters annotated with `@NamedArg`.
+    /// It iterates through all public constructors, identifies parameters annotated with
+    /// `@NamedArg` matching the given property name, and collects their parameterized types.
     ///
     /// @param clazz        The class to inspect
     /// @param propertyName The property name to match
@@ -293,21 +326,27 @@ public final class Utils {
     }
 
     /// Retrieves static setter methods that take exactly two parameters and are assignable from [Node].
+    /// It searches for methods that are static, match the specified name, have two parameters,
+    /// and whose first parameter is assignable from the `forClass` parameter.
     ///
+    /// @param forClass         The class to search
     /// @param staticClass      The class to search
     /// @param staticSetterName The name of the static setter
     /// @return A list of matching methods
-    public static List<Method> findStaticSettersForNode(Class<?> staticClass, String staticSetterName) {
-        // TODO: Don't force Node type here
+    public static List<Method> findStaticSettersForNode(
+            Class<?> forClass, Class<?> staticClass, String staticSetterName
+    ) {
         return Stream.of(staticClass.getMethods())
                 .filter(method -> Modifier.isStatic(method.getModifiers()))
                 .filter(method -> staticSetterName.equals(method.getName()))
                 .filter(method -> method.getParameterCount() == 2)
-                .filter(method -> method.getParameterTypes()[0].isAssignableFrom(Node.class))
+                .filter(method -> method.getParameterTypes()[0].isAssignableFrom(forClass))
                 .toList();
     }
 
     /// Finds non-static setter methods with the specified name.
+    /// It identifies methods that are not static, match the specified name, and have exactly
+    /// one parameter.
     ///
     /// @param clazz      The class to search
     /// @param setterName The name of the setter
@@ -321,6 +360,8 @@ public final class Utils {
     }
 
     /// Searches for a non-static, parameterless method with the specified name.
+    /// It returns an [Optional] containing the first matching method that is not static
+    /// and takes no parameters.
     ///
     /// @param clazz      The class to search
     /// @param getterName The name of the method
@@ -334,6 +375,8 @@ public final class Utils {
     }
 
     /// Converts the path of a [URL] into an OS-specific file path string.
+    /// It first converts the [URL] to a [URI] and then uses [Path.of] to obtain an OS-specific path.
+    /// Any [URISyntaxException] encountered is wrapped in a [RuntimeException].
     ///
     /// @param url The [URL] to convert
     /// @return The OS-specific file path string
@@ -347,9 +390,12 @@ public final class Utils {
     }
 
     /// Creates a [Collector] that collects strings matching the pattern into an immutable list.
+    /// It filters the input stream using the pattern as a predicate and accumulates
+    /// matching groups (specifically the first captured group) using [collectPatternConsumer].
     ///
     /// @param pattern The regex pattern to match
     /// @return A [Collector] that accumulates matching strings
+    /// @throws NullPointerException If the pattern is null
     public static Collector<String, ?, List<String>> collectPattern(Pattern pattern) {
         Objects.requireNonNull(pattern, "pattern must not be null");
         return Collectors.filtering(
@@ -407,6 +453,8 @@ public final class Utils {
 
     /// Splits the string into a stream of substrings based on the delimiter.
     /// Consecutive delimiters are treated as a single separator; empty substrings are ignored.
+    /// It iterates through the string character by character, identifying the delimiter,
+    /// and builds a stream of non-empty substrings between delimiters.
     ///
     /// @param string    The input string
     /// @param character The delimiter character
@@ -432,6 +480,9 @@ public final class Utils {
     }
 
     /// Splits a string by commas, excluding commas inside angle brackets.
+    /// It iterates through the string while tracking the depth of angle brackets to ensure only commas at the top level
+    /// are used as delimiters.
+    /// Non-blank, stripped substrings are added to the result stream.
     ///
     /// @param string The string to split
     /// @return A stream of substrings split by commas outside brackets
@@ -462,6 +513,9 @@ public final class Utils {
     }
 
     /// Traverses the class hierarchy to find the specified target interface and extract its type argument.
+    /// It recursively checks the class's generic interfaces and its superclass.
+    /// If the target interface is found as a [ParameterizedType],
+    /// the type argument at the specified index is extracted.
     ///
     /// @param clazz             The class to search
     /// @param targetInterface   The target interface
@@ -471,38 +525,85 @@ public final class Utils {
         if (clazz == null || clazz == Object.class || clazz == targetInterface) {
             return Object.class;
         }
-        for (Type genericInterface : clazz.getGenericInterfaces()) {
-            if (genericInterface instanceof ParameterizedType pt && pt.getRawType() == targetInterface) {
-                Type typeArg = pt.getActualTypeArguments()[typeArgumentIndex];
-                if (typeArg instanceof Class<?> typeClass) {
-                    return typeClass;
-                }
-                return Object.class;
-            }
-        }
-        Class<?> superclass = clazz.getSuperclass();
-        if (superclass != null) {
-            Class<?> result = findGenericTypeFromHierarchy(superclass, targetInterface, typeArgumentIndex);
-            if (result != Object.class) {
-                return result;
-            }
-        }
-        for (Type genericInterface : clazz.getGenericInterfaces()) {
-            Class<?> ifaceClass = genericInterface instanceof ParameterizedType pt
-                    ? (Class<?>) pt.getRawType()
-                    : (Class<?>) genericInterface;
-            Class<?> result = findGenericTypeFromHierarchy(ifaceClass, targetInterface, typeArgumentIndex);
-            if (result != Object.class) {
-                return result;
-            }
-        }
-        return Object.class;
+        return Arrays.stream(clazz.getGenericInterfaces())
+                .map(genericInterface -> getInterfaceElementType(targetInterface, typeArgumentIndex, genericInterface))
+                .gather(optional())
+                .findFirst()
+                .or(
+                        () -> Optional.ofNullable(clazz.getSuperclass())
+                                .map(superclass -> findGenericTypeFromHierarchy(
+                                        superclass,
+                                        targetInterface,
+                                        typeArgumentIndex
+                                ))
+                                .filter(typedClass -> typedClass != Object.class)
+                )
+                .or(
+                        () -> Arrays.stream(clazz.getGenericInterfaces())
+                                .map(Utils::typeToClass)
+                                .map(genericInterface -> findGenericTypeFromHierarchy(
+                                        genericInterface,
+                                        targetInterface,
+                                        typeArgumentIndex
+                                ))
+                                .findFirst()
+                )
+                .orElse(Object.class);
+    }
+
+    /// Extracts the element type of target interface from a generic interface definition.
+    /// It checks if the provided [Type] is a [ParameterizedType] that matches the target interface.
+    /// If so, it returns the type argument at the specified index as a [Class] object.
+    ///
+    /// @param targetInterface   The interface to search for
+    /// @param typeArgumentIndex The index of the type argument
+    /// @param genericInterface  The generic interface type to analyze
+    /// @return An [Optional] containing the extracted [Class] type
+    private static Optional<Class<?>> getInterfaceElementType(
+            Class<?> targetInterface, int typeArgumentIndex, Type genericInterface
+    ) {
+        return Stream.of(genericInterface)
+                .gather(CheckAndCast.of(ParameterizedType.class))
+                .filter(checkRawType(targetInterface))
+                .findFirst()
+                .map(
+                        parameterizedType -> (Class<?>) Stream.of(
+                                        parameterizedType.getActualTypeArguments()[typeArgumentIndex]
+                                )
+                                .gather(CheckAndCast.of(Class.class))
+                                .findFirst()
+                                .orElse(Object.class)
+                );
+    }
+
+    /// Returns a predicate that checks if a [ParameterizedType]'s raw type matches the target interface.
+    ///
+    /// @param targetInterface The interface to check against
+    /// @return A predicate for matching the raw type
+    private static Predicate<ParameterizedType> checkRawType(Class<?> targetInterface) {
+        return parameterizedType -> parameterizedType.getRawType() == targetInterface;
+    }
+
+    /// Resolves a [Type] to its raw [Class] representation.
+    /// If the type is a [ParameterizedType], it returns its raw type; otherwise, it returns the type itself.
+    ///
+    /// @param type The type to resolve
+    /// @return The raw [Class] associated with the type
+    private static Class<?> typeToClass(Type type) {
+        return (Class<?>) Stream.of(type)
+                .gather(CheckAndCast.of(ParameterizedType.class))
+                .map(ParameterizedType::getRawType)
+                .findFirst()
+                .orElse(type);
     }
 
     /// Creates a [BiConsumer] that collects pattern matches into a list.
+    /// It uses a [Matcher] to find all occurrences of the pattern and adds the first captured
+    /// group of each match to the provided list.
     ///
     /// @param pattern The regex pattern to match
     /// @return A [BiConsumer] that adds matches to a list
+    /// @throws NullPointerException If the pattern is null
     private static BiConsumer<List<String>, String> collectPatternConsumer(Pattern pattern) {
         Objects.requireNonNull(pattern, "pattern must not be null");
         return (list, line) -> {
@@ -514,6 +615,7 @@ public final class Utils {
     }
 
     /// Returns a filter for methods that are public, abstract, non-default, and non-static.
+    /// These are the criteria typically used to identify functional methods in an interface.
     ///
     /// @return A predicate for functional interface methods
     private static Predicate<Method> getFunctionalInterfaceFilter() {
@@ -524,6 +626,7 @@ public final class Utils {
     }
 
     /// Evaluates whether the downstream is not rejecting.
+    /// It returns a [Supplier] that checks the downstream's current rejection status.
     ///
     /// @param downstream The downstream gatherer
     /// @return A supplier returning the acceptance status
