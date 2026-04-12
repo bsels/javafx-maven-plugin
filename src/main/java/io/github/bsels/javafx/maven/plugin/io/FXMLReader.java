@@ -119,6 +119,7 @@ public record FXMLReader(Log log) {
             documentBuilderFactory.setNamespaceAware(true);
             documentBuilderFactory.setIgnoringElementContentWhitespace(true);
             documentBuilderFactory.setIgnoringComments(false);
+            documentBuilderFactory.setExpandEntityReferences(false);
             Document document = documentBuilderFactory.newDocumentBuilder()
                     .parse(reader);
             data = readDocument(document.getDocumentElement(), 0);

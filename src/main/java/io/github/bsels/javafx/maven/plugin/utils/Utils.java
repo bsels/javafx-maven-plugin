@@ -109,7 +109,7 @@ public final class Utils {
     public static <T> Gatherer<Optional<T>, Void, T> optional() {
         return Gatherer.of(
                 (_, optional, downstream) -> optional.map(downstream::push)
-                        .orElseGet(() -> !downstream.isRejecting())
+                        .orElseGet(isDownstreamAccepting(downstream))
         );
     }
 
@@ -375,7 +375,7 @@ public final class Utils {
     }
 
     /// Converts the path of a [URL] into an OS-specific file path string.
-    /// It first converts the [URL] to a [URI] and then uses [Path.of] to obtain an OS-specific path.
+    /// It first converts the [URL] to a [URI] and then uses [Path#of] to get an OS-specific path.
     /// Any [URISyntaxException] encountered is wrapped in a [RuntimeException].
     ///
     /// @param url The [URL] to convert

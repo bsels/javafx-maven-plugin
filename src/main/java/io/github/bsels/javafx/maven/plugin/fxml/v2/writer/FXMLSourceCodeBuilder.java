@@ -268,7 +268,7 @@ public final class FXMLSourceCodeBuilder {
 
         sourceCode.append(context.sourceCode(SourcePart.CLASS_DECLARATION)).append(" {\n");
         if (context.hasFeature(Feature.RESOURCE_BUNDLE)) {
-            sourceCode.append("private static final java.util.ResourceBundle ")
+            sourceCode.append("    private static final java.util.ResourceBundle ")
                     .append(INTERNAL_RESOURCE_BUNDLE)
                     .append(" = ")
                     .append(context.resourceBundle())
