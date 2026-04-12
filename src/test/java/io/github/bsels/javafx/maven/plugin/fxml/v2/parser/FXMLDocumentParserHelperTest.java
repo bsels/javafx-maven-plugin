@@ -18,6 +18,7 @@ import io.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
 import javafx.beans.NamedArg;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
+import javafx.scene.Node;
 import org.apache.maven.monitor.logging.DefaultLog;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
@@ -431,11 +432,18 @@ class FXMLDocumentParserHelperTest {
     /// Tests for [FXMLDocumentParserHelper#findStaticSetter].
     @Nested
     class FindStaticSetterTest {
+        /// Verifies taht a null `clazz` throws [NullPointerException].
+        @Test
+        void nullClazzThrowsNullPointerException() {
+            assertThatThrownBy(() -> helper.findStaticSetter(null, buildContext, "StaticSetterClass.constraint"))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessageContaining("`clazz` must not be null");
+        }
 
         /// Verifies that a null `buildContext` throws [NullPointerException].
         @Test
         void nullBuildContextThrowsNullPointerException() {
-            assertThatThrownBy(() -> helper.findStaticSetter(null, "StaticSetterClass.constraint"))
+            assertThatThrownBy(() -> helper.findStaticSetter(Node.class, null, "StaticSetterClass.constraint"))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("`buildContext` must not be null");
         }
@@ -443,7 +451,7 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a null `name` throws [NullPointerException].
         @Test
         void nullNameThrowsNullPointerException() {
-            assertThatThrownBy(() -> helper.findStaticSetter(buildContext, null))
+            assertThatThrownBy(() -> helper.findStaticSetter(Node.class, buildContext, null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("`name` must not be null");
         }
@@ -451,7 +459,7 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that an unresolvable class name returns empty.
         @Test
         void unresolvableClassReturnsEmpty() {
-            assertThat(helper.findStaticSetter(buildContext, "com.example.UnknownClass.constraint"))
+            assertThat(helper.findStaticSetter(Node.class, buildContext, "com.example.UnknownClass.constraint"))
                     .isEmpty();
         }
 
@@ -460,7 +468,7 @@ class FXMLDocumentParserHelperTest {
         void validStaticSetterReturnsPresent() {
             // Use binary name (with $) so ClassLoader.loadClass can resolve the inner class
             String qualifiedName = StaticSetterClass.class.getName() + ".constraint";
-            assertThat(helper.findStaticSetter(buildContext, qualifiedName))
+            assertThat(helper.findStaticSetter(Node.class, buildContext, qualifiedName))
                     .isPresent()
                     .get()
                     .hasFieldOrPropertyWithValue("name", "constraint")
@@ -472,15 +480,15 @@ class FXMLDocumentParserHelperTest {
         @Test
         void noMatchingStaticSetterReturnsEmpty() {
             String qualifiedName = StaticSetterClass.class.getName() + ".nonExistentProperty";
-            assertThat(helper.findStaticSetter(buildContext, qualifiedName))
+            assertThat(helper.findStaticSetter(Node.class, buildContext, qualifiedName))
                     .isEmpty();
         }
 
-        /// Verifies that multiple matching static setters (ambiguous) returns empty.
+        /// Verifies that multiple matching static setters (ambiguous) return empty.
         @Test
         void multipleStaticSettersReturnsEmpty() {
             String qualifiedName = AmbiguousStaticSetterClass.class.getName() + ".constraint";
-            assertThat(helper.findStaticSetter(buildContext, qualifiedName))
+            assertThat(helper.findStaticSetter(Node.class, buildContext, qualifiedName))
                     .isEmpty();
         }
     }
@@ -632,7 +640,11 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a non-functional interface throws [IllegalArgumentException].
         @Test
         void nonFunctionalInterfaceThrowsIllegalArgumentException() {
-            assertThatThrownBy(() -> helper.findMethodReferenceType("onAction", FXMLType.of(NotFunctional.class), buildContext))
+            assertThatThrownBy(() -> helper.findMethodReferenceType(
+                    "onAction",
+                    FXMLType.of(NotFunctional.class),
+                    buildContext
+            ))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("must be a functional interface");
         }
@@ -640,7 +652,11 @@ class FXMLDocumentParserHelperTest {
         /// Verifies that a plain class (not a functional interface) throws [IllegalArgumentException].
         @Test
         void plainClassThrowsIllegalArgumentException() {
-            assertThatThrownBy(() -> helper.findMethodReferenceType("onAction", FXMLType.of(String.class), buildContext))
+            assertThatThrownBy(() -> helper.findMethodReferenceType(
+                    "onAction",
+                    FXMLType.of(String.class),
+                    buildContext
+            ))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("must be a functional interface");
         }

@@ -855,7 +855,7 @@ public final class FXMLDocumentParser {
         String name = element.getKey();
         T value = element.getValue();
         if (name.contains(".")) {
-            return helper.findStaticSetter(buildContext, name)
+            return helper.findStaticSetter(clazz, buildContext, name)
                     .map(staticSetter -> new FXMLStaticObjectProperty(
                             staticSetter.name(),
                             new FXMLClassType(staticSetter.staticClass()),

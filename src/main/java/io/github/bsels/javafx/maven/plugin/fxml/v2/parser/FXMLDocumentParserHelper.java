@@ -188,13 +188,15 @@ final class FXMLDocumentParserHelper {
     /// 4. Validating that exactly one such setter exists.
     /// 5. Building the [FXMLType] for the setter's value parameter.
     ///
+    /// @param clazz        The class to search for the static setter within
     /// @param buildContext The [BuildContext] used to resolve the class name and types
     /// @param name         The qualified name of the static property (e.g., "GridPane.columnIndex")
-    /// @return An [Optional] containing an [InternalStaticSetterProperty] if a unique setter is found;
-    ///                 empty otherwise (with a warning logged).
-    /// @throws NullPointerException If `buildContext` or `name` is null
-    public Optional<InternalStaticSetterProperty> findStaticSetter(BuildContext buildContext, String name)
-            throws NullPointerException {
+    /// @return An [Optional] containing an [InternalStaticSetterProperty] if a unique setter is found; empty otherwise (with a warning logged).
+    /// @throws NullPointerException If `clazz`, `buildContext` or `name` is null
+    public Optional<InternalStaticSetterProperty> findStaticSetter(
+            Class<?> clazz, BuildContext buildContext, String name
+    ) throws NullPointerException {
+        Objects.requireNonNull(clazz, "`clazz` must not be null");
         Objects.requireNonNull(buildContext, "`buildContext` must not be null");
         Objects.requireNonNull(name, "`name` must not be null");
         int dotIndex = name.lastIndexOf('.');
@@ -205,8 +207,7 @@ final class FXMLDocumentParserHelper {
         List<Method> setters;
         try {
             staticClass = Utils.findType(buildContext.imports(), className);
-            // TODO: Use actual class instead of `Node.class`
-            setters = Utils.findStaticSettersForNode(Node.class, staticClass, setterName);
+            setters = Utils.findStaticSettersForNode(clazz, staticClass, setterName);
         } catch (InternalClassNotFoundException e) {
             log.warn("Could not resolve static property class '%s', skipping attribute '%s'".formatted(
                     className,
