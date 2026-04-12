@@ -52,7 +52,7 @@ It is used to reduce runtime dependencies because the JavaFX FXML loader is not 
 4. **Generates** Java source code (`FXMLSourceCodeBuilder`) that mirrors the FXML hierarchy (fields, methods, imports,
    resource bundle lookups, etc.).
 5. **Writes/updates** the generated `.java` files (existing files are overwritten) into a configurable output folder
-   and adds that folder to the project’s compile source roots so the generated classes are compiled with the rest of
+   and adds that folder to the project’s compiler source roots so the generated classes are compiled with the rest of
    the project.
 6. **(Optional)** Extends class discovery with an optimistic in‑memory compilation step so the parser can resolve as
    many project classes as possible even if the project is not fully compiled yet.
@@ -66,7 +66,7 @@ It is used to reduce runtime dependencies because the JavaFX FXML loader is not 
 | `resourceBundleObject`               | `javafx.fxml.resourceBundleObject`     | No             | –                                                   | Fully‑qualified name of a resource‑bundle class used for i18n lookups inside the generated code.                                                                                                           |
 | `generatedSourceDirectory`           | `javafx.fxml.generatedSourceDirectory` | Yes            | `${project.build.directory}/generated-sources/fxml` | Destination folder for the generated Java files.                                                                                                                                                           |
 | `includeSourceFilesInClassDiscovery` | `javafx.fxml.include.source.discovery` | No             | `true`                                              | When `true`, the plugin performs an optimistic in‑memory compilation step to include as many project classes as possible in the discovery classpath (helpful when FXML references project types/generics). |
-| `defaultCharset`                     | `javafx.fxml.charset`                  | No             | `UTF-8`                                             | Character set used to read the FXML files and to drive parsing/generation.                                                                                                                                 |
+| `defaultCharset`                     | `javafx.fxml.charset`                  | Yes            | `UTF-8`                                             | Character set used to read the FXML files and to drive parsing/generation.                                                                                                                                 |
 | `addGeneratedAnnotation`             | `javafx.fxml.add.generated.annotation` | No             | `true`                                              | When `true`, the plugin adds an `@Generated` marker to generated sources.                                                                                                                                  |
 
 Each `FXMLDirectory` entry supports:
