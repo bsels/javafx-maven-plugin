@@ -13,5 +13,7 @@ enum Feature {
     /// Indicates the generated class needs the internal string-to-Path conversion method.
     STRING_TO_PATH_METHOD,
     /// Indicates the generated class needs the internal string-to-File conversion method.
-    STRING_TO_FILE_METHOD
+    STRING_TO_FILE_METHOD,
+    /// Indicates that the generated class should bind its internal objects to the fields of a controller.
+    BIND_CONTROLLER
 }

@@ -132,7 +132,7 @@ record SourceCodeGeneratorContext(
                 resourceBundle,
                 imports,
                 fieldDefinitions,
-                features,
+                new HashSet<>(),
                 identifierToTypeMap,
                 seenNestedFXMLFiles,
                 new HashSet<>(),

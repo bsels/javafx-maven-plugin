@@ -3,8 +3,10 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLInterface;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.Visibility;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
@@ -456,6 +458,69 @@ final class FXMLSourceCodeBuilderTypeHelper {
         return Stream.of(sourceCode.append("\n\n").toString());
     }
 
+    /// Renders the source code for mapping an FXML identifier to its corresponding controller field.
+    ///
+    /// This method determines the appropriate mapping strategy based on the field'\''s visibility:
+    /// - [Visibility#PUBLIC]: Direct assignment.
+    /// - [Visibility#PROTECTED] or [Visibility#PACKAGE_PRIVATE]: Direct assignment if within the same package,
+    ///   otherwise reflection.
+    /// - [Visibility#PRIVATE]: Reflective access.
+    ///
+    /// @param context    The [SourceCodeGeneratorContext] used for code generation.
+    /// @param controller The [FXMLController] whose fields are being mapped.
+    /// @param field      The specific [FXMLControllerField] to be mapped.
+    /// @return A string containing the generated Java source code for the field mapping.
+    /// @throws NullPointerException If `context`, `controller`, or `field` is null.
+    public String renderControllerFieldMapping(
+            SourceCodeGeneratorContext context, FXMLController controller, FXMLControllerField field
+    ) throws NullPointerException {
+        Objects.requireNonNull(context, "`context` must not be null");
+        Objects.requireNonNull(controller, "`controller` must not be null");
+        Objects.requireNonNull(field, "`field` must not be null");
+        return switch (field.visibility()) {
+            case PUBLIC -> renderDirectControllerFieldMapping(field);
+            case PROTECTED, PACKAGE_PRIVATE -> {
+                FXMLClassType type = controller.controllerClass();
+                if (context.packageName().map(type.clazz().getPackageName()::equals).orElse(false)) {
+                    yield renderDirectControllerFieldMapping(field);
+                } else {
+                    yield renderReflectionControllerFieldMapping(context, type, field);
+                }
+            }
+            case PRIVATE -> renderReflectionControllerFieldMapping(context, controller.controllerClass(), field);
+        };
+    }
+
+    /// Renders a direct assignment from an FXML identifier to a public or accessible controller field.
+    ///
+    /// @param field The [FXMLControllerField] for which a direct assignment is generated.
+    /// @return The generated Java source code line for direct field assignment.
+    private String renderDirectControllerFieldMapping(FXMLControllerField field) {
+        return "%1$s.%2$s = %2$s;".formatted(INTERNAL_CONTROLLER_FIELD, field.name());
+    }
+
+    /// Renders the source code to assign an FXML identifier to a controller field using reflection.
+    ///
+    /// This is used for private fields or fields that are otherwise inaccessible from the generated class.
+    ///
+    /// @param context   The [SourceCodeGeneratorContext] used for code generation.
+    /// @param classType The [FXMLClassType] of the controller.
+    /// @param field     The [FXMLControllerField] to be mapped via reflection.
+    /// @return A string containing the Java source code block for reflective field assignment.
+    private String renderReflectionControllerFieldMapping(
+            SourceCodeGeneratorContext context, FXMLClassType classType, FXMLControllerField field
+    ) {
+        return """
+                try {
+                    java.lang.reflect.Field $reflectionField$ = %1$s.class.getDeclaredField("%2$s");
+                    $reflectionField$.setAccessible(true);
+                    $reflectionField$.set(%3$s, %2$s);
+                } catch (java.lang.NoSuchFieldException | java.lang.IllegalAccessException e) {
+                    throw new RuntimeException(e);
+                }
+                """.formatted(typeToSourceCode(context, classType), field.name(), INTERNAL_CONTROLLER_FIELD);
+    }
+
     /// Generates the body of a method that uses reflection to call a controller method.
     /// This is used when the controller method is not public or otherwise requires reflective access.
     ///
@@ -494,7 +559,8 @@ final class FXMLSourceCodeBuilderTypeHelper {
                     .append(i);
         }
         sourceCode.append(");\n")
-                .append("    } catch (NoSuchMethodException | IllegalAccessException | java.lang.reflect.InvocationTargetException e) {\n")
+                .append("    } catch (java.lang.NoSuchMethodException | java.lang.IllegalAccessException | ")
+                .append("java.lang.reflect.InvocationTargetException e) {\n")
                 .append("        throw new RuntimeException(e);\n")
                 .append("    }\n");
     }

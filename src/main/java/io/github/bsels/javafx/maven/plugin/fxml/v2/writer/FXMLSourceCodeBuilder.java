@@ -92,6 +92,11 @@ public final class FXMLSourceCodeBuilder {
     /// Prefix for internal constructor variables used to avoid naming collisions during object initialization.
     private static final String CONSTRUCTOR_VARIABLE_PREFIX = "$$";
 
+    /// The name of the internal method generated to bind FXML identifiers to controller fields.
+    ///
+    /// This method is called at the end of the constructor when [Feature#BIND_CONTROLLER] is enabled.
+    private static final String CONTROLLER_BIND_METHOD_NAME = "$bindController$";
+
     /// A set of all Java primitive types used to filter out unnecessary imports.
     private static final Set<String> PRIMITIVE_TYPES = Set.of(
             "boolean", "byte", "char", "short", "int", "long", "float", "double", "void"
@@ -236,6 +241,7 @@ public final class FXMLSourceCodeBuilder {
         addConstructorEpilogue(context, document);
         addInnerClass(document, context);
         addMethods(document, context);
+        bindControllerFields(context, document);
 
         // The class declaration should be done last as it may depend on gathered features
         addClassDeclaration(context, document, isRootDocument);
@@ -255,6 +261,17 @@ public final class FXMLSourceCodeBuilder {
             String className,
             boolean isRootDocument
     ) {
+        if (context.hasFeature(Feature.BIND_CONTROLLER)) {
+            context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE)
+                    .append(CONTROLLER_BIND_METHOD_NAME)
+                    .append("();\n");
+            context.sourceCode(SourcePart.METHODS)
+                    .append("private void ")
+                    .append(CONTROLLER_BIND_METHOD_NAME)
+                    .append("() {\n")
+                    .append(context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString().indent(4))
+                    .append("}\n\n");
+        }
         StringBuilder sourceCode = new StringBuilder();
         if (isRootDocument) {
             sourceCode.append(context.sourceCode(SourcePart.PACKAGE))
@@ -996,60 +1013,58 @@ public final class FXMLSourceCodeBuilder {
             return;
         }
         FXMLController controller = controllerOptional.get();
-        List<FXMLControllerField> fields = controller.fields();
-        if (fields.isEmpty()) {
+        if (controller.fields().isEmpty()) {
             return;
         }
         boolean hasFieldMappings = Stream.concat(
                         Stream.of(document.root()),
                         document.definitions()
                                 .stream()
-                ).map(value -> bindControllerFields(context, fields, value))
+                ).map(value -> bindControllerFields(context, controller, value))
                 .reduce(false, Boolean::logicalOr);
         if (hasFieldMappings) {
-            context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE)
-                    .append(context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString());
+            context.addFeature(Feature.BIND_CONTROLLER);
         }
     }
 
     /// Recursively traverses FXML values to find and bind identifiers to controller fields.
     ///
-    /// @param context The current [SourceCodeGeneratorContext]
-    /// @param fields  The list of [FXMLControllerField]s defined in the controller class
-    /// @param value   The [AbstractFXMLValue] to process for field bindings
+    /// @param context    The current [SourceCodeGeneratorContext]
+    /// @param controller The [FXMLController] containing the fields to bind
+    /// @param value      The [AbstractFXMLValue] to process for field bindings
     /// @return `true` if any field mappings were generated, `false` otherwise
     private boolean bindControllerFields(
             SourceCodeGeneratorContext context,
-            List<FXMLControllerField> fields,
+            FXMLController controller,
             AbstractFXMLValue value
     ) {
         // Using `Boolean.logicalOr` to prevent short-circuit evaluation
         return switch (value) {
             case FXMLCollection(FXMLIdentifier identifier, _, _, List<AbstractFXMLValue> values) -> Boolean.logicalOr(
-                    bindField(context, identifier, fields),
+                    bindField(context, identifier, controller),
                     values.stream()
-                            .map(v -> bindControllerFields(context, fields, v))
+                            .map(v -> bindControllerFields(context, controller, v))
                             .reduce(false, Boolean::logicalOr)
             );
             case FXMLMap(FXMLIdentifier identifier, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> entries) ->
                     Boolean.logicalOr(
-                            bindField(context, identifier, fields),
+                            bindField(context, identifier, controller),
                             entries.values().stream()
-                                    .map(v -> bindControllerFields(context, fields, v))
+                                    .map(v -> bindControllerFields(context, controller, v))
                                     .reduce(false, Boolean::logicalOr)
                     );
             case FXMLObject(FXMLIdentifier identifier, _, _, List<FXMLProperty> properties) -> Boolean.logicalOr(
-                    bindField(context, identifier, fields),
+                    bindField(context, identifier, controller),
                     propertyRecursionHelper.walk(
                             properties,
-                            (v, c) -> Stream.of(bindControllerFields(c, fields, v)),
+                            (v, c) -> Stream.of(bindControllerFields(c, controller, v)),
                             context
                     ).reduce(false, Boolean::logicalOr)
             );
-            case FXMLCopy(FXMLIdentifier identifier, _) -> bindField(context, identifier, fields);
-            case FXMLInclude(FXMLIdentifier identifier, _, _, _, _) -> bindField(context, identifier, fields);
+            case FXMLCopy(FXMLIdentifier identifier, _) -> bindField(context, identifier, controller);
+            case FXMLInclude(FXMLIdentifier identifier, _, _, _, _) -> bindField(context, identifier, controller);
             case FXMLValue(Optional<FXMLIdentifier> identifier, _, _) ->
-                    identifier.map(id -> bindField(context, id, fields)).orElse(false);
+                    identifier.map(id -> bindField(context, id, controller)).orElse(false);
             case FXMLMethod _, FXMLInlineScript _, FXMLLiteral _, FXMLConstant _, FXMLExpression _, FXMLReference _,
                  FXMLResource _, FXMLTranslation _ -> false;
         };
@@ -1059,12 +1074,46 @@ public final class FXMLSourceCodeBuilder {
     ///
     /// @param context    The current [SourceCodeGeneratorContext]
     /// @param identifier The [FXMLIdentifier] from the FXML document
-    /// @param fields     The list of available [FXMLControllerField]s in the controller
+    /// @param controller The [FXMLController] containing the fields to bind
     /// @return `true` if a successful binding was generated, `false` otherwise
     private boolean bindField(
-            SourceCodeGeneratorContext context, FXMLIdentifier identifier, List<FXMLControllerField> fields
+            SourceCodeGeneratorContext context, FXMLIdentifier identifier, FXMLController controller
     ) {
-        return false; // TODO: implement
+        return switch (identifier) {
+            case FXMLExposedIdentifier(String name) -> bindField(context, name, controller);
+            case FXMLNamedRootIdentifier(String name) -> bindField(context, name, controller);
+            case FXMLRootIdentifier _, FXMLInternalIdentifier _ -> false;
+        };
+    }
+
+    /// Generates the Java source code for binding an FXML identifier to a controller field.
+    ///
+    /// @param context    The current [SourceCodeGeneratorContext]
+    /// @param identifier The [FXMLIdentifier] from the FXML document
+    /// @param controller The [FXMLController] containing the fields to bind
+    /// @return `true` if a successful binding was generated, `false` otherwise
+    private boolean bindField(
+            SourceCodeGeneratorContext context, String identifier, FXMLController controller
+    ) {
+        return controller.fields().stream()
+                .filter(f -> f.name().equals(identifier))
+                .findFirst()
+                .map(f -> bindField(context, controller, f))
+                .orElse(false);
+    }
+
+    /// Binds a field in the given controller by generating the appropriate source code
+    /// and appending it to the controller fields section of the source code context.
+    ///
+    /// @param context    The source code generation context used to write the generated code.
+    /// @param controller The FXML controller where the field resides.
+    /// @param field      The field in the FXML controller to be bound and processed.
+    /// @return A boolean value indicating whether the field was successfully bound, always `true`.
+    private boolean bindField(SourceCodeGeneratorContext context, FXMLController controller, FXMLControllerField field) {
+        context.sourceCode(SourcePart.CONTROLLER_FIELDS)
+                .append(typeHelper.renderControllerFieldMapping(context, controller, field))
+                .append('\n');
+        return true;
     }
 
     /// Adds nested inner class declarations for all included FXML files.
@@ -1180,7 +1229,7 @@ public final class FXMLSourceCodeBuilder {
     /// @param key      The key representing the element to be created.
     /// @param supplier A supplier that provides the stream of generated elements if the key is new.
     /// @return A stream containing the generated element(s) if the key was newly added to the set,
-    ///                                                                                                                                                                         or an empty stream if the key was already present.
+    ///                                                                                                                                                                                                 or an empty stream if the key was already present.
     private <K, T> Stream<T> singleCreation(Set<K> set, K key, Supplier<Stream<T>> supplier) {
         if (set.add(key)) {
             return supplier.get();
