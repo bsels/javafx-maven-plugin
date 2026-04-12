@@ -18,6 +18,8 @@ enum SourcePart {
     CONSTRUCTOR_EPILOGUE,
     /// The controller fields mapping.
     CONTROLLER_FIELDS,
+    /// The controller initialization code.
+    CONTROLLER_INITIALIZATION,
     /// Class methods.
     METHODS,
     /// Nested classes or types.

@@ -59,6 +59,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilder.INITIALIZE_METHOD;
 import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilder.INTERNAL_CONTROLLER_FIELD;
 import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilder.INTERNAL_RESOURCE_BUNDLE;
 import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilder.INTERNAL_STRING_TO_FILE_METHOD;
@@ -73,6 +74,10 @@ final class FXMLSourceCodeBuilderTypeHelper {
     private static final FXMLClassType OBJECT_TYPE = new FXMLClassType(Object.class);
     /// The [FXMLClassType] for [String].
     private static final FXMLClassType STRING_TYPE = new FXMLClassType(String.class);
+    /// A set of all Java primitive types used to filter out unnecessary imports.
+    private static final Set<String> PRIMITIVE_TYPES = Set.of(
+            "boolean", "byte", "char", "short", "int", "long", "float", "double", "void"
+    );
 
     /// Cache for storing and reusing [FXMLConstructor]s associated with a [Class].
     private final Map<Class<?>, List<FXMLConstructor>> constructorCache;
@@ -87,6 +92,15 @@ final class FXMLSourceCodeBuilderTypeHelper {
         this.propertyRecursionHelper = new FXMLPropertyRecursionHelper();
         this.constructorCache = new HashMap<>();
         this.factoryMethodCache = new HashMap<>();
+    }
+
+    /// Checks if a given Java type name represents a primitive type.
+    /// Primitive types are handled, especially as they do not require import statements.
+    ///
+    /// @param type The fully qualified or simple name of the type to check.
+    /// @return `true` if the type is a Java primitive, `false` otherwise.
+    public boolean isPrimitive(String type) {
+        return PRIMITIVE_TYPES.contains(type);
     }
 
     /// Returns the default value of an [FXMLType] as a string representation.
@@ -442,7 +456,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
                 case PUBLIC -> createDirectCallMethodBody(sourceCode, method);
                 case PROTECTED, PACKAGE_PRIVATE -> {
                     FXMLClassType type = controller.controllerClass();
-                    if (context.packageName().map(type.clazz().getPackageName()::equals).orElse(false)) {
+                    if (isClassInPackage(context, type)) {
                         createDirectCallMethodBody(sourceCode, method);
                     } else {
                         createReflectionCallMethodBody(context, sourceCode, type, fxmlMethod);
@@ -481,7 +495,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
             case PUBLIC -> renderDirectControllerFieldMapping(field);
             case PROTECTED, PACKAGE_PRIVATE -> {
                 FXMLClassType type = controller.controllerClass();
-                if (context.packageName().map(type.clazz().getPackageName()::equals).orElse(false)) {
+                if (isClassInPackage(context, type)) {
                     yield renderDirectControllerFieldMapping(field);
                 } else {
                     yield renderReflectionControllerFieldMapping(context, type, field);
@@ -489,6 +503,100 @@ final class FXMLSourceCodeBuilderTypeHelper {
             }
             case PRIVATE -> renderReflectionControllerFieldMapping(context, controller.controllerClass(), field);
         };
+    }
+
+    /// Renders the source code to initialize the controller by calling its `initialize` method.
+    ///
+    /// This method determines whether the call can be made directly or requires reflection
+    /// based on the visibility of the controller's `initialize` method.
+    ///
+    /// @param context          The [SourceCodeGeneratorContext] used for code generation.
+    /// @param controllerClass  The [FXMLClassType] of the controller.
+    /// @param initializeMethod The [FXMLControllerMethod] representing the `initialize` method.
+    /// @return A string containing the Java source code to call the initialization method.
+    public String renderControllerInitialization(
+            SourceCodeGeneratorContext context,
+            FXMLClassType controllerClass,
+            FXMLControllerMethod initializeMethod
+    ) {
+        Objects.requireNonNull(context, "`context` must not be null");
+        Objects.requireNonNull(controllerClass, "`controllerClass` must not be null");
+        Objects.requireNonNull(initializeMethod, "`initializeMethod` must not be null");
+        return switch (initializeMethod.visibility()) {
+            case PUBLIC -> renderControllerDirectInitialization(context, initializeMethod);
+            case PROTECTED, PACKAGE_PRIVATE -> {
+                if (isClassInPackage(context, controllerClass)) {
+                    yield renderControllerDirectInitialization(context, initializeMethod);
+                } else {
+                    yield renderControllerReflectionInitialization(context, controllerClass, initializeMethod);
+                }
+            }
+            case PRIVATE -> renderControllerReflectionInitialization(context, controllerClass, initializeMethod);
+        };
+    }
+
+    /// Renders a direct call to the controller's `initialize` method.
+    ///
+    /// This is used when the `initialize` method is public or accessible from the generated class.
+    ///
+    /// @param context          The [SourceCodeGeneratorContext] used for code generation.
+    /// @param initializeMethod The [FXMLControllerMethod] representing the `initialize` method.
+    /// @return A string containing the Java source code for the direct method call.
+    private String renderControllerDirectInitialization(
+            SourceCodeGeneratorContext context,
+            FXMLControllerMethod initializeMethod
+    ) {
+        StringBuilder sourceCode = new StringBuilder()
+                .append(INTERNAL_CONTROLLER_FIELD)
+                .append('.')
+                .append(INITIALIZE_METHOD)
+                .append('(');
+        if (initializeMethod.parameterTypes().size() == 2) {
+            context.addFeature(Feature.RESOURCE_BUNDLE);
+            sourceCode.append("null, ")
+                    .append(INTERNAL_RESOURCE_BUNDLE);
+        }
+        return sourceCode.append(");\n")
+                .toString();
+    }
+
+    /// Renders a call to the controller's `initialize` method using reflection.
+    ///
+    /// This is used when the `initialize` method is private or otherwise inaccessible from the generated class.
+    ///
+    /// @param context          The [SourceCodeGeneratorContext] used for code generation.
+    /// @param controllerClass  The [FXMLClassType] of the controller.
+    /// @param initializeMethod The [FXMLControllerMethod] representing the `initialize` method.
+    /// @return A string containing the Java source code for the reflective method call.
+    private String renderControllerReflectionInitialization(
+            SourceCodeGeneratorContext context,
+            FXMLClassType controllerClass,
+            FXMLControllerMethod initializeMethod
+    ) {
+        StringBuilder sourceCode = new StringBuilder()
+                .append("try {\n")
+                .append("    java.lang.reflect.Method $reflectionMethod$ = ")
+                .append(typeToSourceCode(context, controllerClass))
+                .append(".class.getDeclaredMethod(")
+                .append(encodeString(INITIALIZE_METHOD));
+        if (initializeMethod.parameterTypes().size() == 2) {
+            sourceCode.append(", java.net.URL.class, java.util.ResourceBundle.class");
+        }
+        sourceCode.append(");\n")
+                .append("    $reflectionMethod$.setAccessible(true);\n")
+                .append("    $reflectionMethod$.invoke(")
+                .append(INTERNAL_CONTROLLER_FIELD);
+        if (initializeMethod.parameterTypes().size() == 2) {
+            context.addFeature(Feature.RESOURCE_BUNDLE);
+            sourceCode.append(", null, ")
+                    .append(INTERNAL_RESOURCE_BUNDLE);
+        }
+        return sourceCode.append(");\n")
+                .append("} catch (java.lang.NoSuchMethodException | java.lang.IllegalAccessException | ")
+                .append("java.lang.reflect.InvocationTargetException e) {\n")
+                .append("    throw new RuntimeException(e);\n")
+                .append("}\n")
+                .toString();
     }
 
     /// Renders a direct assignment from an FXML identifier to a public or accessible controller field.
@@ -831,6 +939,17 @@ final class FXMLSourceCodeBuilderTypeHelper {
                     .map(FXMLIdentifier::toString)
                     .map(id -> Map.entry(id, new Wrapper.FXMLTypeWrapper(type)));
         };
+    }
+
+    /// Checks if a class is in the same package as the generated source code.
+    ///
+    /// @param context The [SourceCodeGeneratorContext] providing the target package name.
+    /// @param type    The [FXMLClassType] representing the class to check.
+    /// @return `true` if the class's package matches the context's package, `false` otherwise.
+    private boolean isClassInPackage(SourceCodeGeneratorContext context, FXMLClassType type) {
+        return context.packageName()
+                .map(type.clazz().getPackageName()::equals)
+                .orElse(false);
     }
 
     /// A sealed interface used as a container for either an [FXMLType] or a reference to another identifier.

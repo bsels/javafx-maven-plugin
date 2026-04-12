@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -71,37 +72,30 @@ import java.util.stream.Stream;
 /// import organization, field definition, constructor building, method generation,
 /// and inner class creation for included FXML documents.
 public final class FXMLSourceCodeBuilder {
+    /// The name of the FXML controller's initialization method.
+    static final String INITIALIZE_METHOD = "initialize";
     /// Internal controller field name used within the generated Java class to hold the controller instance.
     static final String INTERNAL_CONTROLLER_FIELD = "$internalField$controller$";
-
     /// Internal resource bundle field name used for translations in the generated Java class.
     static final String INTERNAL_RESOURCE_BUNDLE = "$INTERNAL$RESOURCE$BUNDLE$";
-
     /// Internal method name for converting a string value to a [File] instance.
     static final String INTERNAL_STRING_TO_FILE_METHOD = "$internalMethod$stringToFile$";
-
     /// Internal method name for converting a string value to a [Path] instance.
     static final String INTERNAL_STRING_TO_PATH_METHOD = "$internalMethod$stringToPath$";
-
     /// Internal method name for converting a string value to a [URI] instance.
     static final String INTERNAL_STRING_TO_URI_METHOD = "$internalMethod$stringToURI$";
-
     /// Internal method name for converting a string value to a [URL] instance.
     static final String INTERNAL_STRING_TO_URL_METHOD = "$internalMethod$stringToURL$";
-
+    /// The [FXMLClassType] representation of the [URL] class.
+    private static final FXMLClassType URL_TYPE = new FXMLClassType(URL.class);
+    /// The [FXMLClassType] representation of the [ResourceBundle] class.
+    private static final FXMLClassType RESOURCE_BUNDLE_TYPE = new FXMLClassType(ResourceBundle.class);
     /// Prefix for internal constructor variables used to avoid naming collisions during object initialization.
     private static final String CONSTRUCTOR_VARIABLE_PREFIX = "$$";
-
     /// The name of the internal method generated to bind FXML identifiers to controller fields.
     ///
     /// This method is called at the end of the constructor when [Feature#BIND_CONTROLLER] is enabled.
     private static final String CONTROLLER_BIND_METHOD_NAME = "$bindController$";
-
-    /// A set of all Java primitive types used to filter out unnecessary imports.
-    private static final Set<String> PRIMITIVE_TYPES = Set.of(
-            "boolean", "byte", "char", "short", "int", "long", "float", "double", "void"
-    );
-
     /// The template body for the internal string-to-file conversion method.
     private static final String INTERNAL_STRING_TO_FILE_METHOD_BODY = """
             private java.io.File %s(String value) {
@@ -151,10 +145,8 @@ public final class FXMLSourceCodeBuilder {
                 );
             }
             """.formatted(INTERNAL_STRING_TO_URL_METHOD);
-
     /// Suffix appended to FXML identifiers to denote their associated controller fields.
     private static final String CONTROLLER_SUFFIX = "Controller";
-
     /// Logger for outputting generation information and debugging messages.
     private final Log log;
 
@@ -241,6 +233,7 @@ public final class FXMLSourceCodeBuilder {
         addConstructorEpilogue(context, document);
         addInnerClass(document, context);
         addMethods(document, context);
+        addControllerInitializeMethod(context, document);
         bindControllerFields(context, document);
 
         // The class declaration should be done last as it may depend on gathered features
@@ -270,6 +263,7 @@ public final class FXMLSourceCodeBuilder {
                     .append(CONTROLLER_BIND_METHOD_NAME)
                     .append("() {\n")
                     .append(context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString().indent(4))
+                    .append(context.sourceCode(SourcePart.CONTROLLER_INITIALIZATION).toString().indent(4))
                     .append("}\n\n");
         }
         StringBuilder sourceCode = new StringBuilder();
@@ -340,13 +334,42 @@ public final class FXMLSourceCodeBuilder {
         return sourceCode.toString();
     }
 
-    /// Checks if a given Java type name represents a primitive type.
-    /// Primitive types are handled, especially as they do not require import statements.
+    /// Adds the controller's `initialize` method call to the generated source code.
     ///
-    /// @param type The fully qualified or simple name of the type to check.
-    /// @return `true` if the type is a Java primitive, `false` otherwise.
-    private boolean isPrimitive(String type) {
-        return PRIMITIVE_TYPES.contains(type);
+    /// This method checks if the controller has an `initialize` method and generates
+    /// the appropriate call (direct or via reflection) based on the method's visibility.
+    ///
+    /// @param context  The [SourceCodeGeneratorContext] used for code generation.
+    /// @param document The [FXMLDocument] containing the controller information.
+    private void addControllerInitializeMethod(SourceCodeGeneratorContext context, FXMLDocument document) {
+        Optional<FXMLController> controllerOptional = document.controller();
+        if (controllerOptional.isEmpty()) {
+            return;
+        }
+        FXMLController controller = controllerOptional.get();
+        List<FXMLControllerMethod> initializeMethods = controller.methods()
+                .stream()
+                .filter(method -> INITIALIZE_METHOD.equals(method.name()))
+                .toList();
+        Optional<FXMLControllerMethod> initializeMethodOptional = initializeMethods.stream()
+                .filter(method -> method.parameterTypes().size() == 2)
+                .filter(method -> URL_TYPE.equals(method.parameterTypes().getFirst()))
+                .filter(method -> RESOURCE_BUNDLE_TYPE.equals(method.parameterTypes().get(1)))
+                .findFirst()
+                .or(
+                        () -> initializeMethods.stream()
+                                .filter(method -> method.parameterTypes().isEmpty())
+                                .findFirst()
+                );
+        FXMLClassType controllerClass = controller.controllerClass();
+        if (initializeMethodOptional.isEmpty()) {
+            log.info("No suitable initialize method found for controller: %s".formatted(controllerClass));
+            return;
+        }
+        FXMLControllerMethod initializeMethod = initializeMethodOptional.get();
+        context.addFeature(Feature.BIND_CONTROLLER);
+        context.sourceCode(SourcePart.CONTROLLER_INITIALIZATION)
+                .append(typeHelper.renderControllerInitialization(context, controllerClass, initializeMethod));
     }
 
     /// Adds sorted import statements to the source code context.
@@ -358,7 +381,7 @@ public final class FXMLSourceCodeBuilder {
         List<String> importList = context.imports()
                 .imports()
                 .stream()
-                .filter(Predicate.not(this::isPrimitive))
+                .filter(Predicate.not(typeHelper::isPrimitive))
                 .sorted()
                 .toList();
         StringBuilder sourceCode = context.sourceCode(SourcePart.IMPORTS);
@@ -1229,7 +1252,7 @@ public final class FXMLSourceCodeBuilder {
     /// @param key      The key representing the element to be created.
     /// @param supplier A supplier that provides the stream of generated elements if the key is new.
     /// @return A stream containing the generated element(s) if the key was newly added to the set,
-    ///                                                                                                                                                                                                 or an empty stream if the key was already present.
+    ///                                                                                                                                                                                                                                                                 or an empty stream if the key was already present.
     private <K, T> Stream<T> singleCreation(Set<K> set, K key, Supplier<Stream<T>> supplier) {
         if (set.add(key)) {
             return supplier.get();
