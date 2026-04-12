@@ -483,14 +483,16 @@ final class FXMLSourceCodeBuilderTypeHelper {
     /// @param context    The [SourceCodeGeneratorContext] used for code generation.
     /// @param controller The [FXMLController] whose fields are being mapped.
     /// @param field      The specific [FXMLControllerField] to be mapped.
+    /// @param identifier The identifier to be mapped.
     /// @return A string containing the generated Java source code for the field mapping.
-    /// @throws NullPointerException If `context`, `controller`, or `field` is null.
+    /// @throws NullPointerException If `context`, `controller`, `field`, or `identifier` is null.
     public String renderControllerFieldMapping(
-            SourceCodeGeneratorContext context, FXMLController controller, FXMLControllerField field
+            SourceCodeGeneratorContext context, FXMLController controller, FXMLControllerField field, String identifier
     ) throws NullPointerException {
         Objects.requireNonNull(context, "`context` must not be null");
         Objects.requireNonNull(controller, "`controller` must not be null");
         Objects.requireNonNull(field, "`field` must not be null");
+        Objects.requireNonNull(identifier, "`identifier` must not be null");
         return switch (field.visibility()) {
             case PUBLIC -> renderDirectControllerFieldMapping(field);
             case PROTECTED, PACKAGE_PRIVATE -> {

@@ -1103,25 +1103,26 @@ public final class FXMLSourceCodeBuilder {
             SourceCodeGeneratorContext context, FXMLIdentifier identifier, FXMLController controller
     ) {
         return switch (identifier) {
-            case FXMLExposedIdentifier(String name) -> bindField(context, name, controller);
-            case FXMLNamedRootIdentifier(String name) -> bindField(context, name, controller);
+            case FXMLExposedIdentifier(String name) -> bindField(context, name, name, controller);
+            case FXMLNamedRootIdentifier(String name) -> bindField(context, name, "this", controller);
             case FXMLRootIdentifier _, FXMLInternalIdentifier _ -> false;
         };
     }
 
     /// Generates the Java source code for binding an FXML identifier to a controller field.
     ///
-    /// @param context    The current [SourceCodeGeneratorContext]
-    /// @param identifier The [FXMLIdentifier] from the FXML document
-    /// @param controller The [FXMLController] containing the fields to bind
+    /// @param context          The current [SourceCodeGeneratorContext]
+    /// @param identifier       The [FXMLIdentifier] from the FXML document
+    /// @param assignIdentifier The identifier to use for assignment in the generated code
+    /// @param controller       The [FXMLController] containing the fields to bind
     /// @return `true` if a successful binding was generated, `false` otherwise
     private boolean bindField(
-            SourceCodeGeneratorContext context, String identifier, FXMLController controller
+            SourceCodeGeneratorContext context, String identifier, String assignIdentifier, FXMLController controller
     ) {
         return controller.fields().stream()
                 .filter(f -> f.name().equals(identifier))
                 .findFirst()
-                .map(f -> bindField(context, controller, f))
+                .map(f -> bindField(context, controller, f, assignIdentifier))
                 .orElse(false);
     }
 
@@ -1131,10 +1132,16 @@ public final class FXMLSourceCodeBuilder {
     /// @param context    The source code generation context used to write the generated code.
     /// @param controller The FXML controller where the field resides.
     /// @param field      The field in the FXML controller to be bound and processed.
+    /// @param identifier The identifier of the field in the FXML document.
     /// @return A boolean value indicating whether the field was successfully bound, always `true`.
-    private boolean bindField(SourceCodeGeneratorContext context, FXMLController controller, FXMLControllerField field) {
+    private boolean bindField(
+            SourceCodeGeneratorContext context,
+            FXMLController controller,
+            FXMLControllerField field,
+            String identifier
+    ) {
         context.sourceCode(SourcePart.CONTROLLER_FIELDS)
-                .append(typeHelper.renderControllerFieldMapping(context, controller, field))
+                .append(typeHelper.renderControllerFieldMapping(context, controller, field, identifier))
                 .append('\n');
         return true;
     }
@@ -1252,7 +1259,7 @@ public final class FXMLSourceCodeBuilder {
     /// @param key      The key representing the element to be created.
     /// @param supplier A supplier that provides the stream of generated elements if the key is new.
     /// @return A stream containing the generated element(s) if the key was newly added to the set,
-    ///                                                                                                                                                                                                                                                                 or an empty stream if the key was already present.
+    ///                                                                                                                                                                                                                                                                                 or an empty stream if the key was already present.
     private <K, T> Stream<T> singleCreation(Set<K> set, K key, Supplier<Stream<T>> supplier) {
         if (set.add(key)) {
             return supplier.get();
