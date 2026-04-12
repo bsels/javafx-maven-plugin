@@ -540,7 +540,7 @@ public final class Utils {
                 )
                 .or(
                         () -> Arrays.stream(clazz.getGenericInterfaces())
-                                .map(Utils::typeToClass)
+                                .map(Utils::getClassType)
                                 .map(genericInterface -> findGenericTypeFromHierarchy(
                                         genericInterface,
                                         targetInterface,
@@ -582,19 +582,6 @@ public final class Utils {
     /// @return A predicate for matching the raw type
     private static Predicate<ParameterizedType> checkRawType(Class<?> targetInterface) {
         return parameterizedType -> parameterizedType.getRawType() == targetInterface;
-    }
-
-    /// Resolves a [Type] to its raw [Class] representation.
-    /// If the type is a [ParameterizedType], it returns its raw type; otherwise, it returns the type itself.
-    ///
-    /// @param type The type to resolve
-    /// @return The raw [Class] associated with the type
-    private static Class<?> typeToClass(Type type) {
-        return (Class<?>) Stream.of(type)
-                .gather(CheckAndCast.of(ParameterizedType.class))
-                .map(ParameterizedType::getRawType)
-                .findFirst()
-                .orElse(type);
     }
 
     /// Creates a [BiConsumer] that collects pattern matches into a list.
