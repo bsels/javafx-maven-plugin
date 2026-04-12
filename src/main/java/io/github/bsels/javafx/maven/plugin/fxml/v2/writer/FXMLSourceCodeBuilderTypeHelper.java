@@ -494,16 +494,17 @@ final class FXMLSourceCodeBuilderTypeHelper {
         Objects.requireNonNull(field, "`field` must not be null");
         Objects.requireNonNull(identifier, "`identifier` must not be null");
         return switch (field.visibility()) {
-            case PUBLIC -> renderDirectControllerFieldMapping(field);
+            case PUBLIC -> renderDirectControllerFieldMapping(field, identifier);
             case PROTECTED, PACKAGE_PRIVATE -> {
                 FXMLClassType type = controller.controllerClass();
                 if (isClassInPackage(context, type)) {
-                    yield renderDirectControllerFieldMapping(field);
+                    yield renderDirectControllerFieldMapping(field, identifier);
                 } else {
-                    yield renderReflectionControllerFieldMapping(context, type, field);
+                    yield renderReflectionControllerFieldMapping(context, type, field, identifier);
                 }
             }
-            case PRIVATE -> renderReflectionControllerFieldMapping(context, controller.controllerClass(), field);
+            case PRIVATE ->
+                    renderReflectionControllerFieldMapping(context, controller.controllerClass(), field, identifier);
         };
     }
 
@@ -603,32 +604,39 @@ final class FXMLSourceCodeBuilderTypeHelper {
 
     /// Renders a direct assignment from an FXML identifier to a public or accessible controller field.
     ///
-    /// @param field The [FXMLControllerField] for which a direct assignment is generated.
+    /// @param field      The [FXMLControllerField] for which a direct assignment is generated.
+    /// @param identifier The identifier to use for assignment in the generated code
     /// @return The generated Java source code line for direct field assignment.
-    private String renderDirectControllerFieldMapping(FXMLControllerField field) {
-        return "%1$s.%2$s = %2$s;".formatted(INTERNAL_CONTROLLER_FIELD, field.name());
+    private String renderDirectControllerFieldMapping(FXMLControllerField field, String identifier) {
+        return "%1$s.%2$s = %3$s;".formatted(INTERNAL_CONTROLLER_FIELD, field.name(), identifier);
     }
 
     /// Renders the source code to assign an FXML identifier to a controller field using reflection.
     ///
     /// This is used for private fields or fields that are otherwise inaccessible from the generated class.
     ///
-    /// @param context   The [SourceCodeGeneratorContext] used for code generation.
-    /// @param classType The [FXMLClassType] of the controller.
-    /// @param field     The [FXMLControllerField] to be mapped via reflection.
+    /// @param context    The [SourceCodeGeneratorContext] used for code generation.
+    /// @param classType  The [FXMLClassType] of the controller.
+    /// @param field      The [FXMLControllerField] to be mapped via reflection.
+    /// @param identifier The identifier to be mapped.
     /// @return A string containing the Java source code block for reflective field assignment.
     private String renderReflectionControllerFieldMapping(
-            SourceCodeGeneratorContext context, FXMLClassType classType, FXMLControllerField field
+            SourceCodeGeneratorContext context, FXMLClassType classType, FXMLControllerField field, String identifier
     ) {
         return """
                 try {
                     java.lang.reflect.Field $reflectionField$ = %1$s.class.getDeclaredField("%2$s");
                     $reflectionField$.setAccessible(true);
-                    $reflectionField$.set(%3$s, %2$s);
+                    $reflectionField$.set(%3$s, %4$s);
                 } catch (java.lang.NoSuchFieldException | java.lang.IllegalAccessException e) {
                     throw new RuntimeException(e);
                 }
-                """.formatted(typeToSourceCode(context, classType), field.name(), INTERNAL_CONTROLLER_FIELD);
+                """.formatted(
+                typeToSourceCode(context, classType),
+                field.name(),
+                INTERNAL_CONTROLLER_FIELD,
+                identifier
+        );
     }
 
     /// Generates the body of a method that uses reflection to call a controller method.
