@@ -16,6 +16,8 @@ enum SourcePart {
     CONSTRUCTOR_SUPER_CALL,
     /// End of the constructor, where property assignments and initialization occur.
     CONSTRUCTOR_EPILOGUE,
+    /// The controller fields mapping.
+    CONTROLLER_FIELDS,
     /// Class methods.
     METHODS,
     /// Nested classes or types.

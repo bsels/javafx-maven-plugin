@@ -190,12 +190,11 @@ final class FXMLSourceCodeBuilderImportHelper {
             case FXMLMap(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> entries) -> entries.values()
                     .stream()
                     .flatMap(this::getDocumentClassNames);
-            case FXMLObject(_, _, _, List<FXMLProperty> properties) -> properties.stream()
-                    .flatMap(property -> propertyRecursionHelper.walk(
-                            property,
-                            (v, _) -> getDocumentClassNames(v),
-                            null
-                    ));
+            case FXMLObject(_, _, _, List<FXMLProperty> properties) -> propertyRecursionHelper.walk(
+                    properties,
+                    (v, _) -> getDocumentClassNames(v),
+                    null
+            );
             case FXMLInclude(_, _, _, _, FXMLLazyLoadedDocument lazyLoadedDocument) ->
                     getDocumentClassNames(lazyLoadedDocument.get());
             case FXMLConstant _, FXMLCopy _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _,

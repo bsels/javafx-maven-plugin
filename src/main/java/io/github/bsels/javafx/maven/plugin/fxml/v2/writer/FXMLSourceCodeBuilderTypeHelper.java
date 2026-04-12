@@ -756,12 +756,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
                     _,
                     List<FXMLProperty> properties
             ) -> Stream.concat(
-                    properties.stream()
-                            .flatMap(property -> propertyRecursionHelper.walk(
-                                    property,
-                                    (v, _) -> createIdentifierToTypeMapEntry(v),
-                                    null
-                            )),
+                    propertyRecursionHelper.walk(properties, (v, _) -> createIdentifierToTypeMapEntry(v), null),
                     Stream.of(Map.entry(identifier.toString(), new Wrapper.FXMLTypeWrapper(type)))
             );
             case FXMLConstant _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _, FXMLReference _,

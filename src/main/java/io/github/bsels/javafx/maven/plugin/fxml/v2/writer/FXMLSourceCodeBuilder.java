@@ -3,6 +3,7 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLInterface;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
@@ -41,6 +42,10 @@ import io.github.bsels.javafx.maven.plugin.utils.Utils;
 import org.apache.maven.plugin.logging.Log;
 
 import javax.annotation.processing.Generated;
+import java.io.File;
+import java.net.URI;
+import java.net.URL;
+import java.nio.file.Path;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -72,16 +77,16 @@ public final class FXMLSourceCodeBuilder {
     /// Internal resource bundle field name used for translations in the generated Java class.
     static final String INTERNAL_RESOURCE_BUNDLE = "$INTERNAL$RESOURCE$BUNDLE$";
 
-    /// Internal method name for converting a string value to a [java.io.File] instance.
+    /// Internal method name for converting a string value to a [File] instance.
     static final String INTERNAL_STRING_TO_FILE_METHOD = "$internalMethod$stringToFile$";
 
-    /// Internal method name for converting a string value to a [java.nio.file.Path] instance.
+    /// Internal method name for converting a string value to a [Path] instance.
     static final String INTERNAL_STRING_TO_PATH_METHOD = "$internalMethod$stringToPath$";
 
-    /// Internal method name for converting a string value to a [java.net.URI] instance.
+    /// Internal method name for converting a string value to a [URI] instance.
     static final String INTERNAL_STRING_TO_URI_METHOD = "$internalMethod$stringToURI$";
 
-    /// Internal method name for converting a string value to a [java.net.URL] instance.
+    /// Internal method name for converting a string value to a [URL] instance.
     static final String INTERNAL_STRING_TO_URL_METHOD = "$internalMethod$stringToURL$";
 
     /// Prefix for internal constructor variables used to avoid naming collisions during object initialization.
@@ -423,9 +428,7 @@ public final class FXMLSourceCodeBuilder {
             case FXMLObject(FXMLIdentifier identifier, FXMLType type, _, List<FXMLProperty> properties) ->
                     Stream.concat(
                             identifierToField(context, identifier, type),
-                            properties.stream().flatMap(
-                                    property -> propertyRecursionHelper.walk(property, this::addFields, context)
-                            )
+                            propertyRecursionHelper.walk(properties, this::addFields, context)
                     );
             case FXMLConstant _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _, FXMLReference _,
                  FXMLResource _, FXMLTranslation _ -> Stream.empty();
@@ -820,13 +823,7 @@ public final class FXMLSourceCodeBuilder {
             );
             case FXMLObject fxmlObject -> Stream.concat(
                     Stream.of(findDependenciesForObjectConstruction(fxmlObject)),
-                    fxmlObject.properties()
-                            .stream()
-                            .flatMap(property -> propertyRecursionHelper.walk(
-                                    property,
-                                    this::findConstructions,
-                                    context
-                            ))
+                    propertyRecursionHelper.walk(fxmlObject.properties(), this::findConstructions, context)
             );
             case FXMLCopy copy -> Stream.of(new FXMLCopyAndDependencies(copy, List.of(copy.source())));
             case FXMLInclude include -> Stream.of(new FXMLIncludeAndDependencies(include, List.of()));
@@ -987,6 +984,89 @@ public final class FXMLSourceCodeBuilder {
         }
     }
 
+    /// Orchestrates the binding of FXML identifiers to controller fields in the generated Java code.
+    /// This method identifies if a controller is present and, if so, iterates through the FXML document's
+    /// root and definitions to generate field mapping assignments.
+    ///
+    /// @param context  The current [SourceCodeGeneratorContext]
+    /// @param document The [FXMLDocument] being processed
+    private void bindControllerFields(SourceCodeGeneratorContext context, FXMLDocument document) {
+        Optional<FXMLController> controllerOptional = document.controller();
+        if (controllerOptional.isEmpty()) {
+            return;
+        }
+        FXMLController controller = controllerOptional.get();
+        List<FXMLControllerField> fields = controller.fields();
+        if (fields.isEmpty()) {
+            return;
+        }
+        boolean hasFieldMappings = Stream.concat(
+                        Stream.of(document.root()),
+                        document.definitions()
+                                .stream()
+                ).map(value -> bindControllerFields(context, fields, value))
+                .reduce(false, Boolean::logicalOr);
+        if (hasFieldMappings) {
+            context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE)
+                    .append(context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString());
+        }
+    }
+
+    /// Recursively traverses FXML values to find and bind identifiers to controller fields.
+    ///
+    /// @param context The current [SourceCodeGeneratorContext]
+    /// @param fields  The list of [FXMLControllerField]s defined in the controller class
+    /// @param value   The [AbstractFXMLValue] to process for field bindings
+    /// @return `true` if any field mappings were generated, `false` otherwise
+    private boolean bindControllerFields(
+            SourceCodeGeneratorContext context,
+            List<FXMLControllerField> fields,
+            AbstractFXMLValue value
+    ) {
+        // Using `Boolean.logicalOr` to prevent short-circuit evaluation
+        return switch (value) {
+            case FXMLCollection(FXMLIdentifier identifier, _, _, List<AbstractFXMLValue> values) -> Boolean.logicalOr(
+                    bindField(context, identifier, fields),
+                    values.stream()
+                            .map(v -> bindControllerFields(context, fields, v))
+                            .reduce(false, Boolean::logicalOr)
+            );
+            case FXMLMap(FXMLIdentifier identifier, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> entries) ->
+                    Boolean.logicalOr(
+                            bindField(context, identifier, fields),
+                            entries.values().stream()
+                                    .map(v -> bindControllerFields(context, fields, v))
+                                    .reduce(false, Boolean::logicalOr)
+                    );
+            case FXMLObject(FXMLIdentifier identifier, _, _, List<FXMLProperty> properties) -> Boolean.logicalOr(
+                    bindField(context, identifier, fields),
+                    propertyRecursionHelper.walk(
+                            properties,
+                            (v, c) -> Stream.of(bindControllerFields(c, fields, v)),
+                            context
+                    ).reduce(false, Boolean::logicalOr)
+            );
+            case FXMLCopy(FXMLIdentifier identifier, _) -> bindField(context, identifier, fields);
+            case FXMLInclude(FXMLIdentifier identifier, _, _, _, _) -> bindField(context, identifier, fields);
+            case FXMLValue(Optional<FXMLIdentifier> identifier, _, _) ->
+                    identifier.map(id -> bindField(context, id, fields)).orElse(false);
+            case FXMLMethod _, FXMLInlineScript _, FXMLLiteral _, FXMLConstant _, FXMLExpression _, FXMLReference _,
+                 FXMLResource _, FXMLTranslation _ -> false;
+        };
+    }
+
+    /// Generates the Java source code for binding an FXML identifier to a controller field.
+    ///
+    /// @param context    The current [SourceCodeGeneratorContext]
+    /// @param identifier The [FXMLIdentifier] from the FXML document
+    /// @param fields     The list of available [FXMLControllerField]s in the controller
+    /// @return `true` if a successful binding was generated, `false` otherwise
+    private boolean bindField(
+            SourceCodeGeneratorContext context, FXMLIdentifier identifier, List<FXMLControllerField> fields
+    ) {
+        return false; // TODO: implement
+    }
+
     /// Adds nested inner class declarations for all included FXML files.
     /// Each unique FXML includes results in a generated inner class that encapsulates its object graph.
     ///
@@ -1016,8 +1096,8 @@ public final class FXMLSourceCodeBuilder {
             case FXMLMap(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> entries) -> entries.values()
                     .stream()
                     .flatMap(v -> addInnerClass(v, context));
-            case FXMLObject(_, _, _, List<FXMLProperty> properties) -> properties.stream()
-                    .flatMap(property -> propertyRecursionHelper.walk(property, this::addInnerClass, context));
+            case FXMLObject(_, _, _, List<FXMLProperty> properties) ->
+                    propertyRecursionHelper.walk(properties, this::addInnerClass, context);
             case FXMLInclude(_, String sourceFile, _, Optional<String> resources, FXMLLazyLoadedDocument document) ->
                     singleCreation(
                             context.seenNestedFXMLFiles(),
@@ -1076,12 +1156,11 @@ public final class FXMLSourceCodeBuilder {
             case FXMLMap(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> entries) -> entries.values()
                     .stream()
                     .flatMap(nested -> addMethods(nested, context, controller, interfaces));
-            case FXMLObject(_, _, _, List<FXMLProperty> properties) -> properties.stream()
-                    .flatMap(property -> propertyRecursionHelper.walk(
-                            property,
-                            (nested, ctx) -> addMethods(nested, ctx, controller, interfaces),
-                            context
-                    ));
+            case FXMLObject(_, _, _, List<FXMLProperty> properties) -> propertyRecursionHelper.walk(
+                    properties,
+                    (v, c) -> addMethods(v, c, controller, interfaces),
+                    context
+            );
             case FXMLMethod fxmlMethod -> singleCreation(
                     context.seenFXMLMethods(),
                     fxmlMethod,
@@ -1101,7 +1180,7 @@ public final class FXMLSourceCodeBuilder {
     /// @param key      The key representing the element to be created.
     /// @param supplier A supplier that provides the stream of generated elements if the key is new.
     /// @return A stream containing the generated element(s) if the key was newly added to the set,
-    ///                                                         or an empty stream if the key was already present.
+    ///                                                                                                                                                                         or an empty stream if the key was already present.
     private <K, T> Stream<T> singleCreation(Set<K> set, K key, Supplier<Stream<T>> supplier) {
         if (set.add(key)) {
             return supplier.get();
