@@ -8,6 +8,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLInterface;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLUtils;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
@@ -266,12 +267,12 @@ final class FXMLSourceCodeBuilderTypeHelper {
             FXMLType type
     ) {
         return switch (value) {
-            case AbstractFXMLObject object -> "%s%s".formatted(identifierPrefix, object.identifier());
+            case AbstractFXMLObject object -> createIdentifier(identifierPrefix, object.identifier());
             case FXMLConstant(FXMLClassType clazz, String identifier, _) ->
                     "%s.%s".formatted(typeToSourceCode(context, clazz), identifier);
-            case FXMLCopy(FXMLIdentifier identifier, _) -> "%s%s".formatted(identifierPrefix, identifier);
+            case FXMLCopy(FXMLIdentifier identifier, _) -> createIdentifier(identifierPrefix, identifier);
             case FXMLExpression _ -> throw new UnsupportedOperationException("Expression values are not supported yet");
-            case FXMLInclude(FXMLIdentifier identifier, _, _, _, _) -> "%s%s".formatted(identifierPrefix, identifier);
+            case FXMLInclude(FXMLIdentifier identifier, _, _, _, _) -> createIdentifier(identifierPrefix, identifier);
             case FXMLInlineScript _ ->
                     throw new UnsupportedOperationException("Inline script values are not supported yet");
             case FXMLLiteral(String literal) -> encodeLiteral(context, literal, type);
@@ -307,10 +308,21 @@ final class FXMLSourceCodeBuilderTypeHelper {
                 );
             }
             case FXMLValue(Optional<FXMLIdentifier> identifier, FXMLType t, String v) ->
-                    identifier.map(FXMLIdentifier::toString)
-                            .map(i -> "%s%s".formatted(identifierPrefix, i))
+                    identifier.map(i -> createIdentifier(identifierPrefix, i))
                             .orElseGet(() -> encodeLiteral(context, v, t));
         };
+    }
+
+    /// Creates a unique identifier string based on the provided prefix and object.
+    ///
+    /// @param identifierPrefix The prefix to be used in the identifier.
+    /// @param object           The FXMLIdentifier object used to generate the identifier string.
+    /// @return a string representation of the identifier, either from the object itself if it is an instance of FXMLInternalIdentifier, or composed using the prefix and the object.
+    private String createIdentifier(String identifierPrefix, FXMLIdentifier object) {
+        if (object instanceof FXMLInternalIdentifier internalIdentifier) {
+            return internalIdentifier.toString();
+        }
+        return "%s%s".formatted(identifierPrefix, object);
     }
 
     /// Converts an [FXMLType] to its Java source code representation.

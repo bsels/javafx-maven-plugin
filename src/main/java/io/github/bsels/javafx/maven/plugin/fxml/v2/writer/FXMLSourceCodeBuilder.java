@@ -1,6 +1,5 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
-import io.github.bsels.javafx.maven.plugin.utils.CheckAndCast;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
@@ -37,6 +36,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLReference;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLResource;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLTranslation;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
+import io.github.bsels.javafx.maven.plugin.utils.CheckAndCast;
 import io.github.bsels.javafx.maven.plugin.utils.Utils;
 import org.apache.maven.plugin.logging.Log;
 
@@ -446,9 +446,7 @@ public final class FXMLSourceCodeBuilder {
         return switch (identifier) {
             case FXMLExposedIdentifier(String name) ->
                     Stream.of("protected final %s %s;\n".formatted(typeHelper.typeToSourceCode(context, type), name));
-            case FXMLInternalIdentifier id ->
-                    Stream.of("private final %s %s;\n".formatted(typeHelper.typeToSourceCode(context, type), id));
-            case FXMLNamedRootIdentifier _, FXMLRootIdentifier _ -> Stream.empty();
+            case FXMLInternalIdentifier _, FXMLNamedRootIdentifier _, FXMLRootIdentifier _ -> Stream.empty();
         };
     }
 
@@ -629,8 +627,12 @@ public final class FXMLSourceCodeBuilder {
             Consumer<StringBuilder> sourceCodeConsumer
     ) {
         StringBuilder sourceCode = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE);
-        boolean isDependency = constructorDependencies.contains(identifier);
-        if (isDependency) {
+        boolean isInternalIdentifier = identifier instanceof FXMLInternalIdentifier;
+        boolean isDependency = constructorDependencies.contains(identifier) && !isInternalIdentifier;
+        if (isInternalIdentifier) {
+            sourceCode.append(typeString)
+                    .append(' ');
+        } else if (isDependency) {
             sourceCode.append(typeString)
                     .append(' ')
                     .append(CONSTRUCTOR_VARIABLE_PREFIX);
@@ -650,9 +652,11 @@ public final class FXMLSourceCodeBuilder {
     /// @param fxmlIdentifier The [FXMLIdentifier] of the field to bind.
     private void bindPrologueVariableToField(StringBuilder sourceCode, FXMLIdentifier fxmlIdentifier) {
         sourceCode.append(fxmlIdentifier)
-                .append(" = ")
-                .append(CONSTRUCTOR_VARIABLE_PREFIX)
-                .append(fxmlIdentifier)
+                .append(" = ");
+        if (!(fxmlIdentifier instanceof FXMLInternalIdentifier)) {
+            sourceCode.append(CONSTRUCTOR_VARIABLE_PREFIX);
+        }
+        sourceCode.append(fxmlIdentifier)
                 .append(";\n");
     }
 
@@ -1097,7 +1101,7 @@ public final class FXMLSourceCodeBuilder {
     /// @param key      The key representing the element to be created.
     /// @param supplier A supplier that provides the stream of generated elements if the key is new.
     /// @return A stream containing the generated element(s) if the key was newly added to the set,
-    ///         or an empty stream if the key was already present.
+    ///                                                         or an empty stream if the key was already present.
     private <K, T> Stream<T> singleCreation(Set<K> set, K key, Supplier<Stream<T>> supplier) {
         if (set.add(key)) {
             return supplier.get();
