@@ -38,6 +38,9 @@ class FXMLUtilsTest {
     /** A generic subclass that passes its own type parameter to ArrayList. */
     static class GenericList<T> extends ArrayList<T> {}
 
+    /** A generic subclass with bound that passes its own type parameter to ArrayList. */
+    static class NumberList<T extends Number> extends ArrayList<T> {}
+
     /** A class that directly implements Map<String, Integer>. */
     static class DirectStringIntMap extends HashMap<String, Integer> implements Map<String, Integer> {}
 
@@ -280,6 +283,18 @@ class FXMLUtilsTest {
 
             // Then
             assertThat(result).isEqualTo(FXMLType.wildcard());
+        }
+
+        @Test
+        void shouldReturnDoubleForNumberListDouble() {
+            // Given – NumberList<Double> extends ArrayList<Double>
+            FXMLType type = FXMLType.of(NumberList.class, List.of(FXMLType.of(Double.class)));
+
+            // When
+            FXMLType result = FXMLUtils.findCollectionValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(Double.class));
         }
 
         @Test

@@ -316,7 +316,7 @@ public final class FXMLUtils {
                                         targetInterface,
                                         typeArgumentIndex
                                 ))
-                                .filter(result -> !result.equals(FXMLType.OBJECT))
+                                .filter(Predicate.not(FXMLType.OBJECT::equals))
                 )
                 .or(
                         () -> Arrays.stream(clazz.getGenericInterfaces())
