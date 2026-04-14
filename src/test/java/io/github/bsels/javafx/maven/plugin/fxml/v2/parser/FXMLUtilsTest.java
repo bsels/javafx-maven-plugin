@@ -63,6 +63,12 @@ class FXMLUtilsTest {
     interface MyCollection<E> extends Collection<E> {}
     static class MyCollectionImpl<E> extends ArrayList<E> implements MyCollection<E> {}
 
+    interface SubCollection<T> extends Collection<T> {}
+    abstract static class SubCollectionImpl<T> implements SubCollection<T> {}
+
+    static class GenericSuper<T> extends ArrayList<T> {}
+    static class SubOfGenericSuper extends GenericSuper<String> {}
+
     /** A custom Type implementation for testing non-standard Type handling. */
     static class NonStandardType implements Type {
         @Override
@@ -117,6 +123,11 @@ class FXMLUtilsTest {
     interface MyFunctionalInterface { void run(); }
     interface ImplicitFunctionalInterface { void run(); }
     interface NotAFunctionalInterface { void run(); void walk(); }
+    interface InterfaceWithStaticAndDefaultMethods {
+        void abstractMethod();
+        static void staticMethod() {}
+        default void defaultMethod() {}
+    }
 
     // -------------------------------------------------------------------------
     // findRawType
@@ -295,6 +306,42 @@ class FXMLUtilsTest {
 
             // Then
             assertThat(result).isEqualTo(FXMLType.of(Double.class));
+        }
+
+        @Test
+        void shouldReturnObjectIfClassIsTargetInterface() {
+            // Given
+            FXMLType type = FXMLType.of(Collection.class);
+
+            // When
+            FXMLType result = FXMLUtils.findCollectionValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldResolveViaRecursiveInterfaceSearch() {
+            // Given – SubCollectionImpl<String> implements SubCollection<String> which extends Collection<T>
+            FXMLType type = FXMLType.of(SubCollectionImpl.class, List.of(FXMLType.of(String.class)));
+
+            // When
+            FXMLType result = FXMLUtils.findCollectionValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldResolveViaGenericSuperclass() {
+            // Given – SubOfGenericSuper extends GenericSuper<String> extends ArrayList<String>
+            FXMLType type = FXMLType.of(SubOfGenericSuper.class);
+
+            // When
+            FXMLType result = FXMLUtils.findCollectionValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(String.class));
         }
 
         @Test
@@ -756,6 +803,40 @@ class FXMLUtilsTest {
             // Then – null arg should produce a wildcard FXMLType for "E"
             assertThat(mapping).containsEntry("E", FXMLType.wildcard());
         }
+
+        @Test
+        void shouldResolveMappingForMultipleTypeParameters() {
+            // Given - Map<String, Integer>
+            Map<String, FXMLType> mapping = new HashMap<>();
+            Type type = new CustomParameterizedType(Map.class, new Type[]{String.class, Integer.class});
+
+            // When
+            FXMLUtils.resolveTypeMapping(type, mapping, new HashSet<>());
+
+            // Then
+            assertThat(mapping).containsEntry("K", FXMLType.of(String.class));
+            assertThat(mapping).containsEntry("V", FXMLType.of(Integer.class));
+        }
+
+        @Test
+        void shouldMapTypeVariableToExistingMapping() {
+            // Given - T -> String in mapping
+            // ParameterizedType List<T>
+            Map<String, FXMLType> mapping = new HashMap<>();
+            mapping.put("T", FXMLType.of(String.class));
+
+            // We need a TypeVariable "T"
+            class GenericHolder<T> { List<T> list; }
+            try {
+                Type listType = GenericHolder.class.getDeclaredField("list").getGenericType();
+                // When
+                FXMLUtils.resolveTypeMapping(listType, mapping, new HashSet<>());
+                // Then - E should be String
+                assertThat(mapping).containsEntry("E", FXMLType.of(String.class));
+            } catch (NoSuchFieldException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -998,6 +1079,176 @@ class FXMLUtilsTest {
             assertThatThrownBy(() -> FXMLUtils.hasNonSkippablePrefix(null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`key` must not be null");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Coverage tests using reflection
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class CoverageReflectionTest {
+
+        @Test
+        void shouldHitCacheForDefaultPropertyName() {
+            Class<?> clazz = FXMLUtilsFixtures.WithDefaultProperty.class;
+            assertThat(FXMLUtils.resolveDefaultPropertyName(clazz)).isEqualTo(FXMLUtils.resolveDefaultPropertyName(clazz));
+        }
+
+        @Test
+        void shouldHitCacheForConstantType() {
+            Class<?> clazz = FXMLUtilsFixtures.class;
+            String name = "CONSTANT";
+            assertThat(FXMLUtils.resolveConstantType(clazz, name)).isEqualTo(FXMLUtils.resolveConstantType(clazz, name));
+        }
+
+        @Test
+        void shouldHitCacheForFactoryMethodReturnType() {
+            Class<?> clazz = FXMLUtilsFixtures.class;
+            String name = "factory";
+            assertThat(FXMLUtils.findFactoryMethodReturnType(clazz, name)).isEqualTo(FXMLUtils.findFactoryMethodReturnType(clazz, name));
+        }
+
+        @Test
+        void shouldReturnObjectWhenIndexOutOfBounds() throws Exception {
+            Type mapType = new CustomParameterizedType(Map.class, new Type[]{String.class, Integer.class});
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("getFXMLInterfaceElementType", Class.class, int.class, Type.class);
+            method.setAccessible(true);
+            java.util.Optional<FXMLType> result = (java.util.Optional<FXMLType>) method.invoke(null, Map.class, 2, mapType);
+            assertThat(result).contains(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnObjectForNullArgInGetFXMLInterfaceElementType() throws Exception {
+            Type mapType = new CustomParameterizedType(Map.class, new Type[]{null, Integer.class});
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("getFXMLInterfaceElementType", Class.class, int.class, Type.class);
+            method.setAccessible(true);
+            java.util.Optional<FXMLType> result = (java.util.Optional<FXMLType>) method.invoke(null, Map.class, 0, mapType);
+            assertThat(result).contains(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldHandleDefaultInGetFXMLInterfaceElementType() throws Exception {
+            Type nonStandardType = new NonStandardType();
+            Type mapType = new CustomParameterizedType(Map.class, new Type[]{nonStandardType, Integer.class});
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("getFXMLInterfaceElementType", Class.class, int.class, Type.class);
+            method.setAccessible(true);
+            java.util.Optional<FXMLType> result = (java.util.Optional<FXMLType>) method.invoke(null, Map.class, 0, mapType);
+            assertThat(result).contains(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnEmptyForNonParameterizedTypeInGetFXMLInterfaceElementType() throws Exception {
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("getFXMLInterfaceElementType", Class.class, int.class, Type.class);
+            method.setAccessible(true);
+            java.util.Optional<FXMLType> result = (java.util.Optional<FXMLType>) method.invoke(null, Map.class, 0, String.class);
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        void shouldReturnEmptyForDifferentTargetInterfaceInGetFXMLInterfaceElementType() throws Exception {
+            Type collectionType = new CustomParameterizedType(Collection.class, new Type[]{String.class});
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("getFXMLInterfaceElementType", Class.class, int.class, Type.class);
+            method.setAccessible(true);
+            java.util.Optional<FXMLType> result = (java.util.Optional<FXMLType>) method.invoke(null, Map.class, 0, collectionType);
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        void shouldHandleWildcardInFindFXMLGenericTypeFromHierarchy() throws Exception {
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("findFXMLGenericTypeFromHierarchy", FXMLType.class, Class.class, int.class);
+            method.setAccessible(true);
+            FXMLType result = (FXMLType) method.invoke(null, FXMLType.wildcard(), Collection.class, 0);
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldHandleUncompiledInFindFXMLGenericTypeFromHierarchy() throws Exception {
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("findFXMLGenericTypeFromHierarchy", FXMLType.class, Class.class, int.class);
+            method.setAccessible(true);
+            FXMLType result = (FXMLType) method.invoke(null, FXMLType.of("MyType", List.of()), Collection.class, 0);
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldHandleNullInFindFXMLGenericTypeFromHierarchy() throws Exception {
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("findFXMLGenericTypeFromHierarchy", FXMLType.class, Class.class, int.class);
+            method.setAccessible(true);
+            try {
+                method.invoke(null, null, Collection.class, 0);
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                assertThat(e.getCause()).isInstanceOf(NullPointerException.class);
+            }
+        }
+
+        @Test
+        void shouldIdentifyFunctionalInterfaceWithStaticAndDefaultMethods() {
+            assertThat(FXMLUtils.isFunctionalInterface(InterfaceWithStaticAndDefaultMethods.class)).isTrue();
+        }
+
+        @Test
+        void shouldHandleNonStaticFieldInResolveConstantType() throws Exception {
+            class NonStaticField { public String field; }
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("internalResolveConstantType", Class.forName("io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLUtils$ClassAndString"));
+            method.setAccessible(true);
+            Object classAndString = createClassAndString(NonStaticField.class, "field");
+            try {
+                method.invoke(null, classAndString);
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                assertThat(e.getCause()).isInstanceOf(IllegalArgumentException.class);
+                assertThat(e.getCause().getMessage()).contains("is not static");
+            }
+        }
+
+        @Test
+        void shouldHandleParameterizedTypeInGetFXMLInterfaceElementType() throws Exception {
+            Type innerType = new CustomParameterizedType(List.class, new Type[]{String.class});
+            Type mapType = new CustomParameterizedType(Map.class, new Type[]{String.class, innerType});
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("getFXMLInterfaceElementType", Class.class, int.class, Type.class);
+            method.setAccessible(true);
+            java.util.Optional<FXMLType> result = (java.util.Optional<FXMLType>) method.invoke(null, Map.class, 1, mapType);
+            assertThat(result).isPresent();
+            assertThat(result.get()).isInstanceOf(io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType.class);
+            io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType genericType = (io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType) result.get();
+            assertThat(genericType.type()).isEqualTo(List.class);
+            assertThat(genericType.typeArguments()).containsExactly(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldHandleParameterizedTypeWithWildcardInGetFXMLInterfaceElementType() throws Exception {
+            Type innerType = new CustomParameterizedType(List.class, new Type[]{new NonStandardType()});
+            Type mapType = new CustomParameterizedType(Map.class, new Type[]{String.class, innerType});
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("getFXMLInterfaceElementType", Class.class, int.class, Type.class);
+            method.setAccessible(true);
+            java.util.Optional<FXMLType> result = (java.util.Optional<FXMLType>) method.invoke(null, Map.class, 1, mapType);
+            assertThat(result).isPresent();
+            assertThat(result.get()).isInstanceOf(io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType.class);
+            io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType genericType = (io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType) result.get();
+            assertThat(genericType.type()).isEqualTo(List.class);
+            assertThat(genericType.typeArguments()).containsExactly(FXMLType.wildcard());
+        }
+
+        @Test
+        void shouldReturnObjectForNullClazzInFindFXMLGenericTypeFromHierarchyForClass() throws Exception {
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("findFXMLGenericTypeFromHierarchyForClass", Class.class, Class.class, int.class);
+            method.setAccessible(true);
+            FXMLType result = (FXMLType) method.invoke(null, null, Collection.class, 0);
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnObjectForObjectClazzInFindFXMLGenericTypeFromHierarchyForClass() throws Exception {
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("findFXMLGenericTypeFromHierarchyForClass", Class.class, Class.class, int.class);
+            method.setAccessible(true);
+            FXMLType result = (FXMLType) method.invoke(null, Object.class, Collection.class, 0);
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        private Object createClassAndString(Class<?> clazz, String string) throws Exception {
+            Class<?> recordClass = Class.forName("io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLUtils$ClassAndString");
+            java.lang.reflect.Constructor<?> constructor = recordClass.getDeclaredConstructors()[0];
+            constructor.setAccessible(true);
+            return constructor.newInstance(clazz, string);
         }
     }
 }

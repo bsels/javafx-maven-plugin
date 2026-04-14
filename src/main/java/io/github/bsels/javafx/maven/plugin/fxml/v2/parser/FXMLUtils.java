@@ -330,21 +330,37 @@ public final class FXMLUtils {
 
     /// Checks the generic superclass of a class for a concrete type argument of the target interface.
     /// If the generic superclass is a [ParameterizedType], it first tries to match it directly against
-    /// the target interface, then resolves the superclass with its concrete type arguments and recurses.
+    /// the target interface, then resolves the superclass with its concrete type arguments, and recurses.
     ///
     /// @param clazz             The class whose generic superclass is to be inspected
     /// @param targetInterface   The target interface to find
     /// @param typeArgumentIndex The index of the type argument to extract
     /// @return An [Optional] containing the extracted [FXMLType], or empty if not applicable
-    private static Optional<FXMLType> getFXMLGenericSuperclassElementType(Class<?> clazz, Class<?> targetInterface, int typeArgumentIndex) {
+    private static Optional<FXMLType> getFXMLGenericSuperclassElementType(
+            Class<?> clazz, Class<?> targetInterface, int typeArgumentIndex
+    ) {
         Type genericSuperclass = clazz.getGenericSuperclass();
         if (!(genericSuperclass instanceof ParameterizedType parameterizedSuperType)) {
             return Optional.empty();
         }
-        Optional<FXMLType> direct = getFXMLInterfaceElementType(targetInterface, typeArgumentIndex, genericSuperclass);
-        if (direct.isPresent()) {
-            return direct;
-        }
+        return getFXMLInterfaceElementType(targetInterface, typeArgumentIndex, genericSuperclass)
+                .or(() -> getFXMLParameterizedSuperclassElementType(
+                        parameterizedSuperType,
+                        targetInterface,
+                        typeArgumentIndex
+                ));
+    }
+
+    /// Checks the parameterized superclass of a class for a concrete type argument of the target interface.
+    /// Resolves the superclass with its concrete type arguments and recurses.
+    ///
+    /// @param parameterizedSuperType The parameterized superclass to inspect
+    /// @param targetInterface        The target interface to find
+    /// @param typeArgumentIndex      The index of the type argument to extract
+    /// @return An [Optional] containing the extracted [FXMLType], or empty if not applicable
+    private static Optional<FXMLType> getFXMLParameterizedSuperclassElementType(
+            ParameterizedType parameterizedSuperType, Class<?> targetInterface, int typeArgumentIndex
+    ) {
         Type[] superActualArgs = parameterizedSuperType.getActualTypeArguments();
         if (Arrays.stream(superActualArgs).anyMatch(arg -> !(arg instanceof Class<?>))) {
             return Optional.empty();
@@ -354,11 +370,13 @@ public final class FXMLUtils {
                 .map(arg -> FXMLType.of((Class<?>) arg))
                 .toList();
         FXMLType superFXMLType = FXMLType.of(superRawClass, superTypeArgs);
-        FXMLType result = findFXMLGenericTypeFromHierarchy(superFXMLType, targetInterface, typeArgumentIndex);
-        if (result.equals(FXMLType.OBJECT)) {
-            return Optional.empty();
-        }
-        return Optional.of(result);
+        FXMLType result = findFXMLGenericTypeFromHierarchy(
+                superFXMLType,
+                targetInterface,
+                typeArgumentIndex
+        );
+        return Optional.of(result)
+                .filter(Predicate.not(FXMLType.OBJECT::equals));
     }
 
     /// Extracts the element type of the target interface from a generic interface definition as an [FXMLType].
