@@ -902,7 +902,7 @@ public final class FXMLSourceCodeBuilder {
             ) -> {
                 values.forEach(v -> sourceCode.append(identifier.toString())
                         .append(".add(")
-                        .append(typeHelper.encodeFXMLValue(context, v, FXMLType.of(Object.class)))
+                        .append(typeHelper.encodeFXMLValue(context, v, FXMLType.OBJECT))
                         .append(");\n"));
                 values.forEach(v -> addConstructorEpilogue(context, v));
             }

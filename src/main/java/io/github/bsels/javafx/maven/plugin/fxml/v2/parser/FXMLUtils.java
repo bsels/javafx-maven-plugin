@@ -17,6 +17,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -65,6 +66,39 @@ public final class FXMLUtils {
         );
     }
 
+    /// Traverses the [FXMLType] hierarchy to find the [Collection] interface and extract its element type.
+    /// For uncompiled types or raw types, returns an [FXMLClassType] of [Object].
+    ///
+    /// @param type The [FXMLType] to search
+    /// @return The [FXMLType] of the collection's element type, or [FXMLClassType] of [Object] if undetermined
+    /// @throws NullPointerException If `type` is null
+    public static FXMLType findCollectionValueTypeFromHierarchy(FXMLType type) throws NullPointerException {
+        Objects.requireNonNull(type, "`type` must not be null");
+        return findFXMLGenericTypeFromHierarchy(type, Collection.class, 0);
+    }
+
+    /// Traverses the [FXMLType] hierarchy to find the [Map] interface and extract its key type.
+    /// For uncompiled types or raw types, returns an [FXMLClassType] of [Object].
+    ///
+    /// @param type The [FXMLType] to search
+    /// @return The [FXMLType] of the map's key type, or [FXMLClassType] of [Object] if undetermined
+    /// @throws NullPointerException If `type` is null
+    public static FXMLType findMapKeyTypeFromHierarchy(FXMLType type) throws NullPointerException {
+        Objects.requireNonNull(type, "`type` must not be null");
+        return findFXMLGenericTypeFromHierarchy(type, Map.class, 0);
+    }
+
+    /// Traverses the [FXMLType] hierarchy to find the [Map] interface and extract its value type.
+    /// For uncompiled types or raw types, returns an [FXMLClassType] of [Object].
+    ///
+    /// @param type The [FXMLType] to search
+    /// @return The [FXMLType] of the map's value type, or [FXMLClassType] of [Object] if undetermined
+    /// @throws NullPointerException If `type` is null
+    public static FXMLType findMapValueTypeFromHierarchy(FXMLType type) throws NullPointerException {
+        Objects.requireNonNull(type, "`type` must not be null");
+        return findFXMLGenericTypeFromHierarchy(type, Map.class, 1);
+    }
+
     /// Determines the element type of [FXMLType] representing a [Collection].
     ///
     /// Logic:
@@ -79,14 +113,14 @@ public final class FXMLUtils {
         Objects.requireNonNull(type, "`type` must not be null");
         return findTypeInformation(
                 type,
-                FXMLType.of(Object.class),
-                clazz -> FXMLType.of(Utils.findCollectionValueTypeFromHierarchy(clazz)),
+                FXMLType.OBJECT,
+                clazz -> findCollectionValueTypeFromHierarchy(FXMLType.of(clazz)),
                 (clazz, generics) -> {
                     Map<String, FXMLType> mapping = buildInitialTypeMapping(clazz, generics);
                     resolveTypeMapping(clazz, mapping, new HashSet<>());
                     // Collection's type parameter is E (index 0)
                     String elementTypeParamName = Collection.class.getTypeParameters()[0].getName();
-                    return mapping.getOrDefault(elementTypeParamName, FXMLType.of(Object.class));
+                    return mapping.getOrDefault(elementTypeParamName, FXMLType.OBJECT);
                 }
         );
     }
@@ -107,10 +141,10 @@ public final class FXMLUtils {
         Objects.requireNonNull(type, "`type` must not be null");
         return findTypeInformation(
                 type,
-                Map.entry(FXMLType.of(Object.class), FXMLType.of(Object.class)),
+                Map.entry(FXMLType.OBJECT, FXMLType.OBJECT),
                 clazz -> Map.entry(
-                        FXMLType.of(Utils.findMapKeyTypeFromHierarchy(clazz)),
-                        FXMLType.of(Utils.findMapValueTypeFromHierarchy(clazz))
+                        findMapKeyTypeFromHierarchy(FXMLType.of(clazz)),
+                        findMapValueTypeFromHierarchy(FXMLType.of(clazz))
                 ),
                 (clazz, generics) -> {
                     Map<String, FXMLType> mapping = buildInitialTypeMapping(clazz, generics);
@@ -119,8 +153,8 @@ public final class FXMLUtils {
                     String keyTypeParamName = Map.class.getTypeParameters()[0].getName();
                     String valueTypeParamName = Map.class.getTypeParameters()[1].getName();
                     return Map.entry(
-                            mapping.getOrDefault(keyTypeParamName, FXMLType.of(Object.class)),
-                            mapping.getOrDefault(valueTypeParamName, FXMLType.of(Object.class))
+                            mapping.getOrDefault(keyTypeParamName, FXMLType.OBJECT),
+                            mapping.getOrDefault(valueTypeParamName, FXMLType.OBJECT)
                     );
                 }
         );
@@ -250,7 +284,7 @@ public final class FXMLUtils {
         );
     }
 
-    /// Finds the return type of a static factory method.
+    /// Finds the return type of the static factory method.
     ///
     /// @param clazz             The class declaring the factory method
     /// @param factoryMethodName The name of the factory method
@@ -288,6 +322,143 @@ public final class FXMLUtils {
     public static boolean hasNonSkippablePrefix(String key) throws NullPointerException {
         Objects.requireNonNull(key, "`key` must not be null");
         return !key.startsWith(FXMLConstants.FX_PREFIX) && !key.startsWith(FXMLConstants.XML_NAMESPACE_PREFIX);
+    }
+
+    /// Traverses the class hierarchy to find the specified target interface and extract its type argument as an [FXMLType].
+    /// For uncompiled types or raw types, returns an [FXMLClassType] of [Object].
+    /// It recursively checks the class's generic interfaces and its superclass.
+    ///
+    /// @param type              The [FXMLType] to search
+    /// @param targetInterface   The target interface to find
+    /// @param typeArgumentIndex The index of the type argument to extract
+    /// @return The [FXMLType] of the extracted type argument, or [FXMLClassType] of [Object] if undetermined
+    private static FXMLType findFXMLGenericTypeFromHierarchy(FXMLType type, Class<?> targetInterface, int typeArgumentIndex) {
+        return switch (type) {
+            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> FXMLType.OBJECT;
+            case FXMLClassType(Class<?> clazz) ->
+                    findFXMLGenericTypeFromHierarchyForClass(clazz, targetInterface, typeArgumentIndex);
+            case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) -> {
+                Map<String, FXMLType> mapping = buildInitialTypeMapping(clazz, generics);
+                resolveTypeMapping(clazz, mapping, new HashSet<>());
+                TypeVariable<?>[] typeParameters = targetInterface.getTypeParameters();
+                if (typeArgumentIndex >= typeParameters.length) {
+                    yield FXMLType.OBJECT;
+                }
+                yield mapping.getOrDefault(typeParameters[typeArgumentIndex].getName(), FXMLType.OBJECT);
+            }
+        };
+    }
+
+    /// Traverses the class hierarchy to find the specified target interface and extract its type argument as an [FXMLType].
+    /// It recursively checks the class's generic interfaces, its generic superclass, and its superclass.
+    /// If the target interface is found as a [ParameterizedType], the type argument at the specified index is extracted.
+    ///
+    /// @param clazz             The class to search
+    /// @param targetInterface   The target interface to find
+    /// @param typeArgumentIndex The index of the type argument to extract
+    /// @return The [FXMLType] of the extracted type argument, or [FXMLClassType] of [Object] if undetermined
+    private static FXMLType findFXMLGenericTypeFromHierarchyForClass(Class<?> clazz, Class<?> targetInterface, int typeArgumentIndex) {
+        if (clazz == null || clazz == Object.class || clazz == targetInterface) {
+            return FXMLType.OBJECT;
+        }
+        return Arrays.stream(clazz.getGenericInterfaces())
+                .map(genericInterface -> getFXMLInterfaceElementType(
+                        targetInterface,
+                        typeArgumentIndex,
+                        genericInterface
+                ))
+                .gather(Utils.optional())
+                .findFirst()
+                .or(() -> getFXMLGenericSuperclassElementType(clazz, targetInterface, typeArgumentIndex))
+                .or(
+                        () -> Optional.ofNullable(clazz.getSuperclass())
+                                .map(superclass -> findFXMLGenericTypeFromHierarchyForClass(
+                                        superclass,
+                                        targetInterface,
+                                        typeArgumentIndex
+                                ))
+                                .filter(result -> !result.equals(FXMLType.OBJECT))
+                )
+                .or(
+                        () -> Arrays.stream(clazz.getGenericInterfaces())
+                                .map(Utils::getClassType)
+                                .map(genericInterface -> findFXMLGenericTypeFromHierarchyForClass(
+                                        genericInterface,
+                                        targetInterface,
+                                        typeArgumentIndex
+                                ))
+                                .findFirst()
+                )
+                .orElse(FXMLType.OBJECT);
+    }
+
+    /// Checks the generic superclass of a class for a concrete type argument of the target interface.
+    /// If the generic superclass is a [ParameterizedType], it first tries to match it directly against
+    /// the target interface, then resolves the superclass with its concrete type arguments and recurses.
+    ///
+    /// @param clazz             The class whose generic superclass is to be inspected
+    /// @param targetInterface   The target interface to find
+    /// @param typeArgumentIndex The index of the type argument to extract
+    /// @return An [Optional] containing the extracted [FXMLType], or empty if not applicable
+    private static Optional<FXMLType> getFXMLGenericSuperclassElementType(Class<?> clazz, Class<?> targetInterface, int typeArgumentIndex) {
+        Type genericSuperclass = clazz.getGenericSuperclass();
+        if (!(genericSuperclass instanceof ParameterizedType parameterizedSuperType)) {
+            return Optional.empty();
+        }
+        Optional<FXMLType> direct = getFXMLInterfaceElementType(targetInterface, typeArgumentIndex, genericSuperclass);
+        if (direct.isPresent()) {
+            return direct;
+        }
+        Type[] superActualArgs = parameterizedSuperType.getActualTypeArguments();
+        if (Arrays.stream(superActualArgs).anyMatch(arg -> !(arg instanceof Class<?>))) {
+            return Optional.empty();
+        }
+        Class<?> superRawClass = (Class<?>) parameterizedSuperType.getRawType();
+        List<FXMLType> superTypeArgs = Arrays.stream(superActualArgs)
+                .map(arg -> FXMLType.of((Class<?>) arg))
+                .toList();
+        FXMLType superFXMLType = FXMLType.of(superRawClass, superTypeArgs);
+        FXMLType result = findFXMLGenericTypeFromHierarchy(superFXMLType, targetInterface, typeArgumentIndex);
+        if (result.equals(FXMLType.OBJECT)) {
+            return Optional.empty();
+        }
+        return Optional.of(result);
+    }
+
+    /// Extracts the element type of the target interface from a generic interface definition as an [FXMLType].
+    /// It checks if the provided [Type] is a [ParameterizedType] that matches the target interface.
+    /// If so, it returns the type argument at the specified index as an [FXMLType].
+    ///
+    /// @param targetInterface   The interface to search for
+    /// @param typeArgumentIndex The index of the type argument
+    /// @param genericInterface  The generic interface type to analyze
+    /// @return An [Optional] containing the extracted [FXMLType], or empty if not applicable
+    private static Optional<FXMLType> getFXMLInterfaceElementType(
+            Class<?> targetInterface, int typeArgumentIndex, Type genericInterface
+    ) {
+        if (!(genericInterface instanceof ParameterizedType parameterizedType)) {
+            return Optional.empty();
+        }
+        if (parameterizedType.getRawType() != targetInterface) {
+            return Optional.empty();
+        }
+        Type[] actualTypeArguments = parameterizedType.getActualTypeArguments();
+        if (typeArgumentIndex >= actualTypeArguments.length) {
+            return Optional.of(FXMLType.OBJECT);
+        }
+        Type arg = actualTypeArguments[typeArgumentIndex];
+        FXMLType result = switch (arg) {
+            case Class<?> argClass -> FXMLType.of(argClass);
+            case ParameterizedType argPt -> {
+                Class<?> argRawClass = (Class<?>) argPt.getRawType();
+                List<FXMLType> argTypeArgs = Stream.of(argPt.getActualTypeArguments())
+                        .map(innerArg -> innerArg instanceof Class<?> innerClass ? FXMLType.of(innerClass) : FXMLType.wildcard())
+                        .toList();
+                yield FXMLType.of(argRawClass, argTypeArgs);
+            }
+            case null, default -> FXMLType.OBJECT;
+        };
+        return Optional.of(result);
     }
 
     /// Builds an initial type variable mapping from a class's own type parameters to the provided generic arguments.

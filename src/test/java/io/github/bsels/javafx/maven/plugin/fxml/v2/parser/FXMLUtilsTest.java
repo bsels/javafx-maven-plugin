@@ -2,8 +2,6 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
-import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -43,8 +41,17 @@ class FXMLUtilsTest {
     /** A class that directly implements Map<String, Integer>. */
     static class DirectStringIntMap extends HashMap<String, Integer> implements Map<String, Integer> {}
 
-    /** A raw HashMap subclass with concrete key/value types (does not directly implement Map<K,V>). */
-    static class StringIntMap extends HashMap<String, Integer> {}
+    /** A class that extends HashMap<String, Integer> without directly implementing Map<K,V>. */
+    static class MyStringIntegerMap extends HashMap<String, Integer> {}
+
+    /** An interface that extends Map<T, T>. */
+    interface IdentityTypeMap<T> extends Map<T, T> {}
+
+    /** A class that extends HashMap<T, T> and implements IdentityTypeMap<T>. */
+    static class IdentityTypeHashMap<T> extends HashMap<T, T> implements IdentityTypeMap<T> {}
+
+    /** A class that implements IdentityTypeMap<String>. */
+    static class StringIdentityTypeMap extends IdentityTypeHashMap<String> {}
 
     /** A generic subclass that passes its own type parameters to HashMap. */
     static class GenericMap<K, V> extends HashMap<K, V> {}
@@ -199,7 +206,7 @@ class FXMLUtilsTest {
             FXMLType result = FXMLUtils.findCollectionValueType(type);
 
             // Then
-            assertThat(result).isEqualTo(FXMLType.of(Object.class));
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
         }
 
         @Test
@@ -211,7 +218,7 @@ class FXMLUtilsTest {
             FXMLType result = FXMLUtils.findCollectionValueType(type);
 
             // Then
-            assertThat(result).isEqualTo(FXMLType.of(Object.class));
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
         }
 
         @Test
@@ -223,7 +230,7 @@ class FXMLUtilsTest {
             FXMLType result = FXMLUtils.findCollectionValueType(type);
 
             // Then
-            assertThat(result).isEqualTo(FXMLType.of(Object.class));
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
         }
 
         @Test
@@ -247,7 +254,7 @@ class FXMLUtilsTest {
             FXMLType result = FXMLUtils.findCollectionValueType(type);
 
             // Then
-            assertThat(result).isEqualTo(FXMLType.of(Object.class));
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
         }
 
         @Test
@@ -354,6 +361,45 @@ class FXMLUtilsTest {
         }
 
         @Test
+        void shouldReturnConcreteKeyAndValueTypesForMyStringIntegerMap() {
+            // Given – MyStringIntegerMap extends HashMap<String, Integer>
+            FXMLType type = FXMLType.of(MyStringIntegerMap.class);
+
+            // When
+            Map.Entry<FXMLType, FXMLType> result = FXMLUtils.findMapKeyAndValueTypes(type);
+
+            // Then
+            assertThat(result.getKey()).isEqualTo(FXMLType.of(String.class));
+            assertThat(result.getValue()).isEqualTo(FXMLType.of(Integer.class));
+        }
+
+        @Test
+        void shouldReturnConcreteKeyAndValueTypesForStringIdentityTypeMap() {
+            // Given – StringIdentityTypeMap implements IdentityTypeMap<String> which extends Map<String, String>
+            FXMLType type = FXMLType.of(StringIdentityTypeMap.class);
+
+            // When
+            Map.Entry<FXMLType, FXMLType> result = FXMLUtils.findMapKeyAndValueTypes(type);
+
+            // Then
+            assertThat(result.getKey()).isEqualTo(FXMLType.of(String.class));
+            assertThat(result.getValue()).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldReturnConcreteKeyAndValueTypesForIdentityTypeHashMap() {
+            // Given – IdentityTypeHashMap<String> extends HashMap<String, String>
+            FXMLType type = FXMLType.of(IdentityTypeHashMap.class, List.of(FXMLType.of(String.class)));
+
+            // When
+            Map.Entry<FXMLType, FXMLType> result = FXMLUtils.findMapKeyAndValueTypes(type);
+
+            // Then
+            assertThat(result.getKey()).isEqualTo(FXMLType.of(String.class));
+            assertThat(result.getValue()).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
         void shouldReturnObjectTypesForFXMLClassTypeWithNoConcreteKeyValueTypes() {
             // Given – raw HashMap has no concrete key/value types
             FXMLType type = FXMLType.of(HashMap.class);
@@ -409,6 +455,375 @@ class FXMLUtilsTest {
         void shouldThrowNullPointerExceptionForNullType() {
             // When & Then
             assertThatThrownBy(() -> FXMLUtils.findMapKeyAndValueTypes(null))
+                    .isInstanceOf(NullPointerException.class);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // findCollectionValueTypeFromHierarchy
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class FindCollectionValueTypeFromHierarchyTest {
+
+        @Test
+        void shouldReturnObjectTypeForFXMLWildcardType() {
+            // Given
+            FXMLType type = FXMLType.wildcard();
+
+            // When
+            FXMLType result = FXMLUtils.findCollectionValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnObjectTypeForFXMLUncompiledClassType() {
+            // Given
+            FXMLType type = FXMLType.of("com.example.Foo", List.of());
+
+            // When
+            FXMLType result = FXMLUtils.findCollectionValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnObjectTypeForFXMLUncompiledGenericType() {
+            // Given
+            FXMLType type = FXMLType.of("com.example.Foo", List.of(FXMLType.of(String.class)));
+
+            // When
+            FXMLType result = FXMLUtils.findCollectionValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnConcreteElementTypeForFXMLClassTypeWithDirectCollectionInterface() {
+            // Given – DirectStringCollection directly implements Collection<String>
+            FXMLType type = FXMLType.of(DirectStringCollection.class);
+
+            // When
+            FXMLType result = FXMLUtils.findCollectionValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldReturnObjectTypeForRawFXMLClassType() {
+            // Given – raw ArrayList has no concrete element type
+            FXMLType type = FXMLType.of(ArrayList.class);
+
+            // When
+            FXMLType result = FXMLUtils.findCollectionValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnElementTypeForFXMLGenericTypeWithConcreteArgument() {
+            // Given – ArrayList<String>
+            FXMLType type = FXMLType.of(ArrayList.class, List.of(FXMLType.of(String.class)));
+
+            // When
+            FXMLType result = FXMLUtils.findCollectionValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldReturnObjectTypeForFXMLGenericTypeWithWildcardArgument() {
+            // Given – GenericList<T> with wildcard argument (no concrete binding)
+            FXMLType type = FXMLType.of(GenericList.class, List.of(FXMLType.wildcard()));
+
+            // When
+            FXMLType result = FXMLUtils.findCollectionValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.wildcard());
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullType() {
+            // When & Then
+            assertThatThrownBy(() -> FXMLUtils.findCollectionValueTypeFromHierarchy(null))
+                    .isInstanceOf(NullPointerException.class);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // findMapKeyTypeFromHierarchy
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class FindMapKeyTypeFromHierarchyTest {
+
+        @Test
+        void shouldReturnObjectTypeForFXMLWildcardType() {
+            // Given
+            FXMLType type = FXMLType.wildcard();
+
+            // When
+            FXMLType result = FXMLUtils.findMapKeyTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnObjectTypeForFXMLUncompiledClassType() {
+            // Given
+            FXMLType type = FXMLType.of("com.example.Foo", List.of());
+
+            // When
+            FXMLType result = FXMLUtils.findMapKeyTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnObjectTypeForFXMLUncompiledGenericType() {
+            // Given
+            FXMLType type = FXMLType.of("com.example.Foo", List.of(FXMLType.of(String.class)));
+
+            // When
+            FXMLType result = FXMLUtils.findMapKeyTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnConcreteKeyTypeForFXMLClassTypeWithDirectMapInterface() {
+            // Given – DirectStringIntMap directly implements Map<String, Integer>
+            FXMLType type = FXMLType.of(DirectStringIntMap.class);
+
+            // When
+            FXMLType result = FXMLUtils.findMapKeyTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldReturnConcreteKeyTypeForMyStringIntegerMap() {
+            // Given – MyStringIntegerMap extends HashMap<String, Integer>
+            FXMLType type = FXMLType.of(MyStringIntegerMap.class);
+
+            // When
+            FXMLType result = FXMLUtils.findMapKeyTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldReturnConcreteKeyTypeForStringIdentityTypeMap() {
+            // Given – StringIdentityTypeMap implements IdentityTypeMap<String>
+            FXMLType type = FXMLType.of(StringIdentityTypeMap.class);
+
+            // When
+            FXMLType result = FXMLUtils.findMapKeyTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldReturnConcreteKeyTypeForIdentityTypeHashMap() {
+            // Given – IdentityTypeHashMap<String>
+            FXMLType type = FXMLType.of(IdentityTypeHashMap.class, List.of(FXMLType.of(String.class)));
+
+            // When
+            FXMLType result = FXMLUtils.findMapKeyTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldReturnObjectTypeForRawFXMLClassType() {
+            // Given – raw HashMap has no concrete key type
+            FXMLType type = FXMLType.of(HashMap.class);
+
+            // When
+            FXMLType result = FXMLUtils.findMapKeyTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnKeyTypeForFXMLGenericTypeWithConcreteArguments() {
+            // Given – HashMap<String, Integer>
+            FXMLType type = FXMLType.of(HashMap.class, List.of(FXMLType.of(String.class), FXMLType.of(Integer.class)));
+
+            // When
+            FXMLType result = FXMLUtils.findMapKeyTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldReturnWildcardTypeForFXMLGenericTypeWithWildcardArgument() {
+            // Given – GenericMap<K,V> with wildcard arguments
+            FXMLType type = FXMLType.of(GenericMap.class, List.of(FXMLType.wildcard(), FXMLType.wildcard()));
+
+            // When
+            FXMLType result = FXMLUtils.findMapKeyTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.wildcard());
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullType() {
+            // When & Then
+            assertThatThrownBy(() -> FXMLUtils.findMapKeyTypeFromHierarchy(null))
+                    .isInstanceOf(NullPointerException.class);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // findMapValueTypeFromHierarchy
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class FindMapValueTypeFromHierarchyTest {
+
+        @Test
+        void shouldReturnObjectTypeForFXMLWildcardType() {
+            // Given
+            FXMLType type = FXMLType.wildcard();
+
+            // When
+            FXMLType result = FXMLUtils.findMapValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnObjectTypeForFXMLUncompiledClassType() {
+            // Given
+            FXMLType type = FXMLType.of("com.example.Foo", List.of());
+
+            // When
+            FXMLType result = FXMLUtils.findMapValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnObjectTypeForFXMLUncompiledGenericType() {
+            // Given
+            FXMLType type = FXMLType.of("com.example.Foo", List.of(FXMLType.of(String.class)));
+
+            // When
+            FXMLType result = FXMLUtils.findMapValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnConcreteValueTypeForFXMLClassTypeWithDirectMapInterface() {
+            // Given – DirectStringIntMap directly implements Map<String, Integer>
+            FXMLType type = FXMLType.of(DirectStringIntMap.class);
+
+            // When
+            FXMLType result = FXMLUtils.findMapValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(Integer.class));
+        }
+
+        @Test
+        void shouldReturnConcreteValueTypeForMyStringIntegerMap() {
+            // Given – MyStringIntegerMap extends HashMap<String, Integer>
+            FXMLType type = FXMLType.of(MyStringIntegerMap.class);
+
+            // When
+            FXMLType result = FXMLUtils.findMapValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(Integer.class));
+        }
+
+        @Test
+        void shouldReturnConcreteValueTypeForStringIdentityTypeMap() {
+            // Given – StringIdentityTypeMap implements IdentityTypeMap<String>
+            FXMLType type = FXMLType.of(StringIdentityTypeMap.class);
+
+            // When
+            FXMLType result = FXMLUtils.findMapValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldReturnConcreteValueTypeForIdentityTypeHashMap() {
+            // Given – IdentityTypeHashMap<String>
+            FXMLType type = FXMLType.of(IdentityTypeHashMap.class, List.of(FXMLType.of(String.class)));
+
+            // When
+            FXMLType result = FXMLUtils.findMapValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldReturnObjectTypeForRawFXMLClassType() {
+            // Given – raw HashMap has no concrete value type
+            FXMLType type = FXMLType.of(HashMap.class);
+
+            // When
+            FXMLType result = FXMLUtils.findMapValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.OBJECT);
+        }
+
+        @Test
+        void shouldReturnValueTypeForFXMLGenericTypeWithConcreteArguments() {
+            // Given – HashMap<String, Integer>
+            FXMLType type = FXMLType.of(HashMap.class, List.of(FXMLType.of(String.class), FXMLType.of(Integer.class)));
+
+            // When
+            FXMLType result = FXMLUtils.findMapValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.of(Integer.class));
+        }
+
+        @Test
+        void shouldReturnWildcardTypeForFXMLGenericTypeWithWildcardArgument() {
+            // Given – GenericMap<K,V> with wildcard arguments
+            FXMLType type = FXMLType.of(GenericMap.class, List.of(FXMLType.wildcard(), FXMLType.wildcard()));
+
+            // When
+            FXMLType result = FXMLUtils.findMapValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(FXMLType.wildcard());
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullType() {
+            // When & Then
+            assertThatThrownBy(() -> FXMLUtils.findMapValueTypeFromHierarchy(null))
                     .isInstanceOf(NullPointerException.class);
         }
     }

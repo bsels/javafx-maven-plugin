@@ -7,6 +7,9 @@ import java.util.Objects;
 public sealed interface FXMLType
         permits FXMLClassType, FXMLGenericType, FXMLUncompiledClassType, FXMLUncompiledGenericType, FXMLWildcardType {
 
+    /// An [FXMLType] representing the `Object` class.
+    FXMLType OBJECT = new FXMLClassType(Object.class);
+
     /// Creates an [FXMLType] representing a class type.
     ///
     /// @param clazz The class type to be encapsulated

@@ -127,7 +127,7 @@ final class FXMLDocumentParserHelper {
                 if (clazz.getTypeParameters().length > 0) {
                     List<FXMLType> typeArgs = Stream.of(clazz.getTypeParameters()).map(tp -> resolvedMapping.getOrDefault(
                             tp.getName(),
-                            FXMLType.of(Object.class)
+                            FXMLType.OBJECT
                     )).toList();
                     yield FXMLType.of(clazz, typeArgs);
                 }
