@@ -909,8 +909,8 @@ public final class FXMLSourceCodeBuilder {
             case FXMLMap(
                     FXMLIdentifier identifier,
                     _,
-                    FXMLClassType keyType,
-                    FXMLClassType valueType,
+                    FXMLType keyType,
+                    FXMLType valueType,
                     _,
                     Map<FXMLLiteral, AbstractFXMLValue> entries
             ) -> {
@@ -959,7 +959,7 @@ public final class FXMLSourceCodeBuilder {
                     _,
                     String getter,
                     _,
-                    FXMLClassType elementClassType,
+                    FXMLType elementClassType,
                     List<AbstractFXMLValue> value,
                     List<FXMLProperty> properties
             ) -> {
@@ -976,8 +976,8 @@ public final class FXMLSourceCodeBuilder {
                     _,
                     String getter,
                     _,
-                    FXMLClassType rawKeyClass,
-                    FXMLClassType rawValueClass,
+                    FXMLType rawKeyClass,
+                    FXMLType rawValueClass,
                     Map<FXMLLiteral, AbstractFXMLValue> value
             ) -> {
                 value.forEach((k, v) -> sourceCode.append(identifier)

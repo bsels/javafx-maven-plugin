@@ -168,10 +168,10 @@ final class FXMLSourceCodeBuilderTypeHelper {
     /// Returns the appropriate type for a map entry.
     /// If the type is [Object], it defaults to [String].
     ///
-    /// @param type The [FXMLClassType] to convert.
-    /// @return The resolved [FXMLClassType].
-    public FXMLClassType getTypeForMapEntry(FXMLClassType type) {
-        return OBJECT_TYPE.equals(type) ? STRING_TYPE : type;
+    /// @param type The [FXMLType] to convert.
+    /// @return The resolved [FXMLType].
+    public FXMLType getTypeForMapEntry(FXMLType type) {
+        return FXMLType.OBJECT.equals(type) ? STRING_TYPE : type;
     }
 
     /// Encodes a literal value for use in Java source code.

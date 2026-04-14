@@ -1326,12 +1326,12 @@ public class FXMLDocumentParserTest {
                                                             )
                                                     )
                                                     .hasFieldOrPropertyWithValue(
-                                                            "rawKeyClass",
-                                                            new FXMLClassType(Object.class)
+                                                            "keyType",
+                                                            FXMLType.OBJECT
                                                     )
                                                     .hasFieldOrPropertyWithValue(
-                                                            "rawValueClass",
-                                                            new FXMLClassType(Object.class)
+                                                            "valueType",
+                                                            FXMLType.OBJECT
                                                     )
                                                     .extracting(FXMLMapProperty::value, MAP_VALUES_ASSERT_FACTORY)
                                                     .hasSize(3)
@@ -1581,8 +1581,8 @@ public class FXMLDocumentParserTest {
                                     STRING_TYPE
                             )
                     )
-                    .hasFieldOrPropertyWithValue("rawKeyClass", STRING_TYPE)
-                    .hasFieldOrPropertyWithValue("rawValueClass", STRING_TYPE)
+                    .hasFieldOrPropertyWithValue("keyType", STRING_TYPE)
+                    .hasFieldOrPropertyWithValue("valueType", STRING_TYPE)
                     .hasFieldOrPropertyWithValue("factoryMethod", Optional.empty())
                     .extracting(FXMLMap::entries, MAP_VALUES_ASSERT_FACTORY)
                     .hasSize(1)

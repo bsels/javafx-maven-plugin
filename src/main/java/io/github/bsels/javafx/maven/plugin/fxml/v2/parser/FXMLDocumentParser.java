@@ -424,17 +424,15 @@ public final class FXMLDocumentParser {
     /// @throws IllegalArgumentException if a map entry element does not have exactly one child element.
     private FXMLMap parseMap(ParseContext context) {
         ParsedXMLStructure structure = context.structure();
-        BuildContext buildContext = context.buildContext();
         FXMLType type = context.type();
-        Map.Entry<FXMLType, FXMLType> mapKeyAndValueTypes = FXMLUtils.findMapKeyAndValueTypes(type);
-        Class<?> rawKeyClass = FXMLUtils.findRawType(mapKeyAndValueTypes.getKey());
-        Class<?> rawValueType = FXMLUtils.findRawType(mapKeyAndValueTypes.getValue());
-        Map<FXMLLiteral, AbstractFXMLValue> entries = parseMapEntries(structure, rawValueType, buildContext);
+        FXMLType keyType = FXMLUtils.findMapKeyTypeFromHierarchy(type);
+        FXMLType valueType = FXMLUtils.findMapValueTypeFromHierarchy(type);
+        Map<FXMLLiteral, AbstractFXMLValue> entries = parseMapEntries(structure, valueType, context.buildContext());
         return new FXMLMap(
                 context.classAndIdentifier().identifier(),
                 type,
-                new FXMLClassType(rawKeyClass),
-                new FXMLClassType(rawValueType),
+                keyType,
+                valueType,
                 context.factoryMethod(),
                 entries
         );
@@ -447,18 +445,18 @@ public final class FXMLDocumentParser {
     /// Child elements with non-skippable prefixes are expected to have exactly one child representing the value.
     ///
     /// @param structure    The [ParsedXMLStructure] containing the map entries to parse.
-    /// @param rawValueType The expected raw class type for the map values.
+    /// @param expectedType The expected type for the map values.
     /// @param buildContext The [BuildContext] used for parsing and resolving values.
     /// @return A [Map] of entry keys to their corresponding [AbstractFXMLValue] objects.
     /// @throws IllegalArgumentException If a child element for a map entry does not have exactly one child representing the value.
-    private Map<FXMLLiteral, AbstractFXMLValue> parseMapEntries(ParsedXMLStructure structure, Class<?> rawValueType, BuildContext buildContext) {
+    private Map<FXMLLiteral, AbstractFXMLValue> parseMapEntries(ParsedXMLStructure structure, FXMLType expectedType, BuildContext buildContext) {
         Map<String, String> properties = structure.properties();
         Map<FXMLLiteral, AbstractFXMLValue> entries = properties.entrySet()
                 .stream()
                 .filter(entry -> FXMLUtils.hasNonSkippablePrefix(entry.getKey()))
                 .collect(Collectors.toMap(
                         entry -> new FXMLLiteral(entry.getKey()),
-                        entry -> parseValueString(entry.getValue(), FXMLType.of(rawValueType), buildContext),
+                        entry -> parseValueString(entry.getValue(), expectedType, buildContext),
                         Utils.duplicateThrowException(),
                         HashMap::new
                 ));
@@ -473,13 +471,13 @@ public final class FXMLDocumentParser {
                 if (textContent.isPresent()) {
                     value = parseValueString(
                             textContent.get().stripTrailing(),
-                            FXMLType.of(rawValueType),
+                            expectedType,
                             buildContext
                     );
                 } else {
                     List<AbstractFXMLValue> grandChildren = child.children()
                             .stream()
-                            .map(grandChild -> parseMapElements(grandChild, buildContext, rawValueType))
+                            .map(grandChild -> parseMapElements(grandChild, buildContext, expectedType))
                             .gather(Utils.optional())
                             .toList();
                     if (grandChildren.size() != 1) {
@@ -505,10 +503,10 @@ public final class FXMLDocumentParser {
     private Optional<AbstractFXMLValue> parseMapElements(
             ParsedXMLStructure structure,
             BuildContext buildContext,
-            Class<?> expectedType
+            FXMLType expectedType
     ) {
         return structure.textValue()
-                .map(value -> parseValueString(value, FXMLType.of(expectedType), buildContext))
+                .map(value -> parseValueString(value, expectedType, buildContext))
                 .or(() -> parseElement(structure, buildContext));
     }
 
@@ -657,8 +655,8 @@ public final class FXMLDocumentParser {
         AbstractFXMLValue parsedValue;
         if (Collection.class.isAssignableFrom(rawType)) {
             if (property.methodType() == ObjectProperty.MethodType.GETTER) {
-                Class<?> collectionValueType = FXMLUtils.findRawType(FXMLUtils.findCollectionValueType(property.type()));
-                parsedValue = parseValueString(value, FXMLType.of(collectionValueType), buildContext);
+                FXMLType collectionValueType = FXMLUtils.findCollectionValueTypeFromHierarchy(property.type());
+                parsedValue = parseValueString(value, collectionValueType, buildContext);
             } else {
                 log.debug(
                         "Parsing string value property using setter or constructor as collection: %s is not supported.".formatted(
@@ -743,16 +741,15 @@ public final class FXMLDocumentParser {
         Class<?> rawType = FXMLUtils.findRawType(property.type());
         // region: map
         if (Map.class.isAssignableFrom(rawType) && property.methodType() == ObjectProperty.MethodType.GETTER) {
-            Map.Entry<FXMLType, FXMLType> mapKeyAndValueTypes = FXMLUtils.findMapKeyAndValueTypes(property.type());
-            Class<?> rawKeyType = FXMLUtils.findRawType(mapKeyAndValueTypes.getKey());
-            Class<?> rawValueType = FXMLUtils.findRawType(mapKeyAndValueTypes.getValue());
-            Map<FXMLLiteral, AbstractFXMLValue> entries = parseMapEntries(value, rawValueType, buildContext);
+            FXMLType keyType = FXMLUtils.findMapKeyTypeFromHierarchy(property.type());
+            FXMLType valueType = FXMLUtils.findMapValueTypeFromHierarchy(property.type());
+            Map<FXMLLiteral, AbstractFXMLValue> entries = parseMapEntries(value, valueType, buildContext);
             return Optional.of(new FXMLMapProperty(
                     property.name(),
                     property.methodName().orElseThrow(),
                     property.type(),
-                    new FXMLClassType(rawKeyType),
-                    new FXMLClassType(rawValueType),
+                    keyType,
+                    valueType,
                     entries
             ));
         }
@@ -799,7 +796,7 @@ public final class FXMLDocumentParser {
                             property.name(),
                             property.methodName().orElseThrow(),
                             property.type(),
-                            new FXMLClassType(FXMLUtils.findRawType(FXMLUtils.findCollectionValueType(property.type()))),
+                            FXMLUtils.findCollectionValueTypeFromHierarchy(property.type()),
                             values,
                             parseAttributesProperties(rawType, buildContext, attributes)
                     )

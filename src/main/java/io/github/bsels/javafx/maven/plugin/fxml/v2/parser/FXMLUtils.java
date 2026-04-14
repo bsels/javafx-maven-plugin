@@ -99,67 +99,6 @@ public final class FXMLUtils {
         return findFXMLGenericTypeFromHierarchy(type, Map.class, 1);
     }
 
-    /// Determines the element type of [FXMLType] representing a [Collection].
-    ///
-    /// Logic:
-    /// 1. For [FXMLWildcardType], [FXMLUncompiledClassType], and [FXMLUncompiledGenericType], returns `Object`.
-    /// 2. For [FXMLClassType], traverses the hierarchy to find the element type.
-    /// 3. For [FXMLGenericType], builds a type mapping and traverses the hierarchy to resolve the element type.
-    ///
-    /// @param type The [FXMLType] representing the collection
-    /// @return The [FXMLType] of the collection's elements, or `Object` if undetermined
-    /// @throws NullPointerException If `type` is null
-    public static FXMLType findCollectionValueType(FXMLType type) throws NullPointerException {
-        Objects.requireNonNull(type, "`type` must not be null");
-        return findTypeInformation(
-                type,
-                FXMLType.OBJECT,
-                clazz -> findCollectionValueTypeFromHierarchy(FXMLType.of(clazz)),
-                (clazz, generics) -> {
-                    Map<String, FXMLType> mapping = buildInitialTypeMapping(clazz, generics);
-                    resolveTypeMapping(clazz, mapping, new HashSet<>());
-                    // Collection's type parameter is E (index 0)
-                    String elementTypeParamName = Collection.class.getTypeParameters()[0].getName();
-                    return mapping.getOrDefault(elementTypeParamName, FXMLType.OBJECT);
-                }
-        );
-    }
-
-    /// Determines the key and value types of an [FXMLType] representing a [Map].
-    ///
-    /// Logic:
-    /// 1. For [FXMLWildcardType], [FXMLUncompiledClassType], and [FXMLUncompiledGenericType],
-    ///    returns `Object` for both.
-    /// 2. For [FXMLClassType], traverses the hierarchy to find concrete key and value types.
-    /// 3. For [FXMLGenericType], builds a type mapping and traverses the hierarchy to resolve key and value types.
-    ///
-    /// @param type The [FXMLType] representing the map
-    /// @return A [Map.Entry] containing the key and value types, both defaulting to `Object` if undetermined
-    /// @throws NullPointerException If `type` is null
-    public static Map.Entry<FXMLType, FXMLType> findMapKeyAndValueTypes(FXMLType type)
-            throws NullPointerException {
-        Objects.requireNonNull(type, "`type` must not be null");
-        return findTypeInformation(
-                type,
-                Map.entry(FXMLType.OBJECT, FXMLType.OBJECT),
-                clazz -> Map.entry(
-                        findMapKeyTypeFromHierarchy(FXMLType.of(clazz)),
-                        findMapValueTypeFromHierarchy(FXMLType.of(clazz))
-                ),
-                (clazz, generics) -> {
-                    Map<String, FXMLType> mapping = buildInitialTypeMapping(clazz, generics);
-                    resolveTypeMapping(clazz, mapping, new HashSet<>());
-                    // Map's type parameters are K (index 0) and V (index 1)
-                    String keyTypeParamName = Map.class.getTypeParameters()[0].getName();
-                    String valueTypeParamName = Map.class.getTypeParameters()[1].getName();
-                    return Map.entry(
-                            mapping.getOrDefault(keyTypeParamName, FXMLType.OBJECT),
-                            mapping.getOrDefault(valueTypeParamName, FXMLType.OBJECT)
-                    );
-                }
-        );
-    }
-
     /// Recursively resolves the type mapping for a type and updates the mapping.
     /// Traverses the class hierarchy to propagate type variable bindings.
     ///

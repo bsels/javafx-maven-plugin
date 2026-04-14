@@ -1,6 +1,5 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.properties;
 
-import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 
@@ -12,14 +11,14 @@ import java.util.Objects;
 /// @param name           The property name
 /// @param getter         The name of the getter method that returns the collection
 /// @param type           The property type
-/// @param rawElementType The raw element type
+/// @param elementType    The element type
 /// @param value          The list of values
 /// @param properties     The list of properties
 public record FXMLCollectionProperties(
         String name,
         String getter,
         FXMLType type,
-        FXMLClassType rawElementType,
+        FXMLType elementType,
         List<AbstractFXMLValue> value,
         List<FXMLProperty> properties
 ) implements FXMLProperty {
@@ -29,15 +28,15 @@ public record FXMLCollectionProperties(
     /// @param name           The property name
     /// @param getter         The name of the getter method
     /// @param type           The property type
-    /// @param rawElementType The raw element type
+    /// @param elementType    The element type
     /// @param value          The list of values
     /// @param properties     The list of properties
-    /// @throws NullPointerException If `name`, `getter`, `type`, or `rawElementType` is null
+    /// @throws NullPointerException If `name`, `getter`, `type`, or `elementType` is null
     public FXMLCollectionProperties {
         Objects.requireNonNull(name, "`name` must not be null");
         Objects.requireNonNull(getter, "`getter` must not be null");
         Objects.requireNonNull(type, "`type` must not be null");
-        Objects.requireNonNull(rawElementType, "`rawElementType` must not be null");
+        Objects.requireNonNull(elementType, "`elementType` must not be null");
         value = List.copyOf(Objects.requireNonNullElseGet(value, List::of));
         properties = List.copyOf(Objects.requireNonNullElseGet(properties, List::of));
     }

@@ -17,15 +17,15 @@ import java.util.Optional;
 ///
 /// @param identifier    The identifier of the map
 /// @param type          The type of the map
-/// @param rawKeyClass   The raw key class of the map
-/// @param rawValueClass The raw value class of the map
+/// @param keyType       The key type of the map
+/// @param valueType     The value type of the map
 /// @param factoryMethod The optional factory method
 /// @param entries       The map entries
 public record FXMLMap(
         FXMLIdentifier identifier,
         FXMLType type,
-        FXMLClassType rawKeyClass,
-        FXMLClassType rawValueClass,
+        FXMLType keyType,
+        FXMLType valueType,
         Optional<FXMLFactoryMethod> factoryMethod,
         Map<FXMLLiteral, AbstractFXMLValue> entries
 ) implements AbstractFXMLValue, AbstractFXMLObject {
@@ -34,8 +34,8 @@ public record FXMLMap(
     ///
     /// @param identifier    The identifier of the map
     /// @param type          The type of the map
-    /// @param rawKeyClass   The raw key class of the map
-    /// @param rawValueClass The raw value class of the map
+    /// @param keyType       The key type of the map
+    /// @param valueType     The value type of the map
     /// @param factoryMethod The optional factory method
     /// @param entries       The collection of entries
     /// @throws NullPointerException     If any parameter is null
@@ -43,8 +43,8 @@ public record FXMLMap(
     public FXMLMap {
         Objects.requireNonNull(identifier, "`identifier` must not be null");
         Objects.requireNonNull(type, "`type` must not be null");
-        Objects.requireNonNull(rawKeyClass, "`rawKeyClass` must not be null");
-        Objects.requireNonNull(rawValueClass, "`rawValueClass` must not be null");
+        Objects.requireNonNull(keyType, "`keyType` must not be null");
+        Objects.requireNonNull(valueType, "`valueType` must not be null");
         Objects.requireNonNull(factoryMethod, "`factoryMethod` must not be null");
         entries = Map.copyOf(Objects.requireNonNullElseGet(entries, Map::of));
         switch (type) {
