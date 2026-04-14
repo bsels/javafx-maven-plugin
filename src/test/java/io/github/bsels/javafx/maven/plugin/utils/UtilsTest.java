@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Gatherer;
 
@@ -1201,128 +1200,6 @@ class UtilsTest {
     }
 
     @Nested
-    class FindCollectionValueTypeFromHierarchyTest {
-
-        @Test
-        void shouldReturnElementTypeForDirectCollectionImplementation() {
-            // When
-            Class<?> result = Utils.findCollectionValueTypeFromHierarchy(DirectStringCollection.class);
-
-            // Then
-            assertThat(result).isEqualTo(String.class);
-        }
-
-        @Test
-        void shouldReturnObjectForNullClass() {
-            // When - null clazz triggers the null check in findGenericTypeFromHierarchy
-            Class<?> result = Utils.findMapKeyTypeFromHierarchy(null);
-
-            // Then
-            assertThat(result).isEqualTo(Object.class);
-        }
-
-        @Test
-        void shouldReturnObjectForRawCollection() {
-            // When
-            Class<?> result = Utils.findCollectionValueTypeFromHierarchy(Object.class);
-
-            // Then
-            assertThat(result).isEqualTo(Object.class);
-        }
-
-        @Test
-        void shouldReturnObjectWhenClassIsTargetInterface() {
-            // When - passing Collection.class itself as the clazz
-            Class<?> result = Utils.findCollectionValueTypeFromHierarchy(java.util.Collection.class);
-
-            // Then
-            assertThat(result).isEqualTo(Object.class);
-        }
-
-        @Test
-        void shouldFindTypeViaInterfaceTraversal() {
-            // When - StringCollectionViaInterface implements StringCollection which extends Collection<String>
-            Class<?> result = Utils.findCollectionValueTypeFromHierarchy(StringCollectionViaInterface.class);
-
-            // Then
-            assertThat(result).isEqualTo(String.class);
-        }
-
-        @Test
-        void shouldFindTypeViaSuperclassTraversal() {
-            // When - subclass of DirectStringCollection; superclass directly implements Collection<String>
-            class SubOfDirect extends DirectStringCollection {
-                // inherits Collection<String> via superclass
-                public int size() {
-                    return 0;
-                }
-
-                public boolean isEmpty() {
-                    return true;
-                }
-
-                public boolean contains(Object o) {
-                    return false;
-                }
-
-                public java.util.Iterator<String> iterator() {
-                    return java.util.Collections.emptyIterator();
-                }
-
-                public Object[] toArray() {
-                    return new Object[0];
-                }
-
-                public <T> T[] toArray(T[] a) {
-                    return a;
-                }
-
-                public boolean add(String s) {
-                    return false;
-                }
-
-                public boolean remove(Object o) {
-                    return false;
-                }
-
-                public boolean containsAll(java.util.Collection<?> c) {
-                    return false;
-                }
-
-                public boolean addAll(java.util.Collection<? extends String> c) {
-                    return false;
-                }
-
-                public boolean removeAll(java.util.Collection<?> c) {
-                    return false;
-                }
-
-                public boolean retainAll(java.util.Collection<?> c) {
-                    return false;
-                }
-
-                public void clear() {
-                }
-            }
-
-            Class<?> result = Utils.findCollectionValueTypeFromHierarchy(SubOfDirect.class);
-
-            assertThat(result).isEqualTo(String.class);
-        }
-
-        // Implements an interface that extends Collection<String> - tests interface traversal path
-        interface StringCollection extends java.util.Collection<String> {
-        }
-
-        // Directly implements Collection<String> so generic type info is preserved
-        static abstract class DirectStringCollection implements java.util.Collection<String> {
-        }
-
-        static abstract class StringCollectionViaInterface implements StringCollection {
-        }
-    }
-
-    @Nested
     class FindStaticSettersForNodeTest {
 
         @Test
@@ -2446,64 +2323,6 @@ class UtilsTest {
     }
 
     @Nested
-    class FindMapValueTypeFromHierarchyTest {
-
-        @Test
-        void shouldReturnValueTypeForDirectMapImplementation() {
-            // When
-            Class<?> result = Utils.findMapValueTypeFromHierarchy(DirectStringIntegerMap.class);
-
-            // Then
-            assertThat(result).isEqualTo(Integer.class);
-        }
-
-        @Test
-        void shouldReturnValueTypeViaInterfaceTraversal() {
-            // When
-            Class<?> result = Utils.findMapValueTypeFromHierarchy(StringIntegerMapViaInterface.class);
-
-            // Then
-            assertThat(result).isEqualTo(Integer.class);
-        }
-
-        @Test
-        void shouldReturnObjectForNullClass() {
-            // When
-            Class<?> result = Utils.findMapValueTypeFromHierarchy(null);
-
-            // Then
-            assertThat(result).isEqualTo(Object.class);
-        }
-
-        @Test
-        void shouldReturnObjectForRawMap() {
-            // When
-            Class<?> result = Utils.findMapValueTypeFromHierarchy(Object.class);
-
-            // Then
-            assertThat(result).isEqualTo(Object.class);
-        }
-
-        @Test
-        void shouldReturnObjectWhenClassIsMapInterface() {
-            // When
-            Class<?> result = Utils.findMapValueTypeFromHierarchy(Map.class);
-
-            // Then
-            assertThat(result).isEqualTo(Object.class);
-        }
-
-        interface StringIntegerMap extends Map<String, Integer> {
-        }
-
-        static abstract class DirectStringIntegerMap implements Map<String, Integer> {
-        }
-
-        static abstract class StringIntegerMapViaInterface implements StringIntegerMap {
-        }
-    }
-
-    @Nested
     class UrlPathToOsPathStringTest {
 
         @Test
@@ -2533,47 +2352,4 @@ class UtilsTest {
         }
     }
 
-    @Nested
-    class CheckRawTypeTest {
-
-        private static Predicate<ParameterizedType> invokeCheckRawType(Class<?> targetInterface) throws Exception {
-            Method method = Utils.class.getDeclaredMethod("checkRawType", Class.class);
-            method.setAccessible(true);
-            //noinspection unchecked
-            return (Predicate<ParameterizedType>) method.invoke(null, targetInterface);
-        }
-
-        @Test
-        void shouldMatchTargetInterface() throws Exception {
-            // Given
-            Predicate<ParameterizedType> predicate = invokeCheckRawType(List.class);
-            // Anonymous class implementing List<String>
-            ParameterizedType listStringType = (ParameterizedType) new ArrayList<String>() {
-            }.getClass().getGenericSuperclass();
-
-            // When
-            boolean result = predicate.test(listStringType);
-
-            // Then - The raw type of ArrayList<String> is ArrayList.class, not List.class
-            assertThat(result).isFalse();
-
-            // Let's use a type whose raw type IS List.class
-            Predicate<ParameterizedType> listPredicate = invokeCheckRawType(ArrayList.class);
-            assertThat(listPredicate.test(listStringType)).isTrue();
-        }
-
-        @Test
-        void shouldNotMatchDifferentInterface() throws Exception {
-            // Given
-            Predicate<ParameterizedType> predicate = invokeCheckRawType(Map.class);
-            ParameterizedType listStringType = (ParameterizedType) new ArrayList<String>() {
-            }.getClass().getGenericSuperclass();
-
-            // When
-            boolean result = predicate.test(listStringType);
-
-            // Then
-            assertThat(result).isFalse();
-        }
-    }
 }

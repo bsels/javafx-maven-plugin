@@ -14,12 +14,10 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
@@ -427,30 +425,6 @@ public final class Utils {
         };
     }
 
-    /// Traverses the class hierarchy to find the [Collection] interface and extract its element type.
-    ///
-    /// @param clazz The class to search
-    /// @return The raw [Class] of the collection's element type, or [Object] if undetermined
-    public static Class<?> findCollectionValueTypeFromHierarchy(Class<?> clazz) {
-        return findGenericTypeFromHierarchy(clazz, Collection.class, 0);
-    }
-
-    /// Traverses the class hierarchy to find the [Map] interface and extract its key type.
-    ///
-    /// @param clazz The class to search
-    /// @return The raw [Class] of the map's key type, or [Object] if undetermined
-    public static Class<?> findMapKeyTypeFromHierarchy(Class<?> clazz) {
-        return findGenericTypeFromHierarchy(clazz, Map.class, 0);
-    }
-
-    /// Traverses the class hierarchy to find the [Map] interface and extract its value type.
-    ///
-    /// @param clazz The class to search
-    /// @return The raw [Class] of the map's value type, or [Object] if undetermined
-    public static Class<?> findMapValueTypeFromHierarchy(Class<?> clazz) {
-        return findGenericTypeFromHierarchy(clazz, Map.class, 1);
-    }
-
     /// Splits the string into a stream of substrings based on the delimiter.
     /// Consecutive delimiters are treated as a single separator; empty substrings are ignored.
     /// It iterates through the string character by character, identifying the delimiter,
@@ -510,78 +484,6 @@ public final class Utils {
             builder.accept(substring.strip());
         }
         return builder.build();
-    }
-
-    /// Traverses the class hierarchy to find the specified target interface and extract its type argument.
-    /// It recursively checks the class's generic interfaces and its superclass.
-    /// If the target interface is found as a [ParameterizedType],
-    /// the type argument at the specified index is extracted.
-    ///
-    /// @param clazz             The class to search
-    /// @param targetInterface   The target interface
-    /// @param typeArgumentIndex The index of the type argument to extract
-    /// @return The raw [Class] of the extracted type argument, or [Object] if undetermined
-    private static Class<?> findGenericTypeFromHierarchy(Class<?> clazz, Class<?> targetInterface, int typeArgumentIndex) {
-        if (clazz == null || clazz == Object.class || clazz == targetInterface) {
-            return Object.class;
-        }
-        return Arrays.stream(clazz.getGenericInterfaces())
-                .map(genericInterface -> getInterfaceElementType(targetInterface, typeArgumentIndex, genericInterface))
-                .gather(optional())
-                .findFirst()
-                .or(
-                        () -> Optional.ofNullable(clazz.getSuperclass())
-                                .map(superclass -> findGenericTypeFromHierarchy(
-                                        superclass,
-                                        targetInterface,
-                                        typeArgumentIndex
-                                ))
-                                .filter(typedClass -> typedClass != Object.class)
-                )
-                .or(
-                        () -> Arrays.stream(clazz.getGenericInterfaces())
-                                .map(Utils::getClassType)
-                                .map(genericInterface -> findGenericTypeFromHierarchy(
-                                        genericInterface,
-                                        targetInterface,
-                                        typeArgumentIndex
-                                ))
-                                .findFirst()
-                )
-                .orElse(Object.class);
-    }
-
-    /// Extracts the element type of target interface from a generic interface definition.
-    /// It checks if the provided [Type] is a [ParameterizedType] that matches the target interface.
-    /// If so, it returns the type argument at the specified index as a [Class] object.
-    ///
-    /// @param targetInterface   The interface to search for
-    /// @param typeArgumentIndex The index of the type argument
-    /// @param genericInterface  The generic interface type to analyze
-    /// @return An [Optional] containing the extracted [Class] type
-    private static Optional<Class<?>> getInterfaceElementType(
-            Class<?> targetInterface, int typeArgumentIndex, Type genericInterface
-    ) {
-        return Stream.of(genericInterface)
-                .gather(CheckAndCast.of(ParameterizedType.class))
-                .filter(checkRawType(targetInterface))
-                .findFirst()
-                .map(
-                        parameterizedType -> (Class<?>) Stream.of(
-                                        parameterizedType.getActualTypeArguments()[typeArgumentIndex]
-                                )
-                                .gather(CheckAndCast.of(Class.class))
-                                .findFirst()
-                                .orElse(Object.class)
-                );
-    }
-
-    /// Returns a predicate that checks if a [ParameterizedType]'s raw type matches the target interface.
-    ///
-    /// @param targetInterface The interface to check against
-    /// @return A predicate for matching the raw type
-    private static Predicate<ParameterizedType> checkRawType(Class<?> targetInterface) {
-        return parameterizedType -> parameterizedType.getRawType() == targetInterface;
     }
 
     /// Creates a [BiConsumer] that collects pattern matches into a list.
