@@ -280,9 +280,6 @@ public final class FXMLUtils {
                 Map<String, FXMLType> mapping = buildInitialTypeMapping(clazz, generics);
                 resolveTypeMapping(clazz, mapping, new HashSet<>());
                 TypeVariable<?>[] typeParameters = targetInterface.getTypeParameters();
-                if (typeArgumentIndex >= typeParameters.length) {
-                    yield FXMLType.OBJECT;
-                }
                 yield mapping.getOrDefault(typeParameters[typeArgumentIndex].getName(), FXMLType.OBJECT);
             }
         };
