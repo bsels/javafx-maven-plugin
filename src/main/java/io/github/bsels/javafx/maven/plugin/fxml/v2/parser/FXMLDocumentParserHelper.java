@@ -1,6 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLConstants;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
@@ -21,7 +22,6 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMethod;
 import io.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
 import io.github.bsels.javafx.maven.plugin.utils.InternalClassNotFoundException;
 import io.github.bsels.javafx.maven.plugin.utils.Utils;
-import javafx.scene.Node;
 import org.apache.maven.plugin.logging.Log;
 
 import java.lang.reflect.Constructor;

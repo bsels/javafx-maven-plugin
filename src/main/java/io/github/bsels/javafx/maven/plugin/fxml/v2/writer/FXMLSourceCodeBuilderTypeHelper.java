@@ -11,7 +11,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdenti
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLUtils;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
@@ -70,8 +70,6 @@ import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeB
 /// Helper for handling [FXMLType]s and their conversion to Java source code.
 /// Provides methods for creating type mappings, encoding literals, and generating class names.
 final class FXMLSourceCodeBuilderTypeHelper {
-    /// The [FXMLClassType] for [Object].
-    private static final FXMLClassType OBJECT_TYPE = new FXMLClassType(Object.class);
     /// The [FXMLClassType] for [String].
     private static final FXMLClassType STRING_TYPE = new FXMLClassType(String.class);
     /// A set of all Java primitive types used to filter out unnecessary imports.

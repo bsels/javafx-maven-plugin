@@ -1,4 +1,4 @@
-package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
+package io.github.bsels.javafx.maven.plugin.fxml.v2;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
@@ -17,7 +17,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -1189,7 +1188,8 @@ class FXMLUtilsTest {
         @Test
         void shouldHandleNonStaticFieldInResolveConstantType() throws Exception {
             class NonStaticField { public String field; }
-            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("internalResolveConstantType", Class.forName("io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLUtils$ClassAndString"));
+            java.lang.reflect.Method method = FXMLUtils.class.getDeclaredMethod("internalResolveConstantType", Class.forName(
+                    "io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils$ClassAndString"));
             method.setAccessible(true);
             Object classAndString = createClassAndString(NonStaticField.class, "field");
             try {
@@ -1245,7 +1245,7 @@ class FXMLUtilsTest {
         }
 
         private Object createClassAndString(Class<?> clazz, String string) throws Exception {
-            Class<?> recordClass = Class.forName("io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLUtils$ClassAndString");
+            Class<?> recordClass = Class.forName("io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils$ClassAndString");
             java.lang.reflect.Constructor<?> constructor = recordClass.getDeclaredConstructors()[0];
             constructor.setAccessible(true);
             return constructor.newInstance(clazz, string);

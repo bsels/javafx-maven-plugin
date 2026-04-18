@@ -47,21 +47,14 @@ public record FXMLMap(
         Objects.requireNonNull(valueType, "`valueType` must not be null");
         Objects.requireNonNull(factoryMethod, "`factoryMethod` must not be null");
         entries = Map.copyOf(Objects.requireNonNullElseGet(entries, Map::of));
-        switch (type) {
-            case FXMLClassType(Class<?> clazz) -> {
-                if (!Map.class.isAssignableFrom(clazz)) {
-                    throw new IllegalArgumentException("`type` must be a Map: %s".formatted(clazz));
-                }
-            }
-            case FXMLGenericType(Class<?> clazz, _) -> {
-                if (!Map.class.isAssignableFrom(clazz)) {
-                    throw new IllegalArgumentException("`type` must be a Map: %s".formatted(clazz));
-                }
-            }
-            case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> {
-                // The type is not yet compiled or available in the current classloader or is a wildcard;
-                // map assignability cannot be verified at this point.
-            }
+        boolean validCompiledType = switch (type) {
+            case FXMLClassType(Class<?> clazz) -> Map.class.isAssignableFrom(clazz);
+            case FXMLGenericType(Class<?> clazz, _) -> Map.class.isAssignableFrom(clazz);
+            case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ ->
+                    true; // Uncompiled types are always valid
+        };
+        if (!validCompiledType) {
+            throw new IllegalArgumentException("`type` must be a Map: %s".formatted(type));
         }
     }
 }

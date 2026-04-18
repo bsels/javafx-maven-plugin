@@ -40,21 +40,14 @@ public record FXMLCollection(
         Objects.requireNonNull(type, "`type` must not be null");
         Objects.requireNonNull(factoryMethod, "`factoryMethod` must not be null");
         values = List.copyOf(Objects.requireNonNullElseGet(values, List::of));
-        switch (type) {
-            case FXMLClassType(Class<?> clazz) -> {
-                if (!Collection.class.isAssignableFrom(clazz)) {
-                    throw new IllegalArgumentException("`type` must be a Collection: %s".formatted(clazz));
-                }
-            }
-            case FXMLGenericType(Class<?> clazz, _) -> {
-                if (!Collection.class.isAssignableFrom(clazz)) {
-                    throw new IllegalArgumentException("`type` must be a Collection: %s".formatted(clazz));
-                }
-            }
-            case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> {
-                // The type is not yet compiled or available in the current classloader or is a wildcard;
-                // collection assignability cannot be verified at this point.
-            }
+        boolean validCompiledType = switch (type) {
+            case FXMLClassType(Class<?> clazz) -> Collection.class.isAssignableFrom(clazz);
+            case FXMLGenericType(Class<?> clazz, _) -> Collection.class.isAssignableFrom(clazz);
+            case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ ->
+                    true; // Uncompiled types are always valid
+        };
+        if (!validCompiledType) {
+            throw new IllegalArgumentException("`type` must be a Collection: %s".formatted(type));
         }
     }
 }

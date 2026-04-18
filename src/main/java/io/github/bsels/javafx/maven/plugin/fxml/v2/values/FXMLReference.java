@@ -1,6 +1,6 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
-import io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLUtils;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
 
 import java.util.Objects;
 
