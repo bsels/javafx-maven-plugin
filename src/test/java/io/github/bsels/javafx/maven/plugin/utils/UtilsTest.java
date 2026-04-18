@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
@@ -352,6 +353,23 @@ class UtilsTest {
 
             // Assert
             assertThat(classType).isEqualTo(List.class);
+        }
+
+        @Test
+        void testGetClassTypeForGenericArrayType() {
+            // Arrange
+            Type type = new GenericArrayType() {
+                @Override
+                public Type getGenericComponentType() {
+                    return String.class;
+                }
+            };
+
+            // Act
+            Class<?> classType = Utils.getClassType(type);
+
+            // Assert
+            assertThat(classType).isEqualTo(String[].class);
         }
     }
 

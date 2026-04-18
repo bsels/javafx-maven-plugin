@@ -917,13 +917,140 @@ public class FXMLDocumentParserTest {
                     .hasOnlyElementsOfType(FXMLInclude.class)
                     .extracting(FXMLInclude.class::cast)
                     .allSatisfy(
-                            element -> assertThat(element)
-                                    .hasFieldOrPropertyWithValue("sourceFile", "/examples/ExplicitDefault.fxml")
-                                    .hasFieldOrPropertyWithValue("resources", Optional.empty())
-                                    .hasFieldOrPropertyWithValue("charset", StandardCharsets.UTF_8)
-                                    .extracting(FXMLInclude::identifier)
-                                    .isInstanceOf(FXMLInternalIdentifier.class)
+                            element -> {
+                                assertThat(element)
+                                        .hasFieldOrPropertyWithValue("sourceFile", "/examples/ExplicitDefault.fxml")
+                                        .hasFieldOrPropertyWithValue("resources", Optional.empty())
+                                        .hasFieldOrPropertyWithValue("charset", StandardCharsets.UTF_8)
+                                        .extracting(FXMLInclude::identifier)
+                                        .isInstanceOf(FXMLInternalIdentifier.class);
+
+                                assertThat(element.lazyLoadedDocument().get())
+                                        .isNotNull()
+                                        .hasFieldOrPropertyWithValue("className", "ExplicitDefault");
+                            }
                     );
+        }
+
+        @Test
+        void fxIncludeNestedController() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/FXIncludeNestedController.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document)
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "FXIncludeNestedController")
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .first(InstanceOfAssertFactories.type(FXMLCollectionProperties.class))
+                    .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
+                    .first()
+                    .isInstanceOf(FXMLInclude.class)
+                    .extracting(FXMLInclude.class::cast)
+                    .satisfies(include -> {
+                        assertThat(include)
+                                .hasFieldOrPropertyWithValue("sourceFile", "/examples/ButtonWithControllerAction.fxml")
+                                .hasFieldOrPropertyWithValue("identifier", new FXMLExposedIdentifier("myButton"));
+
+                        assertThat(include.lazyLoadedDocument().get())
+                                .isNotNull()
+                                .hasFieldOrPropertyWithValue("className", "ButtonWithControllerAction")
+                                .satisfies(nestedDoc -> assertThat(nestedDoc.controller()).isPresent());
+                    });
+        }
+
+        @Test
+        void includeEverywhere() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/IncludeEverywhere.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document)
+                    .isNotNull()
+                    .satisfies(doc -> {
+                        // Check definitions
+                        assertThat(doc.definitions())
+                                .hasSize(1)
+                                .first()
+                                .isInstanceOf(FXMLInclude.class)
+                                .extracting(FXMLInclude.class::cast)
+                                .satisfies(include -> {
+                                    assertThat(include.sourceFile()).isEqualTo("/examples/ButtonWithNoControllerAction.fxml");
+                                    assertThat(include.resources()).contains("/examples/myResources");
+                                    assertThat(include.lazyLoadedDocument().get().className()).isEqualTo("ButtonWithNoControllerAction");
+                                });
+
+                        // Check properties (graphic is an FXMLObjectProperty)
+                        assertThat(doc.root())
+                                .isInstanceOf(FXMLObject.class)
+                                .extracting(FXMLObject.class::cast)
+                                .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                                .first(InstanceOfAssertFactories.type(FXMLCollectionProperties.class))
+                                .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
+                                .first()
+                                .isInstanceOf(FXMLObject.class)
+                                .extracting(FXMLObject.class::cast)
+                                .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                                .anySatisfy(prop -> {
+                                    assertThat(prop)
+                                            .isInstanceOf(FXMLObjectProperty.class)
+                                            .extracting(FXMLObjectProperty.class::cast)
+                                            .satisfies(objProp -> {
+                                                assertThat(objProp.name()).isEqualTo("graphic");
+                                                assertThat(objProp.value())
+                                                        .isInstanceOf(FXMLInclude.class)
+                                                        .extracting(FXMLInclude.class::cast)
+                                                        .satisfies(include -> {
+                                                            assertThat(include.sourceFile()).isEqualTo("/examples/ExplicitDefault.fxml");
+                                                            assertThat(include.lazyLoadedDocument().get().className()).isEqualTo("ExplicitDefault");
+                                                        });
+                                            });
+                                });
+                    });
+        }
+
+        @Test
+        void includeInMap() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/IncludeInMap.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document)
+                    .isNotNull()
+                    .extracting(FXMLDocument::root)
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .first(InstanceOfAssertFactories.type(FXMLObjectProperty.class))
+                    .extracting(FXMLObjectProperty::value)
+                    .isInstanceOf(FXMLMap.class)
+                    .extracting(FXMLMap.class::cast)
+                    .extracting(FXMLMap::entries, MAP_VALUES_ASSERT_FACTORY)
+                    .values()
+                    .hasSize(2)
+                    .anySatisfy(val -> assertThat(val)
+                            .isInstanceOf(FXMLInclude.class)
+                            .extracting(FXMLInclude.class::cast)
+                            .satisfies(include -> {
+                                assertThat(include.sourceFile()).isEqualTo("/examples/ExplicitDefault.fxml");
+                                assertThat(include.lazyLoadedDocument().get().className()).isEqualTo("ExplicitDefault");
+                            }))
+                    .anySatisfy(val -> assertThat(val)
+                            .isInstanceOf(FXMLLiteral.class)
+                            .extracting(FXMLLiteral.class::cast)
+                            .hasFieldOrPropertyWithValue("value", "LiteralValue"));
         }
 
         @ParameterizedTest
