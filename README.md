@@ -29,7 +29,7 @@ rapidly (`run`), and finally produce a lean, portable executable bundle (`jlink`
   introduced in recent JDK releases.
 - **Modular architecture**: The application is built as a **Java module** (using `module-info.java`).
   All source files, libraries, and resources must be declared in explicit modules, allowing the JDK to enforce strong
-  encapsulation and reliable configuration at compile‑time and run‑time.
+  encapsulation and reliable configuration at compile time and run‑time.
 - **FXML handling**:
     - All **FXML files** reference **classes that are part of the compiled classpath** (i.e., they must already be
       compiled into the module), or that can be compiled without the source code that needs to be generated
@@ -482,7 +482,7 @@ Add the snippet above to your project's pom.xml and run:
 mvn javafx:run
 ```
 
-The console will display the exact command that is executed by the plugin, for example:
+The console will display the exact command executed by the plugin, for example:
 
 ```shell
 java -Djava.util.logging.SimpleFormatter.format=%1$tF %1$tT %4$s %2$s - %5$s%6$s%n \

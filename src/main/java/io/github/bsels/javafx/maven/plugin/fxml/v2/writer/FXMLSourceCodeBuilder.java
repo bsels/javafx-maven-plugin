@@ -430,7 +430,7 @@ public final class FXMLSourceCodeBuilder {
     }
 
     /// Recursively identifies and adds field declarations for an FXML value and its nested children.
-    /// Different types of FXML values (collections, includes, maps, objects) are handled  according to their specific
+    /// Different types of FXML values (collections, includes, maps, objects) are handled according to their specific
     /// structural requirements.
     ///
     /// @param context The current [SourceCodeGeneratorContext].
@@ -575,7 +575,7 @@ public final class FXMLSourceCodeBuilder {
     }
 
     /// Adds field creation logic to the constructor prologue section.
-    /// Iterates through the ordered list of constructions and generates the corresponding  Java initialization code
+    /// Iterates through the ordered list of constructions and generates the corresponding Java initialization code
     /// (e.g., `myButton = new Button();`).
     ///
     /// @param context                 The current [SourceCodeGeneratorContext].

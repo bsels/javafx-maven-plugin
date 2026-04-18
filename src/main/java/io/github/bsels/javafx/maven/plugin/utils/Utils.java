@@ -39,7 +39,7 @@ import java.util.stream.Stream;
 /// Utility class providing helper methods for generating method names and processing types.
 public final class Utils {
     /// Gatherer used to identify and collect class types based on their type names.
-    /// It uses [findTypeForName] to resolve each type name to a [Class] object.
+    /// It uses [findTypeForName] to resolve each type name to an [Class] object.
     /// If the type is found, it is pushed downstream; otherwise, the downstream's
     /// acceptance status is checked to decide if the stream should continue.
     public static final Gatherer<String, Void, ? extends Class<?>> CLASS_FINDER = Gatherer.of(

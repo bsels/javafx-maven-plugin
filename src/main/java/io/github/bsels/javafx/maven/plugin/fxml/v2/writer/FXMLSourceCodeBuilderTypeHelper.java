@@ -79,7 +79,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
 
     /// Cache for storing and reusing [FXMLConstructor]s associated with a [Class].
     private final Map<Class<?>, List<FXMLConstructor>> constructorCache;
-    /// Cache for storing and reusing [FXMLConstructor]s associated with an [FXMLFactoryMethod].
+    /// Cache for storing and reusing [FXMLConstructor]s associated with [FXMLFactoryMethod].
     private final Map<FXMLFactoryMethod, List<FXMLConstructor>> factoryMethodCache;
 
     /// Helper for managing and resolving recursive property bindings.
