@@ -271,17 +271,17 @@ public final class FXMLUtils {
     /// @param typeArgumentIndex The index of the type argument to extract
     /// @return The [FXMLType] of the extracted type argument, or [FXMLClassType] of [Object] if undetermined
     private static FXMLType findFXMLGenericTypeFromHierarchy(FXMLType type, Class<?> targetInterface, int typeArgumentIndex) {
-        return switch (type) {
-            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> FXMLType.OBJECT;
-            case FXMLClassType(Class<?> clazz) ->
-                    findFXMLGenericTypeFromHierarchyForClass(clazz, targetInterface, typeArgumentIndex);
-            case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) -> {
-                Map<String, FXMLType> mapping = buildInitialTypeMapping(clazz, generics);
-                resolveTypeMapping(clazz, mapping, new HashSet<>());
-                TypeVariable<?>[] typeParameters = targetInterface.getTypeParameters();
-                yield mapping.getOrDefault(typeParameters[typeArgumentIndex].getName(), FXMLType.OBJECT);
-            }
-        };
+        return findTypeInformation(
+                type,
+                FXMLType.OBJECT,
+                clazz -> findFXMLGenericTypeFromHierarchyForClass(clazz, targetInterface, typeArgumentIndex),
+                (clazz, generics) -> {
+                    Map<String, FXMLType> mapping = buildInitialTypeMapping(clazz, generics);
+                    resolveTypeMapping(clazz, mapping, new HashSet<>());
+                    TypeVariable<?>[] typeParameters = targetInterface.getTypeParameters();
+                    return mapping.getOrDefault(typeParameters[typeArgumentIndex].getName(), FXMLType.OBJECT);
+                }
+        );
     }
 
     /// Traverses the class hierarchy to find the specified target interface and extract its type argument as an [FXMLType].
