@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import io.github.bsels.javafx.maven.plugin.examples.OnChangeTestBean?>
+<?import java.lang.String?>
+
+<OnChangeTestBean xmlns:fx="http://javafx.com/fxml">
+    <plainList onChange="onListChanged">
+        <String fx:value="One"/>
+        <String fx:value="Two"/>
+    </plainList>
+</OnChangeTestBean>

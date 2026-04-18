@@ -1665,6 +1665,112 @@ public class FXMLDocumentParserTest {
     class CoverageTests {
 
         @Test
+        void observableListWithOnChange() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/ObservableListWithOnChange.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document.root())
+                    .isInstanceOf(FXMLObject.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLObject.class))
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .filteredOn(p -> p.name().equals("observableList"))
+                    .first()
+                    .isInstanceOf(FXMLCollectionProperties.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLCollectionProperties.class))
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.of("onListChanged"));
+        }
+
+        @Test
+        void nonObservableListWithOnChange() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/NonObservableListWithOnChange.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert — onChange is ignored for non-observable collections
+            assertThat(document.root())
+                    .isInstanceOf(FXMLObject.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLObject.class))
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .filteredOn(p -> p.name().equals("plainList"))
+                    .first()
+                    .isInstanceOf(FXMLCollectionProperties.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLCollectionProperties.class))
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.empty());
+        }
+
+        @Test
+        void nonObservableMapWithOnChange() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/NonObservableMapWithOnChange.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert — onChange is ignored for non-observable maps
+            assertThat(document.root())
+                    .isInstanceOf(FXMLObject.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLObject.class))
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .filteredOn(p -> p.name().equals("plainMap"))
+                    .first()
+                    .isInstanceOf(FXMLMapProperty.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLMapProperty.class))
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.empty())
+                    .extracting(FXMLMapProperty::value)
+                    .asInstanceOf(InstanceOfAssertFactories.MAP)
+                    .hasSize(2);
+        }
+
+        @Test
+        void observableSetWithOnChange() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/ObservableSetWithOnChange.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document.root())
+                    .isInstanceOf(FXMLObject.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLObject.class))
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .filteredOn(p -> p.name().equals("observableSet"))
+                    .first()
+                    .isInstanceOf(FXMLCollectionProperties.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLCollectionProperties.class))
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.of("onSetChanged"));
+        }
+
+        @Test
+        void observableMapWithOnChange() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/ObservableMapWithOnChange.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document.root())
+                    .isInstanceOf(FXMLObject.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLObject.class))
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .filteredOn(p -> p.name().equals("observableMap"))
+                    .first()
+                    .isInstanceOf(FXMLMapProperty.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLMapProperty.class))
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.of("onMapChanged"))
+                    .extracting(FXMLMapProperty::value)
+                    .asInstanceOf(InstanceOfAssertFactories.MAP)
+                    .hasSize(2);
+        }
+
+        @Test
         void mapWithOnChange() throws MojoExecutionException {
             // Prepare
             ParsedFXML parsedFXML = readFXML("/examples/MapWithOnChange.fxml");
