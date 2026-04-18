@@ -5,6 +5,8 @@ import io.github.bsels.javafx.maven.plugin.examples.ConstantAndCopyBean;
 import io.github.bsels.javafx.maven.plugin.examples.MetaDataHolder;
 import io.github.bsels.javafx.maven.plugin.examples.Unsettable;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLInterface;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
@@ -31,6 +33,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInclude;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInlineScript;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLLiteral;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMap;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLObject;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLReference;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLResource;
@@ -38,6 +41,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLTranslation;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
 import io.github.bsels.javafx.maven.plugin.io.FXMLReader;
 import io.github.bsels.javafx.maven.plugin.io.ParsedFXML;
+import io.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
@@ -1968,6 +1972,380 @@ public class FXMLDocumentParserTest {
                                         )
                                 );
                     });
+        }
+    }
+
+    /// Tests for the private `parseMapElements` method, invoked via reflection to cover all branches directly.
+    @Nested
+    class ParseMapElementsTest {
+
+        /// Invokes the private `parseMapElements` method via reflection.
+        ///
+        /// @param structure    The [ParsedXMLStructure] to parse
+        /// @param buildContext The [BuildContext] to use
+        /// @param expectedType The expected [FXMLType]
+        /// @return The result of the method call
+        /// @throws Exception If reflection fails or the method throws
+        @SuppressWarnings("unchecked")
+        private Optional<AbstractFXMLValue> invokeParseMapElements(
+                ParsedXMLStructure structure,
+                BuildContext buildContext,
+                FXMLType expectedType
+        ) throws Exception {
+            Method method = FXMLDocumentParser.class.getDeclaredMethod(
+                    "parseMapElements", ParsedXMLStructure.class, BuildContext.class, FXMLType.class);
+            method.setAccessible(true);
+            return (Optional<AbstractFXMLValue>) method.invoke(classUnderTest, structure, buildContext, expectedType);
+        }
+
+        /// Verifies that when the structure has a text value, `parseMapElements` delegates to `parseValueString`
+        /// and returns a non-empty Optional containing the parsed value (e.g. an [FXMLLiteral]).
+        @Test
+        void textValuePresentReturnsParsedValue() throws Exception {
+            // Prepare
+            ParsedXMLStructure structure = new ParsedXMLStructure(
+                    "String", Map.of(), List.of(), List.of(), Optional.of("hello"));
+            BuildContext buildContext = new BuildContext(List.of(), "/examples");
+            FXMLType expectedType = FXMLType.of(String.class);
+
+            // Act
+            Optional<AbstractFXMLValue> result = invokeParseMapElements(structure, buildContext, expectedType);
+
+            // Assert
+            assertThat(result)
+                    .isPresent()
+                    .get()
+                    .isInstanceOf(FXMLLiteral.class)
+                    .hasFieldOrPropertyWithValue("value", "hello");
+        }
+
+        /// Verifies that when the structure has no text value but represents a valid element (e.g. a `Label`),
+        /// `parseMapElements` delegates to `parseElement` and returns a non-empty Optional containing an [FXMLObject].
+        @Test
+        void noTextValueDelegatesToParseElement() throws Exception {
+            // Prepare
+            ParsedXMLStructure structure = new ParsedXMLStructure(
+                    "javafx.scene.control.Label", Map.of(), List.of(), List.of(), Optional.empty());
+            BuildContext buildContext = new BuildContext(List.of(), "/examples");
+            FXMLType expectedType = FXMLType.of(Label.class);
+
+            // Act
+            Optional<AbstractFXMLValue> result = invokeParseMapElements(structure, buildContext, expectedType);
+
+            // Assert
+            assertThat(result)
+                    .isPresent()
+                    .get()
+                    .isInstanceOf(FXMLObject.class)
+                    .hasFieldOrPropertyWithValue("type", FXMLType.of(Label.class));
+        }
+
+        /// Verifies that when the structure has no text value and the element is a special `fx:define` element,
+        /// `parseMapElements` delegates to `parseElement` and returns an empty Optional (as `fx:define` produces no value).
+        @Test
+        void noTextValueAndFxDefineElementReturnsEmpty() throws Exception {
+            // Prepare
+            ParsedXMLStructure structure = new ParsedXMLStructure(
+                    "fx:define", Map.of(), List.of(), List.of(), Optional.empty());
+            BuildContext buildContext = new BuildContext(List.of(), "/examples");
+            FXMLType expectedType = FXMLType.of(Object.class);
+
+            // Act
+            Optional<AbstractFXMLValue> result = invokeParseMapElements(structure, buildContext, expectedType);
+
+            // Assert
+            assertThat(result).isEmpty();
+        }
+    }
+
+    /// Tests for the private `loadIncludeFXMLDocuments` methods via reflection,
+    /// covering all three overloads and every branch within each switch.
+    @Nested
+    class LoadIncludeFXMLDocumentsTest {
+
+        /// Invokes the `loadIncludeFXMLDocuments(FXMLDocument, String, Path)` overload via reflection.
+        ///
+        /// @param document     The [FXMLDocument] to process
+        /// @param resourcePath The base resource path
+        /// @param rootPath     The root path of the project
+        /// @throws Exception If reflection fails or the method throws
+        private void invokeWithDocument(FXMLDocument document, String resourcePath, Path rootPath) throws Exception {
+            Method method = FXMLDocumentParser.class.getDeclaredMethod(
+                    "loadIncludeFXMLDocuments", FXMLDocument.class, String.class, Path.class);
+            method.setAccessible(true);
+            method.invoke(classUnderTest, document, resourcePath, rootPath);
+        }
+
+        /// Invokes the `loadIncludeFXMLDocuments(AbstractFXMLValue, String, Path)` overload via reflection.
+        ///
+        /// @param value        The [AbstractFXMLValue] to process
+        /// @param resourcePath The base resource path
+        /// @param rootPath     The root path of the project
+        /// @throws Exception If reflection fails or the method throws
+        private void invokeWithValue(AbstractFXMLValue value, String resourcePath, Path rootPath) throws Exception {
+            Method method = FXMLDocumentParser.class.getDeclaredMethod(
+                    "loadIncludeFXMLDocuments", AbstractFXMLValue.class, String.class, Path.class);
+            method.setAccessible(true);
+            method.invoke(classUnderTest, value, resourcePath, rootPath);
+        }
+
+        /// Invokes the `loadIncludeFXMLDocuments(FXMLProperty, String, Path)` overload via reflection.
+        ///
+        /// @param property     The [FXMLProperty] to process
+        /// @param resourcePath The base resource path
+        /// @param rootPath     The root path of the project
+        /// @throws Exception If reflection fails or the method throws
+        private void invokeWithProperty(FXMLProperty property, String resourcePath, Path rootPath) throws Exception {
+            Method method = FXMLDocumentParser.class.getDeclaredMethod(
+                    "loadIncludeFXMLDocuments", FXMLProperty.class, String.class, Path.class);
+            method.setAccessible(true);
+            method.invoke(classUnderTest, property, resourcePath, rootPath);
+        }
+
+        /// Verifies that the `FXMLDocument` overload recurses into the root object and all definitions,
+        /// loading any nested [FXMLInclude] documents found in both.
+        @Test
+        void documentOverloadRecursesIntoRootAndDefinitions() throws Exception {
+            // Prepare — root contains an FXMLInclude; definitions contain another FXMLInclude
+            FXMLLazyLoadedDocument rootLazy = new FXMLLazyLoadedDocument();
+            FXMLInclude rootInclude = new FXMLInclude(
+                    FXMLRootIdentifier.INSTANCE, "/examples/SubDocument.fxml",
+                    StandardCharsets.UTF_8, Optional.empty(), rootLazy);
+            FXMLObject root = new FXMLObject(
+                    FXMLRootIdentifier.INSTANCE, FXMLType.of(VBox.class), Optional.empty(),
+                    List.of(new FXMLObjectProperty("include", "setInclude", FXMLType.of(Object.class), rootInclude)));
+
+            FXMLLazyLoadedDocument defLazy = new FXMLLazyLoadedDocument();
+            FXMLInclude defInclude = new FXMLInclude(
+                    FXMLRootIdentifier.INSTANCE, "/examples/SubDocument.fxml",
+                    StandardCharsets.UTF_8, Optional.empty(), defLazy);
+
+            FXMLDocument document = new FXMLDocument(
+                    "Test", root, List.<FXMLInterface>of(), Optional.empty(), Optional.empty(),
+                    List.of(defInclude), List.of());
+
+            // Act
+            invokeWithDocument(document, "/examples/", getRootPath());
+
+            // Assert — both lazy documents should now be loaded
+            assertThat(rootLazy.get()).isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "SubDocument");
+            assertThat(defLazy.get()).isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "SubDocument");
+        }
+
+        /// Verifies that the `AbstractFXMLValue` overload correctly loads the nested document
+        /// when the value is an [FXMLInclude].
+        @Test
+        void valueOverloadLoadsInclude() throws Exception {
+            // Prepare
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            FXMLInclude include = new FXMLInclude(
+                    FXMLRootIdentifier.INSTANCE, "/examples/SubDocument.fxml",
+                    StandardCharsets.UTF_8, Optional.empty(), lazy);
+
+            // Act
+            invokeWithValue(include, "/examples/", getRootPath());
+
+            // Assert
+            assertThat(lazy.get()).isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "SubDocument");
+        }
+
+        /// Verifies that the `AbstractFXMLValue` overload recurses into the values of an [FXMLCollection],
+        /// loading any nested [FXMLInclude] documents found within.
+        @Test
+        void valueOverloadRecursesIntoCollection() throws Exception {
+            // Prepare
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            FXMLInclude include = new FXMLInclude(
+                    FXMLRootIdentifier.INSTANCE, "/examples/SubDocument.fxml",
+                    StandardCharsets.UTF_8, Optional.empty(), lazy);
+            FXMLCollection collection = new FXMLCollection(
+                    FXMLRootIdentifier.INSTANCE, FXMLType.of(ObservableList.class),
+                    Optional.empty(), List.of(include));
+
+            // Act
+            invokeWithValue(collection, "/examples/", getRootPath());
+
+            // Assert
+            assertThat(lazy.get()).isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "SubDocument");
+        }
+
+        /// Verifies that the `AbstractFXMLValue` overload recurses into the entries of an [FXMLMap],
+        /// loading any nested [FXMLInclude] documents found within.
+        @Test
+        void valueOverloadRecursesIntoMap() throws Exception {
+            // Prepare
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            FXMLInclude include = new FXMLInclude(
+                    FXMLRootIdentifier.INSTANCE, "/examples/SubDocument.fxml",
+                    StandardCharsets.UTF_8, Optional.empty(), lazy);
+            FXMLLiteral key = new FXMLLiteral("key");
+            FXMLMap map = new FXMLMap(
+                    FXMLRootIdentifier.INSTANCE, FXMLType.of(HashMap.class),
+                    FXMLType.of(String.class), FXMLType.of(Object.class),
+                    Optional.empty(), Map.of(key, include));
+
+            // Act
+            invokeWithValue(map, "/examples/", getRootPath());
+
+            // Assert
+            assertThat(lazy.get()).isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "SubDocument");
+        }
+
+        /// Verifies that the `AbstractFXMLValue` overload recurses into the properties of an [FXMLObject],
+        /// loading any nested [FXMLInclude] documents found within.
+        @Test
+        void valueOverloadRecursesIntoObject() throws Exception {
+            // Prepare
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            FXMLInclude include = new FXMLInclude(
+                    FXMLRootIdentifier.INSTANCE, "/examples/SubDocument.fxml",
+                    StandardCharsets.UTF_8, Optional.empty(), lazy);
+            FXMLObject object = new FXMLObject(
+                    FXMLRootIdentifier.INSTANCE, FXMLType.of(VBox.class), Optional.empty(),
+                    List.of(new FXMLObjectProperty("include", "setInclude", FXMLType.of(Object.class), include)));
+
+            // Act
+            invokeWithValue(object, "/examples/", getRootPath());
+
+            // Assert
+            assertThat(lazy.get()).isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "SubDocument");
+        }
+
+        /// Verifies that the `AbstractFXMLValue` overload is a no-op for all leaf value types:
+        /// [FXMLLiteral], [FXMLReference], [FXMLResource], [FXMLTranslation], [FXMLExpression],
+        /// [FXMLInlineScript], [FXMLConstant], [FXMLCopy], [FXMLMethod], and [FXMLValue].
+        @Test
+        void valueOverloadIsNoOpForLeafTypes() throws Exception {
+            // Act and Assert — none of these should throw
+            invokeWithValue(new FXMLLiteral("hello"), "/examples/", getRootPath());
+            invokeWithValue(new FXMLReference("myId"), "/examples/", getRootPath());
+            invokeWithValue(new FXMLTranslation("key"), "/examples/", getRootPath());
+            invokeWithValue(new FXMLResource("/img/icon.png"), "/examples/", getRootPath());
+            invokeWithValue(new FXMLExpression("myExpr"), "/examples/", getRootPath());
+            invokeWithValue(new FXMLInlineScript("doSomething()"), "/examples/", getRootPath());
+            invokeWithValue(
+                    new FXMLConstant(new FXMLClassType(String.class), "CASE_INSENSITIVE_ORDER", FXMLType.of(String.class)),
+                    "/examples/", getRootPath());
+            invokeWithValue(
+                    new FXMLCopy(FXMLRootIdentifier.INSTANCE, new FXMLExposedIdentifier("source")),
+                    "/examples/", getRootPath());
+            invokeWithValue(
+                    new FXMLMethod("onAction", List.of(), FXMLType.of(void.class)),
+                    "/examples/", getRootPath());
+            invokeWithValue(
+                    new FXMLValue(Optional.of(FXMLRootIdentifier.INSTANCE), FXMLType.of(String.class), "raw"),
+                    "/examples/", getRootPath());
+        }
+
+        /// Verifies that the `FXMLProperty` overload recurses into the values of an [FXMLCollectionProperties],
+        /// loading any nested [FXMLInclude] documents found within.
+        @Test
+        void propertyOverloadRecursesIntoCollectionProperties() throws Exception {
+            // Prepare
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            FXMLInclude include = new FXMLInclude(
+                    FXMLRootIdentifier.INSTANCE, "/examples/SubDocument.fxml",
+                    StandardCharsets.UTF_8, Optional.empty(), lazy);
+            FXMLCollectionProperties prop = new FXMLCollectionProperties(
+                    "children", "getChildren", FXMLType.of(ObservableList.class),
+                    FXMLType.of(Node.class), List.of(include), Optional.empty());
+
+            // Act
+            invokeWithProperty(prop, "/examples/", getRootPath());
+
+            // Assert
+            assertThat(lazy.get()).isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "SubDocument");
+        }
+
+        /// Verifies that the `FXMLProperty` overload recurses into the value of an [FXMLConstructorProperty],
+        /// loading any nested [FXMLInclude] documents found within.
+        @Test
+        void propertyOverloadRecursesIntoConstructorProperty() throws Exception {
+            // Prepare
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            FXMLInclude include = new FXMLInclude(
+                    FXMLRootIdentifier.INSTANCE, "/examples/SubDocument.fxml",
+                    StandardCharsets.UTF_8, Optional.empty(), lazy);
+            FXMLConstructorProperty prop = new FXMLConstructorProperty(
+                    "value", FXMLType.of(Object.class), include);
+
+            // Act
+            invokeWithProperty(prop, "/examples/", getRootPath());
+
+            // Assert
+            assertThat(lazy.get()).isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "SubDocument");
+        }
+
+        /// Verifies that the `FXMLProperty` overload recurses into the entries of an [FXMLMapProperty],
+        /// loading any nested [FXMLInclude] documents found within.
+        @Test
+        void propertyOverloadRecursesIntoMapProperty() throws Exception {
+            // Prepare
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            FXMLInclude include = new FXMLInclude(
+                    FXMLRootIdentifier.INSTANCE, "/examples/SubDocument.fxml",
+                    StandardCharsets.UTF_8, Optional.empty(), lazy);
+            FXMLLiteral key = new FXMLLiteral("key");
+            FXMLMapProperty prop = new FXMLMapProperty(
+                    "properties", "getProperties", FXMLType.of(ObservableMap.class),
+                    FXMLType.of(String.class), FXMLType.of(Object.class),
+                    Map.of(key, include), Optional.empty());
+
+            // Act
+            invokeWithProperty(prop, "/examples/", getRootPath());
+
+            // Assert
+            assertThat(lazy.get()).isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "SubDocument");
+        }
+
+        /// Verifies that the `FXMLProperty` overload recurses into the value of an [FXMLObjectProperty],
+        /// loading any nested [FXMLInclude] documents found within.
+        @Test
+        void propertyOverloadRecursesIntoObjectProperty() throws Exception {
+            // Prepare
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            FXMLInclude include = new FXMLInclude(
+                    FXMLRootIdentifier.INSTANCE, "/examples/SubDocument.fxml",
+                    StandardCharsets.UTF_8, Optional.empty(), lazy);
+            FXMLObjectProperty prop = new FXMLObjectProperty(
+                    "graphic", "setGraphic", FXMLType.of(Node.class), include);
+
+            // Act
+            invokeWithProperty(prop, "/examples/", getRootPath());
+
+            // Assert
+            assertThat(lazy.get()).isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "SubDocument");
+        }
+
+        /// Verifies that the `FXMLProperty` overload recurses into the value of an [FXMLStaticObjectProperty],
+        /// loading any nested [FXMLInclude] documents found within.
+        @Test
+        void propertyOverloadRecursesIntoStaticObjectProperty() throws Exception {
+            // Prepare
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            FXMLInclude include = new FXMLInclude(
+                    FXMLRootIdentifier.INSTANCE, "/examples/SubDocument.fxml",
+                    StandardCharsets.UTF_8, Optional.empty(), lazy);
+            FXMLStaticObjectProperty prop = new FXMLStaticObjectProperty(
+                    "vgrow", new FXMLClassType(VBox.class), "setVgrow",
+                    FXMLType.of(Object.class), include);
+
+            // Act
+            invokeWithProperty(prop, "/examples/", getRootPath());
+
+            // Assert
+            assertThat(lazy.get()).isNotNull()
+                    .hasFieldOrPropertyWithValue("className", "SubDocument");
         }
     }
 
