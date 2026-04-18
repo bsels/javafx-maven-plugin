@@ -293,7 +293,7 @@ public class FXMLDocumentParserTest {
                             "type",
                             new FXMLGenericType(ObservableList.class, new FXMLClassType(Node.class))
                     )
-                    .hasFieldOrPropertyWithValue("properties", List.of())
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.empty())
                     // Validate root property values
                     .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
                     .hasSize(1)
@@ -380,7 +380,7 @@ public class FXMLDocumentParserTest {
                             "type",
                             new FXMLGenericType(ObservableList.class, new FXMLClassType(Node.class))
                     )
-                    .hasFieldOrPropertyWithValue("properties", List.of())
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.empty())
                     // Validate root property values
                     .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
                     .hasSize(1)
@@ -459,7 +459,7 @@ public class FXMLDocumentParserTest {
                             "type",
                             new FXMLGenericType(ObservableList.class, new FXMLClassType(Node.class))
                     )
-                    .hasFieldOrPropertyWithValue("properties", List.of())
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.empty())
                     // Validate children values
                     .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
                     .hasSize(3)
@@ -907,7 +907,7 @@ public class FXMLDocumentParserTest {
                     .first(InstanceOfAssertFactories.type(FXMLCollectionProperties.class))
                     .hasFieldOrPropertyWithValue("name", "children")
                     .hasFieldOrPropertyWithValue("getter", "getChildren")
-                    .hasFieldOrPropertyWithValue("properties", List.of())
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.empty())
                     .hasFieldOrPropertyWithValue(
                             "type",
                             new FXMLGenericType(ObservableList.class, new FXMLClassType(Node.class))
@@ -1079,7 +1079,7 @@ public class FXMLDocumentParserTest {
                             "type",
                             new FXMLGenericType(ObservableList.class, new FXMLClassType(Node.class))
                     )
-                    .hasFieldOrPropertyWithValue("properties", List.of())
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.empty())
                     // Validate children's values
                     .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
                     .hasSize(1)
@@ -1158,7 +1158,7 @@ public class FXMLDocumentParserTest {
                             "type",
                             new FXMLGenericType(ObservableList.class, new FXMLClassType(Node.class))
                     )
-                    .hasFieldOrPropertyWithValue("properties", List.of())
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.empty())
                     // Validate children's values
                     .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
                     .hasSize(1)
@@ -1307,7 +1307,7 @@ public class FXMLDocumentParserTest {
                             "type",
                             new FXMLGenericType(ObservableList.class, new FXMLClassType(Node.class))
                     )
-                    .hasFieldOrPropertyWithValue("properties", List.of())
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.empty())
                     // Validate children values
                     .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
                     .hasSize(2)
@@ -1665,6 +1665,29 @@ public class FXMLDocumentParserTest {
     class CoverageTests {
 
         @Test
+        void mapWithOnChange() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/MapWithOnChange.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document.root())
+                    .isInstanceOf(FXMLObject.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLObject.class))
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .filteredOn(p -> p.name().equals("properties"))
+                    .first()
+                    .isInstanceOf(FXMLMapProperty.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLMapProperty.class))
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.of("onPropertiesChange"))
+                    .extracting(FXMLMapProperty::value)
+                    .asInstanceOf(InstanceOfAssertFactories.MAP)
+                    .hasSize(2);
+        }
+
+        @Test
         void mapWithLambda() throws MojoExecutionException {
             // Prepare
             ParsedFXML parsedFXML = readFXML("/examples/MapWithLambda.fxml");
@@ -1715,7 +1738,38 @@ public class FXMLDocumentParserTest {
                     .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
                     .filteredOn(p -> p.name().equals("children"))
                     .first()
-                    .isInstanceOf(FXMLCollectionProperties.class);
+                    .isInstanceOf(FXMLCollectionProperties.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLCollectionProperties.class))
+                    .satisfies(p -> {
+                        assertThat(p.onChangeListener()).contains("#childrenListener");
+                        // Check the fx:include in the collection
+                        assertThat(p.value())
+                                .first()
+                                .isInstanceOf(FXMLInclude.class)
+                                .asInstanceOf(InstanceOfAssertFactories.type(FXMLInclude.class))
+                                .satisfies(include -> {
+                                    assertThat(include.sourceFile()).isEqualTo("/examples/SubDocument.fxml");
+                                    assertThat(include.lazyLoadedDocument().get()).isNotNull();
+                                });
+                    });
+
+            // Verify properties map (String element without fx:value uses element name as key)
+            assertThat(document.root())
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLObject.class))
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .filteredOn(p -> p.name().equals("properties"))
+                    .first()
+                    .isInstanceOf(FXMLMapProperty.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLMapProperty.class))
+                    .extracting(FXMLMapProperty::value, MAP_VALUES_ASSERT_FACTORY)
+                    .hasEntrySatisfying(new FXMLLiteral("String"), val -> assertThat(val)
+                            .isInstanceOf(FXMLInclude.class)
+                            .asInstanceOf(InstanceOfAssertFactories.type(FXMLInclude.class))
+                            .satisfies(include -> {
+                                assertThat(include.sourceFile()).isEqualTo("/examples/SubDocument.fxml");
+                                assertThat(include.lazyLoadedDocument().get()).isNotNull();
+                            })
+                    );
         }
 
         @Test

@@ -961,7 +961,7 @@ public final class FXMLSourceCodeBuilder {
                     _,
                     FXMLType elementClassType,
                     List<AbstractFXMLValue> value,
-                    List<FXMLProperty> properties
+                    _
             ) -> {
                 String collectionSelection = "%s.%s()".formatted(identifier, getter);
                 value.forEach(v -> sourceCode.append(collectionSelection)
@@ -969,7 +969,6 @@ public final class FXMLSourceCodeBuilder {
                         .append(typeHelper.encodeFXMLValue(context, v, elementClassType))
                         .append(");\n"));
                 value.forEach(v -> addConstructorEpilogue(context, v));
-                properties.forEach(p -> addConstructorEpilogue(context, collectionSelection, p));
             }
             case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> addConstructorEpilogue(context, value);
             case FXMLMapProperty(
@@ -978,7 +977,8 @@ public final class FXMLSourceCodeBuilder {
                     _,
                     FXMLType rawKeyClass,
                     FXMLType rawValueClass,
-                    Map<FXMLLiteral, AbstractFXMLValue> value
+                    Map<FXMLLiteral, AbstractFXMLValue> value,
+                    _
             ) -> {
                 value.forEach((k, v) -> sourceCode.append(identifier)
                         .append('.')

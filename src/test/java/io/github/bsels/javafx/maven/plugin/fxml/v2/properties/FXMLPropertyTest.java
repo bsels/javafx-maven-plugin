@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -119,7 +120,7 @@ class FXMLPropertyTest {
                     FXMLType.of(List.class, List.of(stringType)),
                     stringType,
                     List.of(literalValue),
-                    List.of()
+                    Optional.of("onChanged")
             );
             assertThat(prop)
                     .hasFieldOrPropertyWithValue("name", "name")
@@ -127,11 +128,11 @@ class FXMLPropertyTest {
                     .hasFieldOrPropertyWithValue("type", FXMLType.of(List.class, List.of(stringType)))
                     .hasFieldOrPropertyWithValue("elementType", stringType)
                     .hasFieldOrPropertyWithValue("value", List.of(literalValue))
-                    .hasFieldOrPropertyWithValue("properties", List.of());
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.of("onChanged"));
         }
 
         @Test
-        void shouldHandleNullLists() {
+        void shouldHandleNullListsAndOptional() {
             FXMLCollectionProperties prop = new FXMLCollectionProperties(
                     "name",
                     "getProp",
@@ -141,7 +142,7 @@ class FXMLPropertyTest {
                     null
             );
             assertThat(prop.value()).isEmpty();
-            assertThat(prop.properties()).isEmpty();
+            assertThat(prop.onChangeListener()).isEmpty();
         }
 
         @Test
@@ -152,7 +153,7 @@ class FXMLPropertyTest {
                     FXMLType.of(List.class, List.of(stringType)),
                     stringType,
                     List.of(),
-                    List.of()
+                    Optional.empty()
             )).isInstanceOf(NullPointerException.class).hasMessage("`name` must not be null");
             assertThatThrownBy(() -> new FXMLCollectionProperties(
                     "n",
@@ -160,7 +161,7 @@ class FXMLPropertyTest {
                     FXMLType.of(List.class, List.of(stringType)),
                     stringType,
                     List.of(),
-                    List.of()
+                    Optional.empty()
             )).isInstanceOf(NullPointerException.class).hasMessage("`getter` must not be null");
             assertThatThrownBy(() -> new FXMLCollectionProperties(
                     "n",
@@ -168,7 +169,7 @@ class FXMLPropertyTest {
                     null,
                     stringType,
                     List.of(),
-                    List.of()
+                    Optional.empty()
             )).isInstanceOf(NullPointerException.class).hasMessage("`type` must not be null");
             assertThatThrownBy(() -> new FXMLCollectionProperties(
                     "n",
@@ -176,7 +177,7 @@ class FXMLPropertyTest {
                     FXMLType.of(List.class, List.of(stringType)),
                     null,
                     List.of(),
-                    List.of()
+                    Optional.empty()
             )).isInstanceOf(NullPointerException.class).hasMessage("`elementType` must not be null");
         }
     }
@@ -191,7 +192,8 @@ class FXMLPropertyTest {
                     stringType,
                     stringType,
                     stringType,
-                    Map.of(new FXMLLiteral("k"), literalValue)
+                    Map.of(new FXMLLiteral("k"), literalValue),
+                    Optional.of("listener")
             );
             assertThat(prop)
                     .hasFieldOrPropertyWithValue("name", "name")
@@ -199,7 +201,8 @@ class FXMLPropertyTest {
                     .hasFieldOrPropertyWithValue("type", stringType)
                     .hasFieldOrPropertyWithValue("keyType", stringType)
                     .hasFieldOrPropertyWithValue("valueType", stringType)
-                    .hasFieldOrPropertyWithValue("value", Map.of(new FXMLLiteral("k"), literalValue));
+                    .hasFieldOrPropertyWithValue("value", Map.of(new FXMLLiteral("k"), literalValue))
+                    .hasFieldOrPropertyWithValue("onChangeListener", Optional.of("listener"));
         }
 
         @Test
@@ -210,9 +213,11 @@ class FXMLPropertyTest {
                     stringType,
                     stringType,
                     stringType,
-                    null
+                    null,
+                    Optional.empty()
             );
             assertThat(prop.value()).isEmpty();
+            assertThat(prop.onChangeListener()).isEmpty();
         }
 
         @Test
@@ -223,7 +228,8 @@ class FXMLPropertyTest {
                     stringType,
                     stringType,
                     stringType,
-                    Map.of()
+                    Map.of(),
+                    Optional.empty()
             ))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`name` must not be null");
@@ -233,7 +239,8 @@ class FXMLPropertyTest {
                     stringType,
                     stringType,
                     stringType,
-                    Map.of()
+                    Map.of(),
+                    Optional.empty()
             ))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`getter` must not be null");
@@ -243,7 +250,8 @@ class FXMLPropertyTest {
                     null,
                     stringType,
                     stringType,
-                    Map.of()
+                    Map.of(),
+                    Optional.empty()
             ))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`type` must not be null");
@@ -253,7 +261,8 @@ class FXMLPropertyTest {
                     stringType,
                     null,
                     stringType,
-                    Map.of()
+                    Map.of(),
+                    Optional.empty()
             ))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`keyType` must not be null");
@@ -263,10 +272,22 @@ class FXMLPropertyTest {
                     stringType,
                     stringType,
                     null,
-                    Map.of()
+                    Map.of(),
+                    Optional.empty()
             ))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`valueType` must not be null");
+            assertThatThrownBy(() -> new FXMLMapProperty(
+                    "n",
+                    "g",
+                    stringType,
+                    stringType,
+                    stringType,
+                    Map.of(),
+                    null
+            ))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`onChangeListener` must not be null");
         }
     }
 

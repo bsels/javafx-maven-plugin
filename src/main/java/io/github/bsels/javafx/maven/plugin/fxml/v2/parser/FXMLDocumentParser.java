@@ -43,6 +43,9 @@ import io.github.bsels.javafx.maven.plugin.io.FXMLReader;
 import io.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import io.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
 import io.github.bsels.javafx.maven.plugin.utils.Utils;
+import javafx.collections.ObservableList;
+import javafx.collections.ObservableMap;
+import javafx.collections.ObservableSet;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.logging.Log;
 
@@ -454,7 +457,7 @@ public final class FXMLDocumentParser {
         Map<String, String> properties = structure.properties();
         Map<FXMLLiteral, AbstractFXMLValue> entries = properties.entrySet()
                 .stream()
-                .filter(entry -> FXMLUtils.hasNonSkippablePrefix(entry.getKey()))
+                .filter(entry -> FXMLUtils.hasNonSkippablePrefix(entry.getKey()) && !entry.getKey().equals("onChange"))
                 .collect(Collectors.toMap(
                         entry -> new FXMLLiteral(entry.getKey()),
                         entry -> parseValueString(entry.getValue(), expectedType, buildContext),
@@ -592,7 +595,7 @@ public final class FXMLDocumentParser {
             FXMLUtils.resolveDefaultPropertyName(clazz)
                     .flatMap(name -> helper.findObjectProperty(context.buildContext(), clazz, name))
                     .flatMap(property -> handleObjectPropertyOrCollectionProperties(
-                            context.buildContext(), property, Map.of(), defaultPropertyValues
+                            property, Map.of(), defaultPropertyValues
                     ))
                     .ifPresent(properties::add);
         }
@@ -668,7 +671,7 @@ public final class FXMLDocumentParser {
             parsedValue = parseValueString(value, property.type(), buildContext);
         }
         return handleObjectPropertyOrCollectionProperties(
-                buildContext, property, Map.of(), List.of(parsedValue)
+                property, Map.of(), List.of(parsedValue)
         );
         // endregion
     }
@@ -745,18 +748,23 @@ public final class FXMLDocumentParser {
             FXMLType keyType = FXMLUtils.findMapKeyTypeFromHierarchy(property.type());
             FXMLType valueType = FXMLUtils.findMapValueTypeFromHierarchy(property.type());
             Map<FXMLLiteral, AbstractFXMLValue> entries = parseMapEntries(value, valueType, buildContext);
+            Optional<String> onChangeListener = Optional.empty();
+            if (ObservableMap.class.isAssignableFrom(rawType) && value.properties().containsKey("onChange")) {
+                onChangeListener = Optional.of(value.properties().get("onChange"));
+            }
             return Optional.of(new FXMLMapProperty(
                     property.name(),
                     property.methodName().orElseThrow(),
                     property.type(),
                     keyType,
                     valueType,
-                    entries
+                    entries,
+                    onChangeListener
             ));
         }
         // endregion
         List<AbstractFXMLValue> values = parseChildrenAsValues(buildContext, value);
-        return handleObjectPropertyOrCollectionProperties(buildContext, property, value.properties(), values);
+        return handleObjectPropertyOrCollectionProperties(property, value.properties(), values);
     }
 
     /// Parses the children of the given XML structure into a list of AbstractFXMLValue instances.
@@ -774,14 +782,12 @@ public final class FXMLDocumentParser {
 
     /// Handles object property or collection properties based on the property type.
     ///
-    /// @param buildContext The build context
     /// @param property     The [ObjectProperty] definition
     /// @param attributes   The XML attributes of the property element
     /// @param values       The list of values to assign to the property
     /// @return An [Optional] containing the resolved [FXMLProperty]
     /// @throws IllegalArgumentException If multiple values are provided for a non-collection property
     private Optional<FXMLProperty> handleObjectPropertyOrCollectionProperties(
-            BuildContext buildContext,
             ObjectProperty property,
             Map<String, String> attributes,
             List<AbstractFXMLValue> values
@@ -793,13 +799,18 @@ public final class FXMLDocumentParser {
         }
         // region: collection
         if (Collection.class.isAssignableFrom(rawType) && property.methodType() == ObjectProperty.MethodType.GETTER) {
+            Optional<String> onChangeListener = Optional.empty();
+            if ((ObservableList.class.isAssignableFrom(rawType) || ObservableSet.class.isAssignableFrom(rawType))
+                    && attributes.containsKey("onChange")) {
+                onChangeListener = Optional.of(attributes.get("onChange"));
+            }
             return Optional.of(new FXMLCollectionProperties(
                             property.name(),
                             property.methodName().orElseThrow(),
                             property.type(),
                             FXMLUtils.findCollectionValueTypeFromHierarchy(property.type()),
                             values,
-                            parseAttributesProperties(rawType, buildContext, attributes)
+                            onChangeListener
                     )
             );
         }
@@ -970,13 +981,11 @@ public final class FXMLDocumentParser {
     /// @param rootPath     The root path of the project
     private void loadIncludeFXMLDocuments(FXMLProperty property, String resourcePath, Path rootPath) {
         switch (property) {
-            case FXMLCollectionProperties(_, _, _, _, List<AbstractFXMLValue> value, List<FXMLProperty> properties) -> {
-                value.forEach(value1 -> loadIncludeFXMLDocuments(value1, resourcePath, rootPath));
-                properties.forEach(property1 -> loadIncludeFXMLDocuments(property1, resourcePath, rootPath));
-            }
+            case FXMLCollectionProperties(_, _, _, _, List<AbstractFXMLValue> value, _) ->
+                    value.forEach(value1 -> loadIncludeFXMLDocuments(value1, resourcePath, rootPath));
             case FXMLConstructorProperty(_, _, AbstractFXMLValue value) ->
                     loadIncludeFXMLDocuments(value, resourcePath, rootPath);
-            case FXMLMapProperty(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> value) -> value.values()
+            case FXMLMapProperty(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> value, _) -> value.values()
                     .forEach(value1 -> loadIncludeFXMLDocuments(value1, resourcePath, rootPath));
             case FXMLObjectProperty(_, _, _, AbstractFXMLValue value) ->
                     loadIncludeFXMLDocuments(value, resourcePath, rootPath);

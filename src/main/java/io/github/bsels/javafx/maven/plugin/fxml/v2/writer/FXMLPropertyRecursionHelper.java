@@ -39,14 +39,10 @@ final class FXMLPropertyRecursionHelper {
         Objects.requireNonNull(property, "`property` must not be null");
         Objects.requireNonNull(valueWalk, "`valueWalk` must not be null");
         return switch (property) {
-            case FXMLCollectionProperties(_, _, _, _, List<AbstractFXMLValue> values, List<FXMLProperty> properties) ->
-                    Stream.concat(
-                            values.stream()
-                                    .flatMap(value -> valueWalk.apply(value, context)),
-                            walk(properties, valueWalk, context)
-                    );
+            case FXMLCollectionProperties(_, _, _, _, List<AbstractFXMLValue> values, _) ->
+                    values.stream().flatMap(value -> valueWalk.apply(value, context));
             case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> valueWalk.apply(value, context);
-            case FXMLMapProperty(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> values) -> values.values()
+            case FXMLMapProperty(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> values, _) -> values.values()
                     .stream()
                     .flatMap(value -> valueWalk.apply(value, context));
             case FXMLObjectProperty(_, _, _, AbstractFXMLValue value) -> valueWalk.apply(value, context);
