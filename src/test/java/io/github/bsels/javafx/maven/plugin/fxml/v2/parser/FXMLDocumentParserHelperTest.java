@@ -3,6 +3,7 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLConstants;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLInterface;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.Visibility;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
@@ -367,15 +368,17 @@ class FXMLDocumentParserHelperTest {
                     .isEqualTo(FXMLType.wildcard());
         }
 
-        /// Verifies that a [GenericArrayType] (default branch) throws [IllegalStateException] since it is unsupported.
+        /// Verifies that a [GenericArrayType] falls back to the raw array class via the default branch.
         @Test
-        void genericArrayTypeThrowsIllegalStateException() throws Exception {
+        void genericArrayTypeFallsBackToRawArrayClass() throws Exception {
             class Holder {
                 List<String>[] field;
             }
             var genericArrayType = Holder.class.getDeclaredField("field").getGenericType();
-            assertThatThrownBy(() -> helper.buildFXMLType(genericArrayType, buildContext))
-                    .isInstanceOf(IllegalStateException.class);
+            // List<String>[] should return List[].class
+            assertThat(helper.buildFXMLType(genericArrayType, buildContext))
+                    .isInstanceOf(FXMLClassType.class)
+                    .hasFieldOrPropertyWithValue("clazz", List[].class);
         }
     }
 
@@ -659,6 +662,21 @@ class FXMLDocumentParserHelperTest {
             ))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("must be a functional interface");
+        }
+
+        /// Verifies that a generic functional interface ([EventHandler]&lt;ActionEvent&gt;) resolves correctly,
+        /// exercising the [FXMLGenericType] branch that maps type parameters.
+        @Test
+        void genericFunctionalInterfaceResolvesCorrectly() {
+            FXMLType genericParamType = FXMLType.of(EventHandler.class, List.of(FXMLType.of(ActionEvent.class)));
+            assertThat(helper.findMethodReferenceType("onAction", genericParamType, buildContext))
+                    .isNotNull()
+                    .hasFieldOrPropertyWithValue("name", "onAction")
+                    .satisfies(method -> assertThat(method.parameters())
+                            .hasSize(1)
+                            .first()
+                            .isInstanceOf(FXMLClassType.class)
+                            .hasFieldOrPropertyWithValue("clazz", ActionEvent.class));
         }
     }
 
@@ -1026,6 +1044,163 @@ class FXMLDocumentParserHelperTest {
         }
     }
 
+
+    // -------------------------------------------------------------------------
+    // parseInterfaces tests
+    // -------------------------------------------------------------------------
+
+    /// Tests for [FXMLDocumentParserHelper#parseInterfaces] and its private helpers.
+    @Nested
+    class ParseInterfacesTest {
+
+        /// Verifies that a null `comments` throws [NullPointerException].
+        @Test
+        void nullCommentsThrowsNullPointerException() {
+            assertThatThrownBy(() -> helper.parseInterfaces(null, buildContext))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessageContaining("`comments` must not be null");
+        }
+
+        /// Verifies that a null `buildContext` throws [NullPointerException].
+        @Test
+        void nullBuildContextThrowsNullPointerException() {
+            assertThatThrownBy(() -> helper.parseInterfaces(List.of(), null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessageContaining("`buildContext` must not be null");
+        }
+
+        /// Verifies that an empty comment list returns an empty list.
+        @Test
+        void emptyCommentsReturnsEmptyList() {
+            assertThat(helper.parseInterfaces(List.of(), buildContext)).isEmpty();
+        }
+
+        /// Verifies that a non-matching comment is silently ignored.
+        @Test
+        void nonMatchingCommentIsIgnored() {
+            assertThat(helper.parseInterfaces(List.of("not an interface comment"), buildContext)).isEmpty();
+        }
+
+        /// Verifies the [FXMLClassType] branch: a compiled interface without generics.
+        @Test
+        void compiledInterfaceWithoutGenericsIsResolved() {
+            BuildContext ctx = new BuildContext(
+                    List.of(Runnable.class.getName()),
+                    "/"
+            );
+            List<FXMLInterface> result = helper.parseInterfaces(
+                    List.of("interface : Runnable"),
+                    ctx
+            );
+            assertThat(result)
+                    .hasSize(1)
+                    .first()
+                    .hasFieldOrPropertyWithValue("type", FXMLType.of(Runnable.class))
+                    .satisfies(iface -> assertThat(iface.methods()).isNotEmpty());
+        }
+
+        /// Verifies the [FXMLGenericType] branch: a compiled generic interface.
+        @Test
+        void compiledGenericInterfaceIsResolved() {
+            BuildContext ctx = new BuildContext(
+                    List.of(java.util.function.Function.class.getName(), String.class.getName(), Integer.class.getName()),
+                    "/"
+            );
+            List<FXMLInterface> result = helper.parseInterfaces(
+                    List.of("interface : Function<String, Integer>"),
+                    ctx
+            );
+            assertThat(result)
+                    .hasSize(1)
+                    .first()
+                    .satisfies(iface -> {
+                        assertThat(iface.type()).isInstanceOf(FXMLGenericType.class);
+                        assertThat(iface.methods()).isNotEmpty();
+                    });
+        }
+
+        /// Verifies the uncompiled branch: an interface not on the classpath uses method signatures from the comment.
+        @Test
+        void uncompiledInterfaceWithMethodsFromComment() {
+            BuildContext ctx = new BuildContext(List.of(), "/");
+            List<FXMLInterface> result = helper.parseInterfaces(
+                    List.of("interface : com.example.MyListener; methods : void onEvent(\nString)"),
+                    ctx
+            );
+            assertThat(result)
+                    .hasSize(1)
+                    .first()
+                    .satisfies(iface -> {
+                        assertThat(iface.type()).isInstanceOf(
+                                io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType.class
+                        );
+                        assertThat(iface.methods())
+                                .hasSize(1)
+                                .first()
+                                .hasFieldOrPropertyWithValue("name", "onEvent");
+                    });
+        }
+
+        /// Verifies that an interface method with no parameters is parsed correctly.
+        @Test
+        void uncompiledInterfaceMethodWithNoParameters() {
+            BuildContext ctx = new BuildContext(List.of(), "/");
+            List<FXMLInterface> result = helper.parseInterfaces(
+                    List.of("interface : com.example.MyListener; methods : void run(\n)"),
+                    ctx
+            );
+            assertThat(result)
+                    .hasSize(1)
+                    .first()
+                    .satisfies(iface -> assertThat(iface.methods())
+                            .hasSize(1)
+                            .first()
+                            .hasFieldOrPropertyWithValue("name", "run")
+                            .satisfies(m -> assertThat(m.parameterTypes()).isEmpty()));
+        }
+
+        /// Verifies that multiple method signatures separated by semicolons are all parsed.
+        @Test
+        void uncompiledInterfaceWithMultipleMethods() {
+            BuildContext ctx = new BuildContext(List.of(), "/");
+            List<FXMLInterface> result = helper.parseInterfaces(
+                    List.of("interface : com.example.MyListener; methods : void onStart(\n); void onStop\n()"),
+                    ctx
+            );
+            assertThat(result)
+                    .hasSize(1)
+                    .first()
+                    .satisfies(iface -> assertThat(iface.methods())
+                            .hasSize(2)
+                            .extracting(FXMLControllerMethod::name)
+                            .containsExactly("onStart", "onStop"));
+        }
+
+        /// Verifies that [findMethodsOfInterface] throws when generic type count mismatches.
+        @Test
+        void compiledGenericInterfaceWithWrongGenericCountThrows() {
+            // Function<T,R> has 2 type params; providing 1 should throw
+            BuildContext ctx = new BuildContext(
+                    List.of(java.util.function.Function.class.getName(), String.class.getName()),
+                    "/"
+            );
+            // Manually craft a comment that resolves to FXMLGenericType with 1 arg for Function (needs 2)
+            // We do this by providing a raw uncompiled generic that matches FXMLGenericType pattern
+            // but with wrong count — easiest is to use a real class with 1 param vs 2 expected
+            // Use Comparator<String> (1 param) but pass 2 args via uncompiled trick:
+            // Actually the easiest path: use a compiled interface with 1 type param but supply 2 args
+            // java.util.Comparator<T> has 1 param; supply 2 args
+            BuildContext ctx2 = new BuildContext(
+                    List.of(java.util.Comparator.class.getName(), String.class.getName(), Integer.class.getName()),
+                    "/"
+            );
+            assertThatThrownBy(() -> helper.parseInterfaces(
+                    List.of("interface : Comparator<String, Integer>"),
+                    ctx2
+            )).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("does not match the number of type parameters");
+        }
+    }
 
     // -------------------------------------------------------------------------
     // constructGenericType

@@ -4,6 +4,7 @@ import javafx.beans.NamedArg;
 import javafx.scene.Node;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
@@ -85,13 +86,21 @@ public final class Utils {
 
     /// Resolves the raw class type associated with a [Type].
     /// If the type is a [ParameterizedType], it retrieves its raw type.
+    /// If the type is a [GenericArrayType], it retrieves the raw array class.
     /// If the final type is not a [Class], it throws an [IllegalStateException].
     ///
     /// @param type The type to evaluate
     /// @return The class object associated with the provided type
     /// @throws IllegalStateException If the type cannot be resolved to a class
     public static Class<?> getClassType(Type type) {
-        Type finalType = type instanceof ParameterizedType parameterizedType ? parameterizedType.getRawType() : type;
+        Type finalType = switch (type) {
+            case ParameterizedType parameterizedType -> parameterizedType.getRawType();
+            case GenericArrayType genericArrayType -> {
+                Class<?> componentClass = getClassType(genericArrayType.getGenericComponentType());
+                yield componentClass.arrayType();
+            }
+            default -> type;
+        };
         if (!(finalType instanceof Class<?> clazz)) {
             throw new IllegalStateException("Unable to find class type for %s".formatted(type));
         }
