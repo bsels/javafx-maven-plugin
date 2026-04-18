@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.*?>
+<?import java.util.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml">
+    <children onChange="#childrenListener">
+        <!-- fx:include in a collection with a nested property (e.g. alignment) -->
+        <fx:include source="SubDocument.fxml">
+             <VBox.vgrow>ALWAYS</VBox.vgrow>
+        </fx:include>
+    </children>
+    <properties>
+        <String fx:value="key1">
+            <fx:include source="SubDocument.fxml"/>
+        </String>
+    </properties>
+    <fx:define>
+        <!-- fx:include in definitions -->
+        <fx:include source="SubDocument.fxml" fx:id="definedInclude"/>
+    </fx:define>
+</VBox>

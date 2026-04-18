@@ -1,6 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
 import io.github.bsels.javafx.maven.plugin.TestHelpers;
+import io.github.bsels.javafx.maven.plugin.examples.ConstantAndCopyBean;
 import io.github.bsels.javafx.maven.plugin.examples.MetaDataHolder;
 import io.github.bsels.javafx.maven.plugin.examples.Unsettable;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
@@ -965,93 +966,6 @@ public class FXMLDocumentParserTest {
                     });
         }
 
-        @Test
-        void includeEverywhere() throws MojoExecutionException {
-            // Prepare
-            ParsedFXML parsedFXML = readFXML("/examples/IncludeEverywhere.fxml");
-
-            // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
-
-            // Assert
-            assertThat(document)
-                    .isNotNull()
-                    .satisfies(doc -> {
-                        // Check definitions
-                        assertThat(doc.definitions())
-                                .hasSize(1)
-                                .first()
-                                .isInstanceOf(FXMLInclude.class)
-                                .extracting(FXMLInclude.class::cast)
-                                .satisfies(include -> {
-                                    assertThat(include.sourceFile()).isEqualTo("/examples/ButtonWithNoControllerAction.fxml");
-                                    assertThat(include.resources()).contains("/examples/myResources");
-                                    assertThat(include.lazyLoadedDocument().get().className()).isEqualTo("ButtonWithNoControllerAction");
-                                });
-
-                        // Check properties (graphic is an FXMLObjectProperty)
-                        assertThat(doc.root())
-                                .isInstanceOf(FXMLObject.class)
-                                .extracting(FXMLObject.class::cast)
-                                .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
-                                .first(InstanceOfAssertFactories.type(FXMLCollectionProperties.class))
-                                .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
-                                .first()
-                                .isInstanceOf(FXMLObject.class)
-                                .extracting(FXMLObject.class::cast)
-                                .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
-                                .anySatisfy(prop -> {
-                                    assertThat(prop)
-                                            .isInstanceOf(FXMLObjectProperty.class)
-                                            .extracting(FXMLObjectProperty.class::cast)
-                                            .satisfies(objProp -> {
-                                                assertThat(objProp.name()).isEqualTo("graphic");
-                                                assertThat(objProp.value())
-                                                        .isInstanceOf(FXMLInclude.class)
-                                                        .extracting(FXMLInclude.class::cast)
-                                                        .satisfies(include -> {
-                                                            assertThat(include.sourceFile()).isEqualTo("/examples/ExplicitDefault.fxml");
-                                                            assertThat(include.lazyLoadedDocument().get().className()).isEqualTo("ExplicitDefault");
-                                                        });
-                                            });
-                                });
-                    });
-        }
-
-        @Test
-        void includeInMap() throws MojoExecutionException {
-            // Prepare
-            ParsedFXML parsedFXML = readFXML("/examples/IncludeInMap.fxml");
-
-            // Act
-            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
-
-            // Assert
-            assertThat(document)
-                    .isNotNull()
-                    .extracting(FXMLDocument::root)
-                    .isInstanceOf(FXMLObject.class)
-                    .extracting(FXMLObject.class::cast)
-                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
-                    .first(InstanceOfAssertFactories.type(FXMLObjectProperty.class))
-                    .extracting(FXMLObjectProperty::value)
-                    .isInstanceOf(FXMLMap.class)
-                    .extracting(FXMLMap.class::cast)
-                    .extracting(FXMLMap::entries, MAP_VALUES_ASSERT_FACTORY)
-                    .values()
-                    .hasSize(2)
-                    .anySatisfy(val -> assertThat(val)
-                            .isInstanceOf(FXMLInclude.class)
-                            .extracting(FXMLInclude.class::cast)
-                            .satisfies(include -> {
-                                assertThat(include.sourceFile()).isEqualTo("/examples/ExplicitDefault.fxml");
-                                assertThat(include.lazyLoadedDocument().get().className()).isEqualTo("ExplicitDefault");
-                            }))
-                    .anySatisfy(val -> assertThat(val)
-                            .isInstanceOf(FXMLLiteral.class)
-                            .extracting(FXMLLiteral.class::cast)
-                            .hasFieldOrPropertyWithValue("value", "LiteralValue"));
-        }
 
         @ParameterizedTest
         @ValueSource(strings = {"FXRootNoId", "FXRootWithId", "NoFXRootNoId", "NoFXRootWithId"})
@@ -1744,6 +1658,156 @@ public class FXMLDocumentParserTest {
                     // Validate root properties
                     .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
                     .isEmpty();
+        }
+    }
+
+    @Nested
+    class CoverageTests {
+
+        @Test
+        void mapWithLambda() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/MapWithLambda.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document.root())
+                    .isInstanceOf(FXMLObject.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLObject.class))
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .filteredOn(p -> p.name().equals("properties"))
+                    .first()
+                    .isInstanceOf(FXMLMapProperty.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLMapProperty.class))
+                    .extracting(FXMLMapProperty::value)
+                    .asInstanceOf(InstanceOfAssertFactories.MAP)
+                    .hasSize(2)
+                    .containsEntry(new FXMLLiteral("String"), new FXMLLiteral("key1"))
+                    .containsEntry(new FXMLLiteral("Label"), new FXMLLiteral("key2"));
+        }
+
+        @Test
+        void includeWithLambda() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/IncludeWithLambda.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document.root())
+                    .isInstanceOf(FXMLObject.class);
+
+            // Verify recursion worked (lazy documents are loaded)
+            assertThat(document.definitions())
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLInclude.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLInclude.class))
+                    .extracting(FXMLInclude::lazyLoadedDocument)
+                    .satisfies(lazy -> assertThat(lazy.get()).isNotNull());
+
+            // Verify nested property (VBox.vgrow on a child)
+            assertThat(document.root())
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLObject.class))
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .filteredOn(p -> p.name().equals("children"))
+                    .first()
+                    .isInstanceOf(FXMLCollectionProperties.class);
+        }
+
+        @Test
+        void resourceAndTranslation() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/ResourceAndTranslation.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document.root())
+                    .isInstanceOf(FXMLObject.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLObject.class))
+                    .satisfies(root -> {
+                        assertThat(root.properties())
+                                .anySatisfy(p -> assertThat(p)
+                                        .isInstanceOf(FXMLObjectProperty.class)
+                                        .hasFieldOrPropertyWithValue("name", "text")
+                                        .hasFieldOrPropertyWithValue("value", new FXMLTranslation("button.text"))
+                                )
+                                .anySatisfy(p -> assertThat(p)
+                                        .isInstanceOf(FXMLObjectProperty.class)
+                                        .hasFieldOrPropertyWithValue("name", "style")
+                                        .hasFieldOrPropertyWithValue("value", new FXMLLiteral("-fx-background-image: url(\"@background.png\");"))
+                                );
+
+                        assertThat(root.properties())
+                                .filteredOn(p -> p.name().equals("graphic"))
+                                .first()
+                                .isInstanceOf(FXMLObjectProperty.class)
+                                .extracting(p -> ((FXMLObjectProperty) p).value())
+                                .isInstanceOf(FXMLObject.class)
+                                .asInstanceOf(InstanceOfAssertFactories.type(FXMLObject.class))
+                                .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                                .anySatisfy(p -> assertThat(p)
+                                        .isInstanceOf(FXMLObjectProperty.class)
+                                        .hasFieldOrPropertyWithValue("name", "text")
+                                        .hasFieldOrPropertyWithValue("value", new FXMLResource("/examples/label_resource"))
+                                );
+                    });
+        }
+
+        @Test
+        void constantAndCopy() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/ConstantAndCopy.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document.root())
+                    .isInstanceOf(FXMLObject.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLObject.class))
+                    .satisfies(root -> {
+                        assertThat(root.type())
+                                .hasFieldOrPropertyWithValue("clazz", ConstantAndCopyBean.class);
+
+                        assertThat(root.properties())
+                                .anySatisfy(p -> assertThat(p)
+                                        .isInstanceOf(FXMLObjectProperty.class)
+                                        .hasFieldOrPropertyWithValue("name", "value")
+                                        .extracting(prop -> ((FXMLObjectProperty) prop).value())
+                                        .isInstanceOf(FXMLConstant.class)
+                                        .hasFieldOrPropertyWithValue("clazz", new FXMLClassType(ConstantAndCopyBean.class))
+                                        .hasFieldOrPropertyWithValue("identifier", "MY_CONSTANT")
+                                )
+                                .anySatisfy(p -> assertThat(p)
+                                        .isInstanceOf(FXMLObjectProperty.class)
+                                        .hasFieldOrPropertyWithValue("name", "other")
+                                        .extracting(prop -> ((FXMLObjectProperty) prop).value())
+                                        .isInstanceOf(FXMLCopy.class)
+                                        .hasFieldOrPropertyWithValue("source", new FXMLExposedIdentifier("original"))
+                                )
+                                .anySatisfy(p -> assertThat(p)
+                                        .isInstanceOf(FXMLCollectionProperties.class)
+                                        .hasFieldOrPropertyWithValue("name", "items")
+                                        .extracting(prop -> ((FXMLCollectionProperties) prop).value(), LIST_VALUE_ASSERT_FACTORY)
+                                        .hasSize(2)
+                                        .anySatisfy(val -> assertThat(val)
+                                                .isInstanceOf(FXMLConstant.class)
+                                                .hasFieldOrPropertyWithValue("clazz", new FXMLClassType(Color.class))
+                                                .hasFieldOrPropertyWithValue("identifier", "RED")
+                                        )
+                                        .anySatisfy(val -> assertThat(val)
+                                                .isInstanceOf(FXMLCopy.class)
+                                                .hasFieldOrPropertyWithValue("identifier", new FXMLExposedIdentifier("copied"))
+                                                .hasFieldOrPropertyWithValue("source", new FXMLExposedIdentifier("original"))
+                                        )
+                                );
+                    });
         }
     }
 

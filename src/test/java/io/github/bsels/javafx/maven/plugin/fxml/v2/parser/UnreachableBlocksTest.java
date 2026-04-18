@@ -1,15 +1,12 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
-import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLInclude;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLObject;
 import io.github.bsels.javafx.maven.plugin.io.FXMLReader;
 import io.github.bsels.javafx.maven.plugin.io.ParsedFXML;
 import io.github.bsels.javafx.maven.plugin.io.ParsedXMLStructure;
+import org.apache.maven.monitor.logging.DefaultLog;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.logging.Log;
+import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.MockedConstruction;
@@ -41,7 +38,7 @@ public class UnreachableBlocksTest {
     /// This covers FXMLDocumentParser.java:951.
     @Test
     void shouldRethrowMojoExecutionExceptionAsRuntimeException() {
-        Log log = mock(Log.class);
+        Log log = new DefaultLog(new ConsoleLogger());
         Path rootPath = Path.of("root");
         ParsedXMLStructure rootStructure = new ParsedXMLStructure("Button", Map.of(), List.of(), List.of(), Optional.empty());
         ParsedFXML parsedFXML = new ParsedFXML(Optional.empty(), List.of(), rootStructure, "MyButton");
@@ -80,7 +77,7 @@ public class UnreachableBlocksTest {
     /// This covers FXMLReader.java:111.
     @Test
     void shouldThrowMojoExecutionExceptionWhenFilesLinesFails() {
-        Log log = mock(Log.class);
+        Log log = new DefaultLog(new ConsoleLogger());
         FXMLReader reader = new FXMLReader(log);
         Path fxmlFile = Path.of("nonexistent.fxml");
 
@@ -98,7 +95,7 @@ public class UnreachableBlocksTest {
     /// This covers FXMLReader.java:127.
     @Test
     void shouldThrowMojoExecutionExceptionWhenFilesNewInputStreamFails() {
-        Log log = mock(Log.class);
+        Log log = new DefaultLog(new ConsoleLogger());
         FXMLReader reader = new FXMLReader(log);
         Path fxmlFile = Path.of("nonexistent.fxml");
 
@@ -118,7 +115,7 @@ public class UnreachableBlocksTest {
     /// This covers FXMLReader.java:129.
     @Test
     void shouldRethrowParserConfigurationExceptionAsRuntimeException() {
-        Log log = mock(Log.class);
+        Log log = new DefaultLog(new ConsoleLogger());
         FXMLReader reader = new FXMLReader(log);
         Path fxmlFile = Path.of("dummy.fxml");
 
