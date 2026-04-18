@@ -1923,6 +1923,37 @@ public class FXMLDocumentParserTest {
                     });
         }
 
+        /// Verifies that an `fx:include` element with a `resources` attribute is correctly parsed into an
+        /// [FXMLInclude] with the resolved resource path and the `fx:id` identifier.
+        @Test
+        void includeWithResources() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/IncludeWithResources.fxml");
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document.root())
+                    .isInstanceOf(FXMLObject.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLObject.class))
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .filteredOn(p -> p.name().equals("children"))
+                    .first()
+                    .isInstanceOf(FXMLCollectionProperties.class)
+                    .asInstanceOf(InstanceOfAssertFactories.type(FXMLCollectionProperties.class))
+                    .extracting(FXMLCollectionProperties::value, LIST_VALUE_ASSERT_FACTORY)
+                    .anySatisfy(v -> assertThat(v)
+                            .isInstanceOf(FXMLInclude.class)
+                            .asInstanceOf(InstanceOfAssertFactories.type(FXMLInclude.class))
+                            .hasFieldOrPropertyWithValue("sourceFile", "/examples/SubDocument.fxml")
+                            .hasFieldOrPropertyWithValue("resources", Optional.of("/examples/messages"))
+                            .hasFieldOrPropertyWithValue("charset", StandardCharsets.UTF_8)
+                            .extracting(FXMLInclude::identifier)
+                            .isInstanceOf(FXMLExposedIdentifier.class)
+                            .hasFieldOrPropertyWithValue("name", "includedDoc"));
+        }
+
         @Test
         void constantAndCopy() throws MojoExecutionException {
             // Prepare

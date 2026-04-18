@@ -457,7 +457,7 @@ public final class FXMLDocumentParser {
         Map<String, String> properties = structure.properties();
         Map<FXMLLiteral, AbstractFXMLValue> entries = properties.entrySet()
                 .stream()
-                .filter(entry -> FXMLUtils.hasNonSkippablePrefix(entry.getKey()) && !entry.getKey().equals("onChange"))
+                .filter(entry -> FXMLUtils.hasNonSkippablePrefix(entry.getKey()) && !entry.getKey().equals(FXMLConstants.ON_CHANGE_ATTRIBUTE))
                 .collect(Collectors.toMap(
                         entry -> new FXMLLiteral(entry.getKey()),
                         entry -> parseValueString(entry.getValue(), expectedType, buildContext),
@@ -749,8 +749,8 @@ public final class FXMLDocumentParser {
             FXMLType valueType = FXMLUtils.findMapValueTypeFromHierarchy(property.type());
             Map<FXMLLiteral, AbstractFXMLValue> entries = parseMapEntries(value, valueType, buildContext);
             Optional<String> onChangeListener = Optional.empty();
-            if (ObservableMap.class.isAssignableFrom(rawType) && value.properties().containsKey("onChange")) {
-                onChangeListener = Optional.of(value.properties().get("onChange"));
+            if (ObservableMap.class.isAssignableFrom(rawType) && value.properties().containsKey(FXMLConstants.ON_CHANGE_ATTRIBUTE)) {
+                onChangeListener = Optional.of(value.properties().get(FXMLConstants.ON_CHANGE_ATTRIBUTE));
             }
             return Optional.of(new FXMLMapProperty(
                     property.name(),
@@ -801,8 +801,8 @@ public final class FXMLDocumentParser {
         if (Collection.class.isAssignableFrom(rawType) && property.methodType() == ObjectProperty.MethodType.GETTER) {
             Optional<String> onChangeListener = Optional.empty();
             if ((ObservableList.class.isAssignableFrom(rawType) || ObservableSet.class.isAssignableFrom(rawType))
-                    && attributes.containsKey("onChange")) {
-                onChangeListener = Optional.of(attributes.get("onChange"));
+                    && attributes.containsKey(FXMLConstants.ON_CHANGE_ATTRIBUTE)) {
+                onChangeListener = Optional.of(attributes.get(FXMLConstants.ON_CHANGE_ATTRIBUTE));
             }
             return Optional.of(new FXMLCollectionProperties(
                             property.name(),

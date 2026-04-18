@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.Label?>
+
+<VBox xmlns:fx="http://javafx.com/fxml">
+    <fx:include source="SubDocument.fxml" resources="messages" fx:id="includedDoc" charset="UTF-8"/>
+    <Label text="Hello"/>
+</VBox>

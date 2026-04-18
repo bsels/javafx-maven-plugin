@@ -15,6 +15,8 @@ public final class FXMLConstants {
     public static final String FX_ID_ATTRIBUTE = "fx:id";
     /// The `fx:value` attribute name.
     public static final String FX_VALUE_ATTRIBUTE = "fx:value";
+    /// The `onChange` attribute name.
+    public static final String ON_CHANGE_ATTRIBUTE = "onChange";
     /// The `resources` attribute name.
     public static final String RESOURCES_ATTRIBUTE = "resources";
     /// The `source` attribute name.
