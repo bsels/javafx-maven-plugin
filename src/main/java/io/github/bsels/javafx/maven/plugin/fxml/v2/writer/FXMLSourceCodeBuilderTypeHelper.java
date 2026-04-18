@@ -143,7 +143,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
     /// @throws NullPointerException If `document` is null.
     public Map<String, FXMLType> createIdentifierToTypeMap(FXMLDocument document) throws NullPointerException {
         Objects.requireNonNull(document, "`document` must not be null");
-        Map<String, Wrapper> identifierTypeMap = Stream.concat(
+        Map<String, TypeWrapper> identifierTypeMap = Stream.concat(
                         Stream.of(document.root()),
                         document.definitions()
                                 .stream()
@@ -881,26 +881,26 @@ final class FXMLSourceCodeBuilderTypeHelper {
                 .toString();
     }
 
-    /// Recursively finds the [FXMLType] for a given [Wrapper] value in the type map.
+    /// Recursively finds the [FXMLType] for a given [TypeWrapper] value in the type map.
     ///
-    /// @param typeMap The map of identifiers to [Wrapper] values.
-    /// @param value   The [Wrapper] value to resolve.
+    /// @param typeMap The map of identifiers to [TypeWrapper] values.
+    /// @param value   The [TypeWrapper] value to resolve.
     /// @return The resolved [FXMLType].
     /// @throws NoSuchElementException If the reference cannot be resolved.
-    private FXMLType findTypeRecursion(Map<String, Wrapper> typeMap, Wrapper value) {
+    private FXMLType findTypeRecursion(Map<String, TypeWrapper> typeMap, TypeWrapper value) {
         return switch (value) {
-            case Wrapper.FXMLTypeWrapper(FXMLType type) -> type;
-            case Wrapper.ReferenceWrapper(String reference) -> Optional.ofNullable(typeMap.get(reference))
+            case FXMLTypeWrapper(FXMLType type) -> type;
+            case ReferenceWrapper(String reference) -> Optional.ofNullable(typeMap.get(reference))
                     .map(nestedValue -> findTypeRecursion(typeMap, nestedValue))
                     .orElseThrow();
         };
     }
 
-    /// Creates a stream of mapping entries from FXML identifiers to their [Wrapper] values for a given FXML value.
+    /// Creates a stream of mapping entries from FXML identifiers to their [TypeWrapper] values for a given FXML value.
     ///
     /// @param value The [AbstractFXMLValue] to process.
     /// @return A stream of identifier-to-wrapper entries.
-    private Stream<Map.Entry<String, Wrapper>> createIdentifierToTypeMapEntry(AbstractFXMLValue value) {
+    private Stream<Map.Entry<String, TypeWrapper>> createIdentifierToTypeMapEntry(AbstractFXMLValue value) {
         return switch (value) {
             case FXMLCollection(
                     FXMLIdentifier identifier,
@@ -910,14 +910,14 @@ final class FXMLSourceCodeBuilderTypeHelper {
             ) -> Stream.concat(
                     values.stream()
                             .flatMap(this::createIdentifierToTypeMapEntry),
-                    Stream.of(Map.entry(identifier.toString(), new Wrapper.FXMLTypeWrapper(type)))
+                    Stream.of(Map.entry(identifier.toString(), new FXMLTypeWrapper(type)))
             );
             case FXMLCopy(FXMLIdentifier identifier, FXMLExposedIdentifier(String name)) ->
-                    Stream.of(Map.entry(identifier.toString(), new Wrapper.ReferenceWrapper(name)));
+                    Stream.of(Map.entry(identifier.toString(), new ReferenceWrapper(name)));
             case FXMLInclude(FXMLIdentifier identifier, _, _, _, FXMLLazyLoadedDocument document) ->
                     Stream.of(Map.entry(
                             identifier.toString(),
-                            new Wrapper.FXMLTypeWrapper(new FXMLUncompiledClassType(document.get().className()))
+                            new FXMLTypeWrapper(new FXMLUncompiledClassType(document.get().className()))
                     ));
             case FXMLMap(
                     FXMLIdentifier identifier,
@@ -930,7 +930,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
                     entries.values()
                             .stream()
                             .flatMap(this::createIdentifierToTypeMapEntry),
-                    Stream.of(Map.entry(identifier.toString(), new Wrapper.FXMLTypeWrapper(type)))
+                    Stream.of(Map.entry(identifier.toString(), new FXMLTypeWrapper(type)))
             );
             case FXMLObject(
                     FXMLIdentifier identifier,
@@ -939,13 +939,13 @@ final class FXMLSourceCodeBuilderTypeHelper {
                     List<FXMLProperty> properties
             ) -> Stream.concat(
                     propertyRecursionHelper.walk(properties, (v, _) -> createIdentifierToTypeMapEntry(v), null),
-                    Stream.of(Map.entry(identifier.toString(), new Wrapper.FXMLTypeWrapper(type)))
+                    Stream.of(Map.entry(identifier.toString(), new FXMLTypeWrapper(type)))
             );
             case FXMLConstant _, FXMLExpression _, FXMLInlineScript _, FXMLLiteral _, FXMLMethod _, FXMLReference _,
                  FXMLResource _, FXMLTranslation _ -> Stream.empty();
             case FXMLValue(Optional<FXMLIdentifier> identifier, FXMLType type, _) -> identifier.stream()
                     .map(FXMLIdentifier::toString)
-                    .map(id -> Map.entry(id, new Wrapper.FXMLTypeWrapper(type)));
+                    .map(id -> Map.entry(id, new FXMLTypeWrapper(type)));
         };
     }
 
@@ -960,32 +960,4 @@ final class FXMLSourceCodeBuilderTypeHelper {
                 .orElse(false);
     }
 
-    /// A sealed interface used as a container for either an [FXMLType] or a reference to another identifier.
-    private sealed interface Wrapper {
-        /// A wrapper for an [FXMLType].
-        ///
-        /// @param type The [FXMLType] being wrapped.
-        record FXMLTypeWrapper(FXMLType type) implements Wrapper {
-
-            /// Constructs an `FXMLTypeWrapper` and ensures the type is not null.
-            ///
-            /// @param type The [FXMLType] being wrapped.
-            public FXMLTypeWrapper {
-                Objects.requireNonNull(type, "`type` must not be null");
-            }
-        }
-
-        /// A wrapper for a reference to another FXML identifier.
-        ///
-        /// @param reference The name of the FXML identifier being referenced.
-        record ReferenceWrapper(String reference) implements Wrapper {
-
-            /// Constructs a `ReferenceWrapper` and ensures the reference name is not null.
-            ///
-            /// @param reference The name of the FXML identifier being referenced.
-            public ReferenceWrapper {
-                Objects.requireNonNull(reference, "`reference` must not be null");
-            }
-        }
-    }
 }
