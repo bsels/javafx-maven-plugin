@@ -1082,6 +1082,41 @@ class FXMLUtilsTest {
     }
 
     // -------------------------------------------------------------------------
+    // isMapEntryAttribute
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class IsMapEntryAttributeTest {
+
+        @Test
+        void shouldReturnTrueForNonSkippable() {
+            assertThat(FXMLUtils.isMapEntryAttribute("myKey")).isTrue();
+        }
+
+        @Test
+        void shouldReturnFalseForFxPrefix() {
+            assertThat(FXMLUtils.isMapEntryAttribute("fx:id")).isFalse();
+        }
+
+        @Test
+        void shouldReturnFalseForXmlns() {
+            assertThat(FXMLUtils.isMapEntryAttribute("xmlns:fx")).isFalse();
+        }
+
+        @Test
+        void shouldReturnFalseForOnChange() {
+            assertThat(FXMLUtils.isMapEntryAttribute("onChange")).isFalse();
+        }
+
+        @Test
+        void shouldThrowNullPointerExceptionForNullKey() {
+            assertThatThrownBy(() -> FXMLUtils.isMapEntryAttribute(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`key` must not be null");
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Coverage tests using reflection
     // -------------------------------------------------------------------------
 

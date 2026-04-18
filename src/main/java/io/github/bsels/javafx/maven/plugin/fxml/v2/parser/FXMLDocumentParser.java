@@ -457,7 +457,7 @@ public final class FXMLDocumentParser {
         Map<String, String> properties = structure.properties();
         Map<FXMLLiteral, AbstractFXMLValue> entries = properties.entrySet()
                 .stream()
-                .filter(entry -> FXMLUtils.hasNonSkippablePrefix(entry.getKey()) && !entry.getKey().equals(FXMLConstants.ON_CHANGE_ATTRIBUTE))
+                .filter(entry -> FXMLUtils.isMapEntryAttribute(entry.getKey()))
                 .collect(Collectors.toMap(
                         entry -> new FXMLLiteral(entry.getKey()),
                         entry -> parseValueString(entry.getValue(), expectedType, buildContext),

@@ -262,6 +262,17 @@ public final class FXMLUtils {
         return !key.startsWith(FXMLConstants.FX_PREFIX) && !key.startsWith(FXMLConstants.XML_NAMESPACE_PREFIX);
     }
 
+    /// Checks if the specified string is a valid attribute for a map entry.
+    ///
+    /// A map entry attribute must have a non-skippable prefix and not be the `onChange` attribute.
+    ///
+    /// @param key The attribute name to check
+    /// @return `true` if it's a map entry attribute; `false` otherwise
+    /// @throws NullPointerException If `key` is null
+    public static boolean isMapEntryAttribute(String key) throws NullPointerException {
+        return hasNonSkippablePrefix(key) && !key.equals(FXMLConstants.ON_CHANGE_ATTRIBUTE);
+    }
+
     /// Traverses the class hierarchy to find the specified target interface and extract its type argument as an [FXMLType].
     /// For uncompiled types or raw types, returns an [FXMLClassType] of [Object].
     /// It recursively checks the class's generic interfaces and its superclass.
