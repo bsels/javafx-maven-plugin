@@ -2,6 +2,7 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
@@ -11,7 +12,6 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdenti
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
@@ -450,18 +450,10 @@ final class FXMLSourceCodeBuilderTypeHelper {
         if (controllerMethod.isPresent()) {
             FXMLControllerMethod fxmlMethod = controllerMethod.get();
             sourceCode.append(" {\n");
-            switch (fxmlMethod.visibility()) {
-                case PUBLIC -> createDirectCallMethodBody(sourceCode, method);
-                case PROTECTED, PACKAGE_PRIVATE -> {
-                    FXMLClassType type = controller.controllerClass();
-                    if (isClassInPackage(context, type)) {
-                        createDirectCallMethodBody(sourceCode, method);
-                    } else {
-                        createReflectionCallMethodBody(context, sourceCode, type, fxmlMethod);
-                    }
-                }
-                case PRIVATE ->
-                        createReflectionCallMethodBody(context, sourceCode, controller.controllerClass(), fxmlMethod);
+            if (needReflection(fxmlMethod.visibility(), context, controller)) {
+                createReflectionCallMethodBody(context, sourceCode, controller.controllerClass(), fxmlMethod);
+            } else {
+                createDirectCallMethodBody(sourceCode, method);
             }
             sourceCode.append("}");
         } else {
@@ -491,19 +483,11 @@ final class FXMLSourceCodeBuilderTypeHelper {
         Objects.requireNonNull(controller, "`controller` must not be null");
         Objects.requireNonNull(field, "`field` must not be null");
         Objects.requireNonNull(identifier, "`identifier` must not be null");
-        return switch (field.visibility()) {
-            case PUBLIC -> renderDirectControllerFieldMapping(field, identifier);
-            case PROTECTED, PACKAGE_PRIVATE -> {
-                FXMLClassType type = controller.controllerClass();
-                if (isClassInPackage(context, type)) {
-                    yield renderDirectControllerFieldMapping(field, identifier);
-                } else {
-                    yield renderReflectionControllerFieldMapping(context, type, field, identifier);
-                }
-            }
-            case PRIVATE ->
-                    renderReflectionControllerFieldMapping(context, controller.controllerClass(), field, identifier);
-        };
+        if (needReflection(field.visibility(), context, controller)) {
+            return renderReflectionControllerFieldMapping(context, controller.controllerClass(), field, identifier);
+        } else {
+            return renderDirectControllerFieldMapping(field, identifier);
+        }
     }
 
     /// Renders the source code to initialize the controller by calling its `initialize` method.
@@ -533,6 +517,22 @@ final class FXMLSourceCodeBuilderTypeHelper {
                 }
             }
             case PRIVATE -> renderControllerReflectionInitialization(context, controllerClass, initializeMethod);
+        };
+    }
+
+    /// Determines whether reflection is needed for the specified visibility in the given context and controller.
+    ///
+    /// @param visibility The visibility level
+    /// @param context    The source code generation context
+    /// @param controller The FXML controller class to be analyzed
+    /// @return true if reflection is needed for the field; false otherwise
+    private boolean needReflection(
+            Visibility visibility, SourceCodeGeneratorContext context, FXMLController controller
+    ) {
+        return switch (visibility) {
+            case PUBLIC -> false;
+            case PROTECTED, PACKAGE_PRIVATE -> !isClassInPackage(context, controller.controllerClass());
+            case PRIVATE -> true;
         };
     }
 

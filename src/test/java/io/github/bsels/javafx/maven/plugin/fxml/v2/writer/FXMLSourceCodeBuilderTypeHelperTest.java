@@ -1,6 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
@@ -29,12 +30,15 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLReference;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLResource;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLTranslation;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
-import java.util.ArrayList;
 import javafx.beans.NamedArg;
+import javafx.scene.paint.Color;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.net.URI;
@@ -44,35 +48,13 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /// Tests for [FXMLSourceCodeBuilderTypeHelper].
 class FXMLSourceCodeBuilderTypeHelperTest {
-
-    /// A simple bean with a [@NamedArg] constructor for testing.
-    public static class NamedArgBean {
-        /// Creates a new [NamedArgBean] with the given text.
-        ///
-        /// @param text The text value.
-        public NamedArgBean(@NamedArg("text") String text) {
-        }
-    }
-
-    /// A bean with a factory method annotated with [@NamedArg] for testing.
-    public static class FactoryBean {
-        /// Creates a new [FactoryBean] via factory method.
-        ///
-        /// @param value The value.
-        /// @return A new [FactoryBean].
-        public static FactoryBean create(@NamedArg("value") String value) {
-            return new FactoryBean();
-        }
-
-        private FactoryBean() {
-        }
-    }
 
     private FXMLSourceCodeBuilderTypeHelper classUnderTest;
     private SourceCodeGeneratorContext context;
@@ -102,6 +84,29 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                 "io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilderTypeHelperTest.FactoryBean",
                 "FactoryBean"
         ));
+    }
+
+    /// A simple bean with a [@NamedArg] constructor for testing.
+    public static class NamedArgBean {
+        /// Creates a new [NamedArgBean] with the given text.
+        ///
+        /// @param text The text value.
+        public NamedArgBean(@NamedArg("text") String text) {
+        }
+    }
+
+    /// A bean with a factory method annotated with [@NamedArg] for testing.
+    public static class FactoryBean {
+        private FactoryBean() {
+        }
+
+        /// Creates a new [FactoryBean] via factory method.
+        ///
+        /// @param value The value.
+        /// @return A new [FactoryBean].
+        public static FactoryBean create(@NamedArg("value") String value) {
+            return new FactoryBean();
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -221,6 +226,47 @@ class FXMLSourceCodeBuilderTypeHelperTest {
     @Nested
     class EncodeLiteralTest {
 
+        private static Stream<Arguments> provideLiteralEncodingCases() {
+            return Stream.of(
+                    // byte
+                    Arguments.of("5", FXMLType.of(byte.class), "(byte) 5"),
+                    Arguments.of("5", FXMLType.of(Byte.class), "(byte) 5"),
+                    // short
+                    Arguments.of("5", FXMLType.of(short.class), "(short) 5"),
+                    Arguments.of("5", FXMLType.of(Short.class), "(short) 5"),
+                    // int
+                    Arguments.of("5", FXMLType.of(int.class), "5"),
+                    Arguments.of("5", FXMLType.of(Integer.class), "5"),
+                    // long
+                    Arguments.of("5", FXMLType.of(long.class), "5L"),
+                    Arguments.of("5", FXMLType.of(Long.class), "5L"),
+                    // float
+                    Arguments.of("1.5", FXMLType.of(float.class), "1.5f"),
+                    Arguments.of("1.5", FXMLType.of(Float.class), "1.5f"),
+                    // double
+                    Arguments.of("3.14", FXMLType.of(double.class), "3.14"),
+                    Arguments.of("3.14", FXMLType.of(Double.class), "3.14"),
+                    // boolean
+                    Arguments.of("true", FXMLType.of(boolean.class), "true"),
+                    Arguments.of("true", FXMLType.of(Boolean.class), "true"),
+                    Arguments.of("false", FXMLType.of(boolean.class), "false"),
+                    Arguments.of("false", FXMLType.of(Boolean.class), "false"),
+                    // char
+                    Arguments.of("'A'", FXMLType.of(char.class), "'A'"),
+                    Arguments.of("'A'", FXMLType.of(Character.class), "'A'"),
+                    // float special values
+                    Arguments.of("-Infinity", FXMLType.of(Float.class), "Float.NEGATIVE_INFINITY"),
+                    Arguments.of("Infinity", FXMLType.of(Float.class), "Float.POSITIVE_INFINITY"),
+                    Arguments.of("NaN", FXMLType.of(Float.class), "Float.NaN"),
+                    // double special values
+                    Arguments.of("-Infinity", FXMLType.of(Double.class), "Double.NEGATIVE_INFINITY"),
+                    Arguments.of("Infinity", FXMLType.of(Double.class), "Double.POSITIVE_INFINITY"),
+                    Arguments.of("NaN", FXMLType.of(Double.class), "Double.NaN"),
+                    // default
+                    Arguments.of("#ffffff", FXMLType.of(Color.class), "javafx.scene.paint.Color.valueOf(\"#ffffff\")")
+            );
+        }
+
         /// Verifies that null context throws [NullPointerException].
         @Test
         void nullContextThrows() {
@@ -260,6 +306,8 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void charLiteralIsEncoded() {
             assertThat(classUnderTest.encodeLiteral(context, "'A'", FXMLType.of(char.class)))
+                    .isEqualTo("'A'");
+            assertThat(classUnderTest.encodeLiteral(context, "'A'", FXMLType.of(Character.class)))
                     .isEqualTo("'A'");
         }
 
@@ -304,17 +352,16 @@ class FXMLSourceCodeBuilderTypeHelperTest {
             assertThat(classUnderTest.encodeLiteral(context, "TRUE", FXMLType.of(Boolean.class))).isEqualTo("true");
         }
 
-        /// Verifies byte, short, int, long literal encoding.
-        @Test
-        void integerTypeLiterals() {
-            assertThat(classUnderTest.encodeLiteral(context, "5", FXMLType.of(byte.class))).isEqualTo("(byte) 5");
-            assertThat(classUnderTest.encodeLiteral(context, "5", FXMLType.of(Byte.class))).isEqualTo("(byte) 5");
-            assertThat(classUnderTest.encodeLiteral(context, "5", FXMLType.of(short.class))).isEqualTo("(short) 5");
-            assertThat(classUnderTest.encodeLiteral(context, "5", FXMLType.of(Short.class))).isEqualTo("(short) 5");
-            assertThat(classUnderTest.encodeLiteral(context, "5", FXMLType.of(int.class))).isEqualTo("5");
-            assertThat(classUnderTest.encodeLiteral(context, "5", FXMLType.of(Integer.class))).isEqualTo("5");
-            assertThat(classUnderTest.encodeLiteral(context, "5", FXMLType.of(long.class))).isEqualTo("5L");
-            assertThat(classUnderTest.encodeLiteral(context, "5", FXMLType.of(Long.class))).isEqualTo("5L");
+        /// Verifies literal encoding for various types.
+        ///
+        /// @param value    The value to encode.
+        /// @param type     The type to encode for.
+        /// @param expected The expected encoding.
+        @ParameterizedTest
+        @MethodSource("provideLiteralEncodingCases")
+        void shouldEncodeLiteralsCorrectly(String value, FXMLType type, String expected) {
+            assertThat(classUnderTest.encodeLiteral(context, value, type))
+                    .isEqualTo(expected);
         }
 
         /// Verifies that an uncompiled type falls back to `valueOf`.
@@ -462,28 +509,53 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that an [FXMLResource] for an unsupported type throws [IllegalArgumentException].
         @Test
         void resourceForUnsupportedTypeThrows() {
-            assertThatThrownBy(() -> classUnderTest.encodeFXMLValue(context, new FXMLResource("/img.png"), FXMLType.of(int.class)))
-                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> classUnderTest.encodeFXMLValue(
+                    context,
+                    new FXMLResource("/img.png"),
+                    FXMLType.of(int.class)
+            )).isInstanceOf(IllegalArgumentException.class);
+        }
+
+        /// Verifies that an [FXMLResource] for an unsupported type throws [IllegalArgumentException].
+        @Test
+        void resourceForUnsupportedGenericTypeThrows() {
+            assertThatThrownBy(() -> classUnderTest.encodeFXMLValue(
+                    context,
+                    new FXMLResource("/img.png"),
+                    FXMLType.of(List.class, List.of(FXMLType.of(Integer.class)))
+            )).isInstanceOf(IllegalArgumentException.class);
         }
 
         /// Verifies that an [FXMLExpression] throws [UnsupportedOperationException].
         @Test
         void expressionThrowsUnsupported() {
-            assertThatThrownBy(() -> classUnderTest.encodeFXMLValue(context, new FXMLExpression("x+1"), FXMLType.of(int.class)))
+            assertThatThrownBy(() -> classUnderTest.encodeFXMLValue(
+                    context,
+                    new FXMLExpression("x+1"),
+                    FXMLType.of(int.class)
+            ))
                     .isInstanceOf(UnsupportedOperationException.class);
         }
 
         /// Verifies that an [FXMLInlineScript] throws [UnsupportedOperationException].
         @Test
         void inlineScriptThrowsUnsupported() {
-            assertThatThrownBy(() -> classUnderTest.encodeFXMLValue(context, new FXMLInlineScript("x=1"), FXMLType.of(void.class)))
+            assertThatThrownBy(() -> classUnderTest.encodeFXMLValue(
+                    context,
+                    new FXMLInlineScript("x=1"),
+                    FXMLType.of(void.class)
+            ))
                     .isInstanceOf(UnsupportedOperationException.class);
         }
 
         /// Verifies that an [FXMLConstant] returns `ClassName.CONSTANT`.
         @Test
         void constantReturnsClassDotConstant() {
-            FXMLConstant constant = new FXMLConstant(new FXMLClassType(String.class), "CASE_INSENSITIVE_ORDER", FXMLType.of(java.util.Comparator.class));
+            FXMLConstant constant = new FXMLConstant(
+                    new FXMLClassType(String.class),
+                    "CASE_INSENSITIVE_ORDER",
+                    FXMLType.of(java.util.Comparator.class)
+            );
             assertThat(classUnderTest.encodeFXMLValue(context, constant, FXMLType.of(Object.class)))
                     .isEqualTo("String.CASE_INSENSITIVE_ORDER");
         }
@@ -491,7 +563,12 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that an [FXMLObject] returns the identifier string.
         @Test
         void objectReturnsIdentifier() {
-            FXMLObject obj = new FXMLObject(new FXMLExposedIdentifier("myObj"), FXMLType.of(String.class), Optional.empty(), List.of());
+            FXMLObject obj = new FXMLObject(
+                    new FXMLExposedIdentifier("myObj"),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
             assertThat(classUnderTest.encodeFXMLValue(context, obj, FXMLType.of(String.class)))
                     .isEqualTo("myObj");
         }
@@ -499,7 +576,12 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that an [FXMLObject] with internal identifier returns the internal identifier string.
         @Test
         void objectWithInternalIdentifierReturnsInternalId() {
-            FXMLObject obj = new FXMLObject(new FXMLInternalIdentifier(1), FXMLType.of(String.class), Optional.empty(), List.of());
+            FXMLObject obj = new FXMLObject(
+                    new FXMLInternalIdentifier(1),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
             assertThat(classUnderTest.encodeFXMLValue(context, obj, FXMLType.of(String.class)))
                     .isEqualTo("$internalVariable$001");
         }
@@ -516,7 +598,13 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void includeReturnsIdentifier() {
             FXMLLazyLoadedDocument doc = new FXMLLazyLoadedDocument();
-            FXMLInclude include = new FXMLInclude(new FXMLExposedIdentifier("myInclude"), "/sub.fxml", StandardCharsets.UTF_8, Optional.empty(), doc);
+            FXMLInclude include = new FXMLInclude(
+                    new FXMLExposedIdentifier("myInclude"),
+                    "/sub.fxml",
+                    StandardCharsets.UTF_8,
+                    Optional.empty(),
+                    doc
+            );
             assertThat(classUnderTest.encodeFXMLValue(context, include, FXMLType.of(Object.class)))
                     .isEqualTo("myInclude");
         }
@@ -524,7 +612,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that an [FXMLValue] with identifier returns the identifier.
         @Test
         void fxmlValueWithIdentifierReturnsIdentifier() {
-            FXMLValue value = new FXMLValue(Optional.of(new FXMLExposedIdentifier("myVal")), FXMLType.of(String.class), "hello");
+            FXMLValue value = new FXMLValue(
+                    Optional.of(new FXMLExposedIdentifier("myVal")),
+                    FXMLType.of(String.class),
+                    "hello"
+            );
             assertThat(classUnderTest.encodeFXMLValue(context, value, FXMLType.of(String.class)))
                     .isEqualTo("myVal");
         }
@@ -540,7 +632,12 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that the overload with prefix prepends the prefix to exposed identifiers.
         @Test
         void overloadWithPrefixPrependsPrefix() {
-            FXMLObject obj = new FXMLObject(new FXMLExposedIdentifier("myObj"), FXMLType.of(String.class), Optional.empty(), List.of());
+            FXMLObject obj = new FXMLObject(
+                    new FXMLExposedIdentifier("myObj"),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
             assertThat(classUnderTest.encodeFXMLValue(context, "prefix_", obj, FXMLType.of(String.class)))
                     .isEqualTo("prefix_myObj");
         }
@@ -564,8 +661,21 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that a document with a root object produces a type map entry.
         @Test
         void documentWithRootProducesEntry() {
-            FXMLObject root = new FXMLObject(new FXMLExposedIdentifier("root"), FXMLType.of(String.class), Optional.empty(), List.of());
-            FXMLDocument document = new FXMLDocument("MyDoc", root, List.of(), Optional.empty(), Optional.empty(), List.of(), List.of());
+            FXMLObject root = new FXMLObject(
+                    new FXMLExposedIdentifier("root"),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
+            FXMLDocument document = new FXMLDocument(
+                    "MyDoc",
+                    root,
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    List.of(),
+                    List.of()
+            );
             Map<String, FXMLType> map = classUnderTest.createIdentifierToTypeMap(document);
             assertThat(map).containsKey("root")
                     .containsValue(FXMLType.of(String.class));
@@ -574,9 +684,22 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that a copy in definitions resolves to the referenced type.
         @Test
         void copyInDefinitionsResolvesToReferencedType() {
-            FXMLObject original = new FXMLObject(new FXMLExposedIdentifier("orig"), FXMLType.of(String.class), Optional.empty(), List.of());
+            FXMLObject original = new FXMLObject(
+                    new FXMLExposedIdentifier("orig"),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
             FXMLCopy copy = new FXMLCopy(new FXMLExposedIdentifier("myCopy"), new FXMLExposedIdentifier("orig"));
-            FXMLDocument document = new FXMLDocument("MyDoc", original, List.of(), Optional.empty(), Optional.empty(), List.of(copy), List.of());
+            FXMLDocument document = new FXMLDocument(
+                    "MyDoc",
+                    original,
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    List.of(copy),
+                    List.of()
+            );
             Map<String, FXMLType> map = classUnderTest.createIdentifierToTypeMap(document);
             assertThat(map).containsKey("myCopy")
                     .containsEntry("myCopy", FXMLType.of(String.class));
@@ -591,8 +714,21 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     Optional.empty(),
                     List.of()
             );
-            FXMLObject root = new FXMLObject(new FXMLInternalIdentifier(0), FXMLType.of(String.class), Optional.empty(), List.of());
-            FXMLDocument document = new FXMLDocument("MyDoc", root, List.of(), Optional.empty(), Optional.empty(), List.of(collection), List.of());
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
+            FXMLDocument document = new FXMLDocument(
+                    "MyDoc",
+                    root,
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    List.of(collection),
+                    List.of()
+            );
             Map<String, FXMLType> map = classUnderTest.createIdentifierToTypeMap(document);
             assertThat(map).containsKey("myList");
         }
@@ -600,15 +736,33 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that an [FXMLCollection] with a nested child also maps the child's identifier.
         @Test
         void collectionWithNestedChildMapsChildIdentifier() {
-            FXMLObject child = new FXMLObject(new FXMLExposedIdentifier("childObj"), FXMLType.of(Integer.class), Optional.empty(), List.of());
+            FXMLObject child = new FXMLObject(
+                    new FXMLExposedIdentifier("childObj"),
+                    FXMLType.of(Integer.class),
+                    Optional.empty(),
+                    List.of()
+            );
             FXMLCollection collection = new FXMLCollection(
                     new FXMLExposedIdentifier("myList"),
                     new FXMLGenericType(java.util.ArrayList.class, List.of(FXMLType.of(Integer.class))),
                     Optional.empty(),
                     List.of(child)
             );
-            FXMLObject root = new FXMLObject(new FXMLInternalIdentifier(0), FXMLType.of(String.class), Optional.empty(), List.of());
-            FXMLDocument document = new FXMLDocument("MyDoc", root, List.of(), Optional.empty(), Optional.empty(), List.of(collection), List.of());
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
+            FXMLDocument document = new FXMLDocument(
+                    "MyDoc",
+                    root,
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    List.of(collection),
+                    List.of()
+            );
             Map<String, FXMLType> map = classUnderTest.createIdentifierToTypeMap(document);
             assertThat(map).containsKey("myList").containsKey("childObj");
         }
@@ -617,8 +771,21 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void includeInDefinitionsProducesEntry() {
             FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
-            FXMLObject subRoot = new FXMLObject(new FXMLInternalIdentifier(0), FXMLType.of(String.class), Optional.empty(), List.of());
-            FXMLDocument subDoc = new FXMLDocument("SubDoc", subRoot, List.of(), Optional.empty(), Optional.empty(), List.of(), List.of());
+            FXMLObject subRoot = new FXMLObject(
+                    new FXMLInternalIdentifier(0),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
+            FXMLDocument subDoc = new FXMLDocument(
+                    "SubDoc",
+                    subRoot,
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    List.of(),
+                    List.of()
+            );
             lazy.set(subDoc);
             FXMLInclude include = new FXMLInclude(
                     new FXMLExposedIdentifier("included"),
@@ -627,13 +794,28 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     Optional.empty(),
                     lazy
             );
-            FXMLObject root = new FXMLObject(new FXMLInternalIdentifier(0), FXMLType.of(String.class), Optional.empty(), List.of());
-            FXMLDocument document = new FXMLDocument("MyDoc", root, List.of(), Optional.empty(), Optional.empty(), List.of(include), List.of());
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
+            FXMLDocument document = new FXMLDocument(
+                    "MyDoc",
+                    root,
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    List.of(include),
+                    List.of()
+            );
             Map<String, FXMLType> map = classUnderTest.createIdentifierToTypeMap(document);
             assertThat(map).containsKey("included")
-                    .hasEntrySatisfying("included", t -> assertThat(t)
-                            .isInstanceOf(FXMLUncompiledClassType.class)
-                            .hasFieldOrPropertyWithValue("name", "SubDoc"));
+                    .hasEntrySatisfying(
+                            "included", t -> assertThat(t)
+                                    .isInstanceOf(FXMLUncompiledClassType.class)
+                                    .hasFieldOrPropertyWithValue("name", "SubDoc")
+                    );
         }
 
         /// Verifies that an [FXMLMap] in definitions produces a type map entry.
@@ -641,14 +823,30 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         void mapInDefinitionsProducesEntry() {
             FXMLMap fxmlMap = new FXMLMap(
                     new FXMLExposedIdentifier("myMap"),
-                    new FXMLGenericType(java.util.HashMap.class, List.of(FXMLType.of(String.class), FXMLType.of(String.class))),
+                    new FXMLGenericType(
+                            java.util.HashMap.class,
+                            List.of(FXMLType.of(String.class), FXMLType.of(String.class))
+                    ),
                     FXMLType.of(String.class),
                     FXMLType.of(String.class),
                     Optional.empty(),
                     Map.of()
             );
-            FXMLObject root = new FXMLObject(new FXMLInternalIdentifier(0), FXMLType.of(String.class), Optional.empty(), List.of());
-            FXMLDocument document = new FXMLDocument("MyDoc", root, List.of(), Optional.empty(), Optional.empty(), List.of(fxmlMap), List.of());
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
+            FXMLDocument document = new FXMLDocument(
+                    "MyDoc",
+                    root,
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    List.of(fxmlMap),
+                    List.of()
+            );
             Map<String, FXMLType> map = classUnderTest.createIdentifierToTypeMap(document);
             assertThat(map).containsKey("myMap");
         }
@@ -656,17 +854,38 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that an [FXMLMap] with a nested value entry also maps the nested identifier.
         @Test
         void mapWithNestedValueMapsNestedIdentifier() {
-            FXMLObject nestedVal = new FXMLObject(new FXMLExposedIdentifier("nestedVal"), FXMLType.of(Integer.class), Optional.empty(), List.of());
+            FXMLObject nestedVal = new FXMLObject(
+                    new FXMLExposedIdentifier("nestedVal"),
+                    FXMLType.of(Integer.class),
+                    Optional.empty(),
+                    List.of()
+            );
             FXMLMap fxmlMap = new FXMLMap(
                     new FXMLExposedIdentifier("myMap"),
-                    new FXMLGenericType(java.util.HashMap.class, List.of(FXMLType.of(String.class), FXMLType.of(Integer.class))),
+                    new FXMLGenericType(
+                            java.util.HashMap.class,
+                            List.of(FXMLType.of(String.class), FXMLType.of(Integer.class))
+                    ),
                     FXMLType.of(String.class),
                     FXMLType.of(Integer.class),
                     Optional.empty(),
                     Map.of(new FXMLLiteral("key"), nestedVal)
             );
-            FXMLObject root = new FXMLObject(new FXMLInternalIdentifier(0), FXMLType.of(String.class), Optional.empty(), List.of());
-            FXMLDocument document = new FXMLDocument("MyDoc", root, List.of(), Optional.empty(), Optional.empty(), List.of(fxmlMap), List.of());
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
+            FXMLDocument document = new FXMLDocument(
+                    "MyDoc",
+                    root,
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    List.of(fxmlMap),
+                    List.of()
+            );
             Map<String, FXMLType> map = classUnderTest.createIdentifierToTypeMap(document);
             assertThat(map).containsKey("myMap").containsKey("nestedVal");
         }
@@ -674,9 +893,26 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that an [FXMLValue] with an identifier in definitions produces a type map entry.
         @Test
         void fxmlValueWithIdentifierInDefinitionsProducesEntry() {
-            FXMLValue value = new FXMLValue(Optional.of(new FXMLExposedIdentifier("myVal")), FXMLType.of(String.class), "hello");
-            FXMLObject root = new FXMLObject(new FXMLInternalIdentifier(0), FXMLType.of(String.class), Optional.empty(), List.of());
-            FXMLDocument document = new FXMLDocument("MyDoc", root, List.of(), Optional.empty(), Optional.empty(), List.of(value), List.of());
+            FXMLValue value = new FXMLValue(
+                    Optional.of(new FXMLExposedIdentifier("myVal")),
+                    FXMLType.of(String.class),
+                    "hello"
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
+            FXMLDocument document = new FXMLDocument(
+                    "MyDoc",
+                    root,
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    List.of(value),
+                    List.of()
+            );
             Map<String, FXMLType> map = classUnderTest.createIdentifierToTypeMap(document);
             assertThat(map).containsKey("myVal")
                     .containsEntry("myVal", FXMLType.of(String.class));
@@ -685,11 +921,34 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that an [FXMLObject] with a nested object property also maps the nested identifier.
         @Test
         void objectWithNestedObjectPropertyMapsNestedIdentifier() {
-            FXMLObject nested = new FXMLObject(new FXMLExposedIdentifier("nestedObj"), FXMLType.of(Integer.class), Optional.empty(), List.of());
+            FXMLObject nested = new FXMLObject(
+                    new FXMLExposedIdentifier("nestedObj"),
+                    FXMLType.of(Integer.class),
+                    Optional.empty(),
+                    List.of()
+            );
             io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty prop =
-                    new io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty("value", "setValue", FXMLType.of(Integer.class), nested);
-            FXMLObject root = new FXMLObject(new FXMLExposedIdentifier("root"), FXMLType.of(String.class), Optional.empty(), List.of(prop));
-            FXMLDocument document = new FXMLDocument("MyDoc", root, List.of(), Optional.empty(), Optional.empty(), List.of(), List.of());
+                    new io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty(
+                            "value",
+                            "setValue",
+                            FXMLType.of(Integer.class),
+                            nested
+                    );
+            FXMLObject root = new FXMLObject(
+                    new FXMLExposedIdentifier("root"),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of(prop)
+            );
+            FXMLDocument document = new FXMLDocument(
+                    "MyDoc",
+                    root,
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    List.of(),
+                    List.of()
+            );
             Map<String, FXMLType> map = classUnderTest.createIdentifierToTypeMap(document);
             assertThat(map).containsKey("root").containsKey("nestedObj");
         }
@@ -698,8 +957,21 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void fxmlValueWithoutIdentifierInDefinitionsProducesNoEntry() {
             FXMLValue value = new FXMLValue(Optional.empty(), FXMLType.of(String.class), "hello");
-            FXMLObject root = new FXMLObject(new FXMLInternalIdentifier(0), FXMLType.of(String.class), Optional.empty(), List.of());
-            FXMLDocument document = new FXMLDocument("MyDoc", root, List.of(), Optional.empty(), Optional.empty(), List.of(value), List.of());
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
+            FXMLDocument document = new FXMLDocument(
+                    "MyDoc",
+                    root,
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    List.of(value),
+                    List.of()
+            );
             Map<String, FXMLType> map = classUnderTest.createIdentifierToTypeMap(document);
             assertThat(map).doesNotContainKey("myVal");
         }
@@ -730,7 +1002,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that a matching constructor is found.
         @Test
         void matchingConstructorIsFound() {
-            FXMLConstructorProperty prop = new FXMLConstructorProperty("text", FXMLType.of(String.class), new FXMLLiteral("hi"));
+            FXMLConstructorProperty prop = new FXMLConstructorProperty(
+                    "text",
+                    FXMLType.of(String.class),
+                    new FXMLLiteral("hi")
+            );
             FXMLConstructor result = classUnderTest.findMinimalConstructor(NamedArgBean.class, List.of(prop));
             assertThat(result).isNotNull()
                     .satisfies(c -> assertThat(c.properties()).hasSize(1));
@@ -739,7 +1015,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that no matching constructor throws [IllegalArgumentException].
         @Test
         void noMatchingConstructorThrows() {
-            FXMLConstructorProperty prop = new FXMLConstructorProperty("nonexistent", FXMLType.of(String.class), new FXMLLiteral("x"));
+            FXMLConstructorProperty prop = new FXMLConstructorProperty(
+                    "nonexistent",
+                    FXMLType.of(String.class),
+                    new FXMLLiteral("x")
+            );
             assertThatThrownBy(() -> classUnderTest.findMinimalConstructor(NamedArgBean.class, List.of(prop)))
                     .isInstanceOf(IllegalArgumentException.class);
         }
@@ -747,7 +1027,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that the constructor cache is used on repeated calls.
         @Test
         void constructorCacheIsUsedOnRepeatedCalls() {
-            FXMLConstructorProperty prop = new FXMLConstructorProperty("text", FXMLType.of(String.class), new FXMLLiteral("hi"));
+            FXMLConstructorProperty prop = new FXMLConstructorProperty(
+                    "text",
+                    FXMLType.of(String.class),
+                    new FXMLLiteral("hi")
+            );
             FXMLConstructor first = classUnderTest.findMinimalConstructor(NamedArgBean.class, List.of(prop));
             FXMLConstructor second = classUnderTest.findMinimalConstructor(NamedArgBean.class, List.of(prop));
             assertThat(first).isEqualTo(second);
@@ -781,7 +1065,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void matchingFactoryMethodIsFound() {
             FXMLFactoryMethod fm = new FXMLFactoryMethod(new FXMLClassType(FactoryBean.class), "create");
-            FXMLConstructorProperty prop = new FXMLConstructorProperty("value", FXMLType.of(String.class), new FXMLLiteral("x"));
+            FXMLConstructorProperty prop = new FXMLConstructorProperty(
+                    "value",
+                    FXMLType.of(String.class),
+                    new FXMLLiteral("x")
+            );
             FXMLConstructor result = classUnderTest.findFactoryMethodConstructor(fm, List.of(prop));
             assertThat(result).isNotNull()
                     .satisfies(c -> assertThat(c.properties()).hasSize(1));
@@ -791,7 +1079,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void noMatchingFactoryMethodThrows() {
             FXMLFactoryMethod fm = new FXMLFactoryMethod(new FXMLClassType(FactoryBean.class), "create");
-            FXMLConstructorProperty prop = new FXMLConstructorProperty("nonexistent", FXMLType.of(String.class), new FXMLLiteral("x"));
+            FXMLConstructorProperty prop = new FXMLConstructorProperty(
+                    "nonexistent",
+                    FXMLType.of(String.class),
+                    new FXMLLiteral("x")
+            );
             assertThatThrownBy(() -> classUnderTest.findFactoryMethodConstructor(fm, List.of(prop)))
                     .isInstanceOf(IllegalArgumentException.class);
         }
@@ -800,7 +1092,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void factoryMethodCacheIsUsedOnRepeatedCalls() {
             FXMLFactoryMethod fm = new FXMLFactoryMethod(new FXMLClassType(FactoryBean.class), "create");
-            FXMLConstructorProperty prop = new FXMLConstructorProperty("value", FXMLType.of(String.class), new FXMLLiteral("x"));
+            FXMLConstructorProperty prop = new FXMLConstructorProperty(
+                    "value",
+                    FXMLType.of(String.class),
+                    new FXMLLiteral("x")
+            );
             FXMLConstructor first = classUnderTest.findFactoryMethodConstructor(fm, List.of(prop));
             FXMLConstructor second = classUnderTest.findFactoryMethodConstructor(fm, List.of(prop));
             assertThat(first).isEqualTo(second);
@@ -850,8 +1146,18 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that a public controller method generates a direct call.
         @Test
         void publicControllerMethodGeneratesDirectCall() {
-            FXMLControllerMethod cm = new FXMLControllerMethod(Visibility.PUBLIC, "onClick", false, FXMLType.of(void.class), List.of());
-            FXMLController controller = new FXMLController(new FXMLClassType(NamedArgBean.class), List.of(), List.of(cm));
+            FXMLControllerMethod cm = new FXMLControllerMethod(
+                    Visibility.PUBLIC,
+                    "onClick",
+                    false,
+                    FXMLType.of(void.class),
+                    List.of()
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(NamedArgBean.class),
+                    List.of(),
+                    List.of(cm)
+            );
             FXMLMethod method = new FXMLMethod("onClick", List.of(), FXMLType.of(void.class));
             String result = classUnderTest.renderMethod(context, controller, List.of(), method)
                     .reduce("", String::concat);
@@ -861,8 +1167,18 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that a private controller method generates a reflection call.
         @Test
         void privateControllerMethodGeneratesReflectionCall() {
-            FXMLControllerMethod cm = new FXMLControllerMethod(Visibility.PRIVATE, "onClick", false, FXMLType.of(void.class), List.of());
-            FXMLController controller = new FXMLController(new FXMLClassType(NamedArgBean.class), List.of(), List.of(cm));
+            FXMLControllerMethod cm = new FXMLControllerMethod(
+                    Visibility.PRIVATE,
+                    "onClick",
+                    false,
+                    FXMLType.of(void.class),
+                    List.of()
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(NamedArgBean.class),
+                    List.of(),
+                    List.of(cm)
+            );
             FXMLMethod method = new FXMLMethod("onClick", List.of(), FXMLType.of(void.class));
             String result = classUnderTest.renderMethod(context, controller, List.of(), method)
                     .reduce("", String::concat);
@@ -870,17 +1186,30 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         }
 
         /// Verifies that a protected controller method in same package generates a direct call.
-        @Test
-        void protectedControllerMethodInSamePackageGeneratesDirectCall() {
+        @ParameterizedTest
+        @EnumSource(value = Visibility.class, names = {"PROTECTED", "PACKAGE_PRIVATE"})
+        void protectedControllerMethodInSamePackageGeneratesDirectCall(Visibility visibility) {
             SourceCodeGeneratorContext samePackageContext = new SourceCodeGeneratorContext(
-                    new Imports(List.of(), Map.of(
+                    new Imports(
+                            List.of(), Map.of(
                             "io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilderTypeHelperTest.NamedArgBean",
                             "NamedArgBean"
-                    )), "rb", Map.of(),
+                    )
+                    ), "rb", Map.of(),
                     "io.github.bsels.javafx.maven.plugin.fxml.v2.writer"
             );
-            FXMLControllerMethod cm = new FXMLControllerMethod(Visibility.PROTECTED, "onClick", false, FXMLType.of(void.class), List.of());
-            FXMLController controller = new FXMLController(new FXMLClassType(NamedArgBean.class), List.of(), List.of(cm));
+            FXMLControllerMethod cm = new FXMLControllerMethod(
+                    visibility,
+                    "onClick",
+                    false,
+                    FXMLType.of(void.class),
+                    List.of()
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(NamedArgBean.class),
+                    List.of(),
+                    List.of(cm)
+            );
             FXMLMethod method = new FXMLMethod("onClick", List.of(), FXMLType.of(void.class));
             String result = classUnderTest.renderMethod(samePackageContext, controller, List.of(), method)
                     .reduce("", String::concat);
@@ -890,12 +1219,20 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that a public controller method with two parameters generates comma-separated params in direct call.
         @Test
         void publicMethodWithTwoParamsGeneratesCommaSeparatedDirectCall() {
-            FXMLControllerMethod cm = new FXMLControllerMethod(Visibility.PUBLIC, "onEvent", false,
-                    FXMLType.of(void.class), List.of(FXMLType.of(String.class), FXMLType.of(Integer.class)));
-            FXMLController controller = new FXMLController(new FXMLClassType(NamedArgBean.class), List.of(), List.of(cm));
-            FXMLMethod method = new FXMLMethod("onEvent",
+            FXMLControllerMethod cm = new FXMLControllerMethod(
+                    Visibility.PUBLIC, "onEvent", false,
+                    FXMLType.of(void.class), List.of(FXMLType.of(String.class), FXMLType.of(Integer.class))
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(NamedArgBean.class),
+                    List.of(),
+                    List.of(cm)
+            );
+            FXMLMethod method = new FXMLMethod(
+                    "onEvent",
                     List.of(FXMLType.of(String.class), FXMLType.of(Integer.class)),
-                    FXMLType.of(void.class));
+                    FXMLType.of(void.class)
+            );
             String result = classUnderTest.renderMethod(context, controller, List.of(), method)
                     .reduce("", String::concat);
             assertThat(result).contains("param0").contains(", param1").doesNotContain("getDeclaredMethod");
@@ -913,9 +1250,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that a method with two parameters generates a comma separator between them.
         @Test
         void methodWithTwoParametersGeneratesCommaSeparator() {
-            FXMLMethod method = new FXMLMethod("onEvent",
+            FXMLMethod method = new FXMLMethod(
+                    "onEvent",
                     List.of(FXMLType.of(String.class), FXMLType.of(Integer.class)),
-                    FXMLType.of(void.class));
+                    FXMLType.of(void.class)
+            );
             String result = classUnderTest.renderMethod(context, null, List.of(), method)
                     .reduce("", String::concat);
             assertThat(result).contains("param0").contains("param1").contains(", ");
@@ -924,8 +1263,18 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that a method with non-void return type generates return statement.
         @Test
         void methodWithReturnTypeGeneratesReturnStatement() {
-            FXMLControllerMethod cm = new FXMLControllerMethod(Visibility.PUBLIC, "getValue", false, FXMLType.of(String.class), List.of());
-            FXMLController controller = new FXMLController(new FXMLClassType(NamedArgBean.class), List.of(), List.of(cm));
+            FXMLControllerMethod cm = new FXMLControllerMethod(
+                    Visibility.PUBLIC,
+                    "getValue",
+                    false,
+                    FXMLType.of(String.class),
+                    List.of()
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(NamedArgBean.class),
+                    List.of(),
+                    List.of(cm)
+            );
             FXMLMethod method = new FXMLMethod("getValue", List.of(), FXMLType.of(String.class));
             String result = classUnderTest.renderMethod(context, controller, List.of(), method)
                     .reduce("", String::concat);
@@ -935,12 +1284,20 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that a private controller method with parameters and non-void return generates full reflection body.
         @Test
         void privateMethodWithParamsAndNonVoidReturnGeneratesFullReflectionBody() {
-            FXMLControllerMethod cm = new FXMLControllerMethod(Visibility.PRIVATE, "compute", false,
-                    FXMLType.of(String.class), List.of(FXMLType.of(String.class), FXMLType.of(Integer.class)));
-            FXMLController controller = new FXMLController(new FXMLClassType(NamedArgBean.class), List.of(), List.of(cm));
-            FXMLMethod method = new FXMLMethod("compute",
+            FXMLControllerMethod cm = new FXMLControllerMethod(
+                    Visibility.PRIVATE, "compute", false,
+                    FXMLType.of(String.class), List.of(FXMLType.of(String.class), FXMLType.of(Integer.class))
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(NamedArgBean.class),
+                    List.of(),
+                    List.of(cm)
+            );
+            FXMLMethod method = new FXMLMethod(
+                    "compute",
                     List.of(FXMLType.of(String.class), FXMLType.of(Integer.class)),
-                    FXMLType.of(String.class));
+                    FXMLType.of(String.class)
+            );
             String result = classUnderTest.renderMethod(context, controller, List.of(), method)
                     .reduce("", String::concat);
             assertThat(result)
@@ -955,9 +1312,15 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that a controller method with mismatched parameter types falls back to abstract.
         @Test
         void mismatchedParameterTypesFallsBackToAbstract() {
-            FXMLControllerMethod cm = new FXMLControllerMethod(Visibility.PUBLIC, "onEvent", false,
-                    FXMLType.of(void.class), List.of(FXMLType.of(Integer.class)));
-            FXMLController controller = new FXMLController(new FXMLClassType(NamedArgBean.class), List.of(), List.of(cm));
+            FXMLControllerMethod cm = new FXMLControllerMethod(
+                    Visibility.PUBLIC, "onEvent", false,
+                    FXMLType.of(void.class), List.of(FXMLType.of(Integer.class))
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(NamedArgBean.class),
+                    List.of(),
+                    List.of(cm)
+            );
             // method expects String param but controller has Integer param — no match → abstract
             FXMLMethod method = new FXMLMethod("onEvent", List.of(FXMLType.of(String.class)), FXMLType.of(void.class));
             String result = classUnderTest.renderMethod(context, controller, List.of(), method)
@@ -978,7 +1341,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void nullContextThrows() {
             FXMLController controller = new FXMLController(new FXMLClassType(NamedArgBean.class), List.of(), List.of());
-            FXMLControllerField field = new FXMLControllerField(Visibility.PUBLIC, "myField", FXMLType.of(String.class));
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC,
+                    "myField",
+                    FXMLType.of(String.class)
+            );
             assertThatThrownBy(() -> classUnderTest.renderControllerFieldMapping(null, controller, field, "id"))
                     .isInstanceOf(NullPointerException.class);
         }
@@ -986,7 +1353,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that null controller throws [NullPointerException].
         @Test
         void nullControllerThrows() {
-            FXMLControllerField field = new FXMLControllerField(Visibility.PUBLIC, "myField", FXMLType.of(String.class));
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC,
+                    "myField",
+                    FXMLType.of(String.class)
+            );
             assertThatThrownBy(() -> classUnderTest.renderControllerFieldMapping(context, null, field, "id"))
                     .isInstanceOf(NullPointerException.class);
         }
@@ -1003,7 +1374,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void nullIdentifierThrows() {
             FXMLController controller = new FXMLController(new FXMLClassType(NamedArgBean.class), List.of(), List.of());
-            FXMLControllerField field = new FXMLControllerField(Visibility.PUBLIC, "myField", FXMLType.of(String.class));
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC,
+                    "myField",
+                    FXMLType.of(String.class)
+            );
             assertThatThrownBy(() -> classUnderTest.renderControllerFieldMapping(context, controller, field, null))
                     .isInstanceOf(NullPointerException.class);
         }
@@ -1012,7 +1387,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void publicFieldGeneratesDirectAssignment() {
             FXMLController controller = new FXMLController(new FXMLClassType(NamedArgBean.class), List.of(), List.of());
-            FXMLControllerField field = new FXMLControllerField(Visibility.PUBLIC, "myField", FXMLType.of(String.class));
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC,
+                    "myField",
+                    FXMLType.of(String.class)
+            );
             String result = classUnderTest.renderControllerFieldMapping(context, controller, field, "myId");
             assertThat(result).contains("myField").contains("myId").doesNotContain("getDeclaredField");
         }
@@ -1021,7 +1400,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void privateFieldGeneratesReflectionAssignment() {
             FXMLController controller = new FXMLController(new FXMLClassType(NamedArgBean.class), List.of(), List.of());
-            FXMLControllerField field = new FXMLControllerField(Visibility.PRIVATE, "myField", FXMLType.of(String.class));
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PRIVATE,
+                    "myField",
+                    FXMLType.of(String.class)
+            );
             String result = classUnderTest.renderControllerFieldMapping(context, controller, field, "myId");
             assertThat(result).contains("getDeclaredField").contains("myField");
         }
@@ -1030,7 +1413,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void protectedFieldInDifferentPackageGeneratesReflection() {
             FXMLController controller = new FXMLController(new FXMLClassType(NamedArgBean.class), List.of(), List.of());
-            FXMLControllerField field = new FXMLControllerField(Visibility.PROTECTED, "myField", FXMLType.of(String.class));
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PROTECTED,
+                    "myField",
+                    FXMLType.of(String.class)
+            );
             String result = classUnderTest.renderControllerFieldMapping(context, controller, field, "myId");
             assertThat(result).contains("getDeclaredField");
         }
@@ -1050,7 +1437,11 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     "io.github.bsels.javafx.maven.plugin.fxml.v2.writer"
             );
             FXMLController controller = new FXMLController(new FXMLClassType(NamedArgBean.class), List.of(), List.of());
-            FXMLControllerField field = new FXMLControllerField(Visibility.PACKAGE_PRIVATE, "myField", FXMLType.of(String.class));
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PACKAGE_PRIVATE,
+                    "myField",
+                    FXMLType.of(String.class)
+            );
             String result = classUnderTest.renderControllerFieldMapping(pkgContext, controller, field, "myId");
             assertThat(result).contains("myField").doesNotContain("getDeclaredField");
         }
@@ -1068,7 +1459,13 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void nullContextThrows() {
             FXMLClassType ct = new FXMLClassType(NamedArgBean.class);
-            FXMLControllerMethod m = new FXMLControllerMethod(Visibility.PUBLIC, "initialize", false, FXMLType.of(void.class), List.of());
+            FXMLControllerMethod m = new FXMLControllerMethod(
+                    Visibility.PUBLIC,
+                    "initialize",
+                    false,
+                    FXMLType.of(void.class),
+                    List.of()
+            );
             assertThatThrownBy(() -> classUnderTest.renderControllerInitialization(null, ct, m))
                     .isInstanceOf(NullPointerException.class);
         }
@@ -1076,7 +1473,13 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         /// Verifies that null controller class throws [NullPointerException].
         @Test
         void nullControllerClassThrows() {
-            FXMLControllerMethod m = new FXMLControllerMethod(Visibility.PUBLIC, "initialize", false, FXMLType.of(void.class), List.of());
+            FXMLControllerMethod m = new FXMLControllerMethod(
+                    Visibility.PUBLIC,
+                    "initialize",
+                    false,
+                    FXMLType.of(void.class),
+                    List.of()
+            );
             assertThatThrownBy(() -> classUnderTest.renderControllerInitialization(context, null, m))
                     .isInstanceOf(NullPointerException.class);
         }
@@ -1093,7 +1496,13 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void publicInitializeMethodGeneratesDirectCall() {
             FXMLClassType ct = new FXMLClassType(NamedArgBean.class);
-            FXMLControllerMethod m = new FXMLControllerMethod(Visibility.PUBLIC, "initialize", false, FXMLType.of(void.class), List.of());
+            FXMLControllerMethod m = new FXMLControllerMethod(
+                    Visibility.PUBLIC,
+                    "initialize",
+                    false,
+                    FXMLType.of(void.class),
+                    List.of()
+            );
             String result = classUnderTest.renderControllerInitialization(context, ct, m);
             assertThat(result).contains("initialize").doesNotContain("getDeclaredMethod");
         }
@@ -1102,8 +1511,10 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void publicInitializeMethodWithTwoParamsAddsResourceBundle() {
             FXMLClassType ct = new FXMLClassType(NamedArgBean.class);
-            FXMLControllerMethod m = new FXMLControllerMethod(Visibility.PUBLIC, "initialize", false, FXMLType.of(void.class),
-                    List.of(FXMLType.of(URL.class), FXMLType.of(java.util.ResourceBundle.class)));
+            FXMLControllerMethod m = new FXMLControllerMethod(
+                    Visibility.PUBLIC, "initialize", false, FXMLType.of(void.class),
+                    List.of(FXMLType.of(URL.class), FXMLType.of(java.util.ResourceBundle.class))
+            );
             String result = classUnderTest.renderControllerInitialization(context, ct, m);
             assertThat(result).contains("initialize").contains("null");
         }
@@ -1112,7 +1523,13 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void privateInitializeMethodGeneratesReflectionCall() {
             FXMLClassType ct = new FXMLClassType(NamedArgBean.class);
-            FXMLControllerMethod m = new FXMLControllerMethod(Visibility.PRIVATE, "initialize", false, FXMLType.of(void.class), List.of());
+            FXMLControllerMethod m = new FXMLControllerMethod(
+                    Visibility.PRIVATE,
+                    "initialize",
+                    false,
+                    FXMLType.of(void.class),
+                    List.of()
+            );
             String result = classUnderTest.renderControllerInitialization(context, ct, m);
             assertThat(result).contains("getDeclaredMethod").contains("initialize");
         }
@@ -1121,8 +1538,10 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void privateInitializeMethodWithTwoParamsAddsResourceBundleInReflection() {
             FXMLClassType ct = new FXMLClassType(NamedArgBean.class);
-            FXMLControllerMethod m = new FXMLControllerMethod(Visibility.PRIVATE, "initialize", false, FXMLType.of(void.class),
-                    List.of(FXMLType.of(URL.class), FXMLType.of(java.util.ResourceBundle.class)));
+            FXMLControllerMethod m = new FXMLControllerMethod(
+                    Visibility.PRIVATE, "initialize", false, FXMLType.of(void.class),
+                    List.of(FXMLType.of(URL.class), FXMLType.of(java.util.ResourceBundle.class))
+            );
             String result = classUnderTest.renderControllerInitialization(context, ct, m);
             assertThat(result).contains("getDeclaredMethod").contains("ResourceBundle");
         }
@@ -1136,7 +1555,13 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     "io.github.bsels.javafx.maven.plugin.fxml.v2.writer"
             );
             FXMLClassType ct = new FXMLClassType(NamedArgBean.class);
-            FXMLControllerMethod m = new FXMLControllerMethod(Visibility.PROTECTED, "initialize", false, FXMLType.of(void.class), List.of());
+            FXMLControllerMethod m = new FXMLControllerMethod(
+                    Visibility.PROTECTED,
+                    "initialize",
+                    false,
+                    FXMLType.of(void.class),
+                    List.of()
+            );
             String result = classUnderTest.renderControllerInitialization(pkgContext, ct, m);
             assertThat(result).contains("initialize").doesNotContain("getDeclaredMethod");
         }
@@ -1145,7 +1570,13 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void protectedInitializeMethodInDifferentPackageGeneratesReflectionCall() {
             FXMLClassType ct = new FXMLClassType(NamedArgBean.class);
-            FXMLControllerMethod m = new FXMLControllerMethod(Visibility.PROTECTED, "initialize", false, FXMLType.of(void.class), List.of());
+            FXMLControllerMethod m = new FXMLControllerMethod(
+                    Visibility.PROTECTED,
+                    "initialize",
+                    false,
+                    FXMLType.of(void.class),
+                    List.of()
+            );
             String result = classUnderTest.renderControllerInitialization(context, ct, m);
             assertThat(result).contains("getDeclaredMethod");
         }
@@ -1159,7 +1590,13 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     "io.github.bsels.javafx.maven.plugin.fxml.v2.writer"
             );
             FXMLClassType ct = new FXMLClassType(NamedArgBean.class);
-            FXMLControllerMethod m = new FXMLControllerMethod(Visibility.PACKAGE_PRIVATE, "initialize", false, FXMLType.of(void.class), List.of());
+            FXMLControllerMethod m = new FXMLControllerMethod(
+                    Visibility.PACKAGE_PRIVATE,
+                    "initialize",
+                    false,
+                    FXMLType.of(void.class),
+                    List.of()
+            );
             String result = classUnderTest.renderControllerInitialization(pkgContext, ct, m);
             assertThat(result).contains("initialize").doesNotContain("getDeclaredMethod");
         }
