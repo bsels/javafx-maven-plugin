@@ -195,34 +195,74 @@ class FXMLSourceCodeBuilderImportHelperTest {
                     .doesNotContainSequence("?");
         }
 
-        /// Verifies that name collision causes fully qualified name to be used inline.
+        /// Verifies that when a simple name collision occurs and the document class name ends with that
+        /// simple name, the colliding class is mapped to its fully qualified name inline instead of being
+        /// imported.
         ///
-        /// The collision branch fires when a simple name is already imported AND the document class name
-        /// ends with that simple name. We use document class "MyString" (ends with "String") and two
-        /// classes with simple name "String" from different packages.
+        /// Setup: document class is `"MyString"` (ends with `"String"`). The root is typed
+        /// `java.lang.String` (count 2, imported first). A property is typed `com.example.String`
+        /// (count 1, processed second). Because `"String"` is already imported and `"MyString"` ends
+        /// with `"String"`, the if-branch fires and `com.example.String` is mapped to its FQN inline.
         @Test
-        @SuppressWarnings("unchecked")
-        void nameCollisionCausesFullyQualifiedNameInline() throws Exception {
-            // Use reflection to invoke findImports with controlled class count order so that
-            // java.lang.String is always processed first (imported), then com.example.String
-            // triggers the collision branch (document class "MyString" ends with "String").
-            Method groupMethod = FXMLSourceCodeBuilderImportHelper.class
-                    .getDeclaredMethod("groupClassCountsBasedOnClassPrefix", List.class);
-            groupMethod.setAccessible(true);
+        void nameCollisionWithDocumentClassCausesFullyQualifiedNameInline() {
+            // java.lang.String appears twice (root type + objectProperty type) → count=2, processed first
+            // com.example.String appears once (constructorProperty type) → count=1, processed second
+            FXMLConstructorProperty comExampleProp = new FXMLConstructorProperty(
+                    "other", new FXMLUncompiledClassType("com.example.String"), LITERAL
+            );
+            FXMLObjectProperty javaStringProp = new FXMLObjectProperty(
+                    "text", "setText", FXMLType.of(String.class), LITERAL
+            );
+            FXMLObject root = new FXMLObject(
+                    FXMLRootIdentifier.INSTANCE,
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of(javaStringProp, comExampleProp)
+            );
+            // Document class "MyString" ends with "String" → collision branch fires for com.example.String
+            FXMLDocument document = minimalDocument("MyString", root);
 
-            // Controlled order: java.lang.String first, com.example.String second
-            ClassCount javaString = new ClassCount(String.class.getCanonicalName(), 2);
-            ClassCount customString = new ClassCount("com.example.String", 1);
-            List<ClassCount> orderedCounts = List.of(javaString, customString);
+            Imports imports = classUnderTest.findImports(document, false);
 
-            Map<String, List<ClassCount>> grouped =
-                    (Map<String, List<ClassCount>>) groupMethod.invoke(classUnderTest, orderedCounts);
+            assertThat(imports.imports())
+                    .contains(String.class.getCanonicalName())
+                    .doesNotContain("com.example.String");
+            assertThat(imports.inlineClassNames())
+                    .containsEntry("com.example.String", "com.example.String");
+        }
 
-            // Both groups must exist separately (different prefixes: java.lang vs com.example)
-            assertThat(grouped)
-                    .hasSize(2)
-                    .containsKey(String.class.getCanonicalName())
-                    .containsKey("com.example.String");
+        /// Verifies that when a simple name is already imported but the document class name does NOT end
+        /// with that simple name, the else-branch fires: the second class is still added to imports and
+        /// mapped by its simple name relative to the group.
+        ///
+        /// Setup: document class is `"MyDoc"` (does not end with `"String"`). Root typed
+        /// `java.lang.String` (count 2). A property typed `com.example.String` (count 1). Because
+        /// `"MyDoc"` does not end with `"String"`, the if-condition is false and the else-branch runs,
+        /// adding `com.example.String` to imports.
+        @Test
+        void simpleNameAlreadyImportedButNoDocumentClassCollisionStillImports() {
+            // java.lang.String appears twice (root type + objectProperty type) → count=2, processed first
+            // com.example.String appears once (constructorProperty type) → count=1, processed second
+            FXMLConstructorProperty comExampleProp = new FXMLConstructorProperty(
+                    "other", new FXMLUncompiledClassType("com.example.String"), LITERAL
+            );
+            FXMLObjectProperty javaStringProp = new FXMLObjectProperty(
+                    "text", "setText", FXMLType.of(String.class), LITERAL
+            );
+            FXMLObject root = new FXMLObject(
+                    FXMLRootIdentifier.INSTANCE,
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    List.of(javaStringProp, comExampleProp)
+            );
+            // Document class "MyDoc" does NOT end with "String" → else-branch fires
+            FXMLDocument document = minimalDocument("MyDoc", root);
+
+            Imports imports = classUnderTest.findImports(document, false);
+
+            assertThat(imports.imports())
+                    .contains(String.class.getCanonicalName())
+                    .contains("com.example.String");
         }
     }
 
