@@ -9,10 +9,13 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMeth
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLInterface;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.Visibility;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLDocumentParser;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
@@ -55,6 +58,8 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -2082,6 +2087,1093 @@ public class FXMLSourceCodeBuilderTest {
 
             String methods = context.sourceCode(SourcePart.METHODS).toString();
             assertThat(methods).contains("return $internalField$controller$.getValue()");
+        }
+    }
+
+    /// Tests for the private `addConstructorPrologue(SourceCodeGeneratorContext, FXMLDocument)` method
+    /// accessed via reflection.
+    @Nested
+    class AddConstructorProloguePrivateTest {
+
+        /// Helper to invoke the private `addConstructorPrologue(SourceCodeGeneratorContext, FXMLDocument)` method
+        /// via reflection.
+        ///
+        /// @param instance The [FXMLSourceCodeBuilder] instance to invoke the method on.
+        /// @param context  The [SourceCodeGeneratorContext] to pass.
+        /// @param document The [FXMLDocument] to pass.
+        /// @throws Exception if reflection fails or the method throws.
+        private void invokeAddConstructorPrologue(
+                FXMLSourceCodeBuilder instance,
+                SourceCodeGeneratorContext context,
+                FXMLDocument document
+        ) throws Exception {
+            Method method = FXMLSourceCodeBuilder.class.getDeclaredMethod(
+                    "addConstructorPrologue",
+                    SourceCodeGeneratorContext.class,
+                    FXMLDocument.class
+            );
+            method.setAccessible(true);
+            method.invoke(instance, context, document);
+        }
+
+        /// Builds a minimal [FXMLDocument] with the given root object, optional controller, and definitions.
+        ///
+        /// @param root        The root [io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject].
+        /// @param controller  The optional [FXMLController].
+        /// @param definitions The list of definition values.
+        /// @return A minimal [FXMLDocument].
+        private FXMLDocument buildDocument(
+                io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject root,
+                Optional<FXMLController> controller,
+                List<io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue> definitions
+        ) {
+            return new FXMLDocument(
+                    "MyView",
+                    root,
+                    List.of(),
+                    controller,
+                    Optional.empty(),
+                    definitions,
+                    List.of()
+            );
+        }
+
+        /// Builds a minimal [FXMLObject] root with no properties.
+        ///
+        /// @param identifier The identifier to use for the root object.
+        /// @return A minimal [FXMLObject].
+        private FXMLObject buildRoot(
+                io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier identifier
+        ) {
+            return new FXMLObject(identifier, new FXMLClassType(Object.class), Optional.empty(), List.of());
+        }
+
+        /// Verifies that with no controller and a simple root, `CONSTRUCTOR_PROLOGUE` is empty
+        /// and `CONSTRUCTOR_SUPER_CALL` contains `super()`.
+        @Test
+        void noControllerProducesEmptyPrologueAndSuperCall() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLDocument document = buildDocument(
+                    buildRoot(new FXMLInternalIdentifier(0)), Optional.empty(), List.of()
+            );
+
+            invokeAddConstructorPrologue(classUnderTest, context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString()).isEmpty();
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_SUPER_CALL).toString()).isEqualTo("super();");
+        }
+
+        /// Verifies that when a controller is present, `CONSTRUCTOR_PROLOGUE` starts with the controller
+        /// field initialization line.
+        @Test
+        void controllerPresentWritesControllerInitToPrologue() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(), List.of()
+            );
+            FXMLDocument document = buildDocument(
+                    buildRoot(new FXMLInternalIdentifier(0)), Optional.of(controller), List.of()
+            );
+
+            invokeAddConstructorPrologue(classUnderTest, context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString())
+                    .startsWith(FXMLSourceCodeBuilder.INTERNAL_CONTROLLER_FIELD + " = new ");
+        }
+
+        /// Verifies that an [FXMLObject] with an [FXMLInternalIdentifier] produces a local variable declaration
+        /// with the type prefix in `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void fxmlObjectWithInternalIdentifierProducesLocalVarWithTypePrefix() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLObject root = buildRoot(new FXMLInternalIdentifier(0));
+            FXMLObject child = new FXMLObject(
+                    new FXMLInternalIdentifier(1), new FXMLClassType(String.class),
+                    Optional.empty(), List.of()
+            );
+            FXMLObjectProperty property = new FXMLObjectProperty(
+                    "child", "setChild", new FXMLClassType(Object.class), child
+            );
+            FXMLObject rootWithChild = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(property)
+            );
+            FXMLDocument document = buildDocument(rootWithChild, Optional.empty(), List.of());
+
+            invokeAddConstructorPrologue(classUnderTest, context, document);
+
+            String prologue = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+            assertThat(prologue).contains("java.lang.String");
+            assertThat(prologue).contains(" = new java.lang.String();\n");
+        }
+
+        /// Verifies that an [FXMLObject] with an [FXMLExposedIdentifier] that is not a dependency
+        /// produces a simple `name = new Type();` assignment in `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void fxmlObjectWithExposedIdentifierNonDependencyProducesSimpleAssignment() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLObject child = new FXMLObject(
+                    new FXMLExposedIdentifier("myButton"), new FXMLClassType(String.class),
+                    Optional.empty(), List.of()
+            );
+            FXMLObjectProperty property = new FXMLObjectProperty(
+                    "child", "setChild", new FXMLClassType(Object.class), child
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(property)
+            );
+            FXMLDocument document = buildDocument(root, Optional.empty(), List.of());
+
+            invokeAddConstructorPrologue(classUnderTest, context, document);
+
+            String prologue = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+            assertThat(prologue).contains("myButton = new java.lang.String();\n");
+            assertThat(prologue).doesNotContain("$$");
+        }
+
+        /// Verifies that an [FXMLObject] with an [FXMLExposedIdentifier] that IS a constructor dependency
+        /// produces a `$$`-prefixed local variable and a subsequent bind line in `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void fxmlObjectWithExposedIdentifierAsDependencyProducesPrefixedVarAndBindLine() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", new java.util.HashMap<>(), null
+            );
+            FXMLExposedIdentifier depId = new FXMLExposedIdentifier("x");
+            FXMLValue dep = new FXMLValue(
+                    Optional.of(depId), new FXMLClassType(double.class), "1.0"
+            );
+            FXMLConstructorProperty constructorPropX = new FXMLConstructorProperty(
+                    "x", new FXMLClassType(double.class), new FXMLReference(depId.name())
+            );
+            FXMLConstructorProperty constructorPropY = new FXMLConstructorProperty(
+                    "y", new FXMLClassType(double.class), new FXMLLiteral("0.0")
+            );
+            FXMLObject consumer = new FXMLObject(
+                    new FXMLExposedIdentifier("myPoint"), new FXMLClassType(javafx.geometry.Point2D.class),
+                    Optional.empty(), List.of(constructorPropX, constructorPropY)
+            );
+            FXMLObjectProperty depProp = new FXMLObjectProperty(
+                    "dep", "setDep", new FXMLClassType(Object.class), dep
+            );
+            FXMLObjectProperty consumerProp = new FXMLObjectProperty(
+                    "consumer", "setConsumer", new FXMLClassType(Object.class), consumer
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(depProp, consumerProp)
+            );
+            FXMLDocument document = buildDocument(root, Optional.empty(), List.of());
+
+            invokeAddConstructorPrologue(classUnderTest, context, document);
+
+            String prologue = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+            assertThat(prologue).contains("$$x");
+            assertThat(prologue).contains("x = $$x;\n");
+        }
+
+        /// Verifies that an [FXMLCopy] produces a `name = new SourceType($$source);` line in
+        /// `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void fxmlCopyProducesCopyConstructorCallInPrologue() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLExposedIdentifier sourceId = new FXMLExposedIdentifier("original");
+            FXMLObject source = new FXMLObject(
+                    sourceId, new FXMLClassType(String.class), Optional.empty(), List.of()
+            );
+            FXMLCopy copy = new FXMLCopy(new FXMLExposedIdentifier("myCopy"), sourceId);
+            FXMLObjectProperty sourceProp = new FXMLObjectProperty(
+                    "source", "setSource", new FXMLClassType(Object.class), source
+            );
+            FXMLObjectProperty copyProp = new FXMLObjectProperty(
+                    "copy", "setCopy", new FXMLClassType(Object.class), copy
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(sourceProp, copyProp)
+            );
+            FXMLDocument document = buildDocument(
+                    root, Optional.empty(),
+                    List.of()
+            );
+            // identifierToTypeMap must be mutable for FXMLCopy type resolution
+            context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "",
+                    new java.util.HashMap<>(Map.of(sourceId.name(), new FXMLClassType(String.class))),
+                    null
+            );
+
+            invokeAddConstructorPrologue(classUnderTest, context, document);
+
+            String prologue = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+            assertThat(prologue).contains("myCopy = new java.lang.String($$original);\n");
+        }
+
+        /// Verifies that an [FXMLInclude] produces a `name = new IncludedClass();` line in
+        /// `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void fxmlIncludeProducesNewIncludedClassCallInPrologue() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLLazyLoadedDocument lazyDoc = new FXMLLazyLoadedDocument();
+            FXMLDocument includedDoc = new FXMLDocument(
+                    "IncludedView", buildRoot(new FXMLInternalIdentifier(0)),
+                    List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
+            );
+            lazyDoc.set(includedDoc);
+            FXMLInclude include = new FXMLInclude(
+                    new FXMLExposedIdentifier("myInclude"),
+                    "included.fxml",
+                    java.nio.charset.StandardCharsets.UTF_8,
+                    Optional.empty(),
+                    lazyDoc
+            );
+            FXMLObjectProperty includeProp = new FXMLObjectProperty(
+                    "include", "setInclude", new FXMLClassType(Object.class), include
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(includeProp)
+            );
+            FXMLDocument document = buildDocument(root, Optional.empty(), List.of());
+
+            invokeAddConstructorPrologue(classUnderTest, context, document);
+
+            String prologue = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+            assertThat(prologue).contains("myInclude = new IncludedView();\n");
+        }
+
+        /// Verifies that an [FXMLValue] with an identifier produces a literal assignment in
+        /// `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void fxmlValueWithIdentifierProducesLiteralAssignmentInPrologue() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLValue fxmlValue = new FXMLValue(
+                    Optional.of(new FXMLExposedIdentifier("myVal")),
+                    new FXMLClassType(String.class),
+                    "hello"
+            );
+            FXMLObjectProperty valueProp = new FXMLObjectProperty(
+                    "val", "setVal", new FXMLClassType(Object.class), fxmlValue
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(valueProp)
+            );
+            FXMLDocument document = buildDocument(root, Optional.empty(), List.of());
+
+            invokeAddConstructorPrologue(classUnderTest, context, document);
+
+            String prologue = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+            assertThat(prologue).contains("myVal = ");
+            assertThat(prologue).contains("hello");
+        }
+
+        /// Verifies that an [FXMLValue] without an identifier produces nothing in `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void fxmlValueWithoutIdentifierProducesNothingInPrologue() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLValue fxmlValue = new FXMLValue(
+                    Optional.empty(),
+                    new FXMLClassType(String.class),
+                    "hello"
+            );
+            FXMLObjectProperty valueProp = new FXMLObjectProperty(
+                    "val", "setVal", new FXMLClassType(Object.class), fxmlValue
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(valueProp)
+            );
+            FXMLDocument document = buildDocument(root, Optional.empty(), List.of());
+
+            invokeAddConstructorPrologue(classUnderTest, context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString()).isEmpty();
+        }
+
+        /// Verifies that objects in the definitions list are also processed and appear in
+        /// `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void definitionsListObjectsAreAlsoProcessedInPrologue() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLObject defObject = new FXMLObject(
+                    new FXMLExposedIdentifier("defItem"), new FXMLClassType(String.class),
+                    Optional.empty(), List.of()
+            );
+            FXMLDocument document = buildDocument(
+                    buildRoot(new FXMLInternalIdentifier(0)), Optional.empty(), List.of(defObject)
+            );
+
+            invokeAddConstructorPrologue(classUnderTest, context, document);
+
+            String prologue = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+            assertThat(prologue).contains("defItem = new java.lang.String();\n");
+        }
+    }
+
+    /// Tests for the private `findConstructions(AbstractFXMLValue, SourceCodeGeneratorContext)` method
+    /// accessed via reflection through `addConstructorPrologue`.
+    @Nested
+    class FindConstructionsPrivateTest {
+
+        /// Helper to build a minimal [FXMLDocument] with the given root.
+        ///
+        /// @param root The root object.
+        /// @return A minimal [FXMLDocument].
+        private FXMLDocument buildDocument(FXMLObject root) {
+            return new FXMLDocument(
+                    "MyView", root, List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
+            );
+        }
+
+        /// Helper to invoke `addConstructorPrologue` and return the prologue string.
+        ///
+        /// @param document The document to process.
+        /// @return The generated prologue string.
+        /// @throws Exception if reflection fails.
+        private String invokePrologue(FXMLDocument document) throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            Method method = FXMLSourceCodeBuilder.class.getDeclaredMethod(
+                    "addConstructorPrologue", SourceCodeGeneratorContext.class, FXMLDocument.class
+            );
+            method.setAccessible(true);
+            method.invoke(classUnderTest, context, document);
+            return context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+        }
+
+        /// Verifies that an [FXMLCollection] nested inside an [FXMLObject] property produces a
+        /// `new ArrayList()` construction in `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void fxmlCollectionNestedInPropertyProducesCollectionConstruction() throws Exception {
+            FXMLCollection collection = new FXMLCollection(
+                    new FXMLExposedIdentifier("myList"),
+                    new FXMLClassType(java.util.ArrayList.class),
+                    Optional.empty(),
+                    List.of()
+            );
+            FXMLObjectProperty prop = new FXMLObjectProperty(
+                    "items", "setItems", new FXMLClassType(Object.class), collection
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(prop)
+            );
+            FXMLDocument document = buildDocument(root);
+
+            String prologue = invokePrologue(document);
+
+            assertThat(prologue).contains("myList = new java.util.ArrayList();");
+        }
+
+        /// Verifies that an [FXMLCollection] nested in a property with a nested [FXMLObject] child
+        /// also constructs the child in `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void fxmlCollectionWithNestedChildConstructsChild() throws Exception {
+            FXMLObject child = new FXMLObject(
+                    new FXMLExposedIdentifier("item"),
+                    new FXMLClassType(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
+            FXMLCollection collection = new FXMLCollection(
+                    new FXMLExposedIdentifier("myList"),
+                    new FXMLClassType(java.util.ArrayList.class),
+                    Optional.empty(),
+                    List.of(child)
+            );
+            FXMLObjectProperty prop = new FXMLObjectProperty(
+                    "items", "setItems", new FXMLClassType(Object.class), collection
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(prop)
+            );
+            FXMLDocument document = buildDocument(root);
+
+            String prologue = invokePrologue(document);
+
+            assertThat(prologue).contains("item = new java.lang.String();");
+        }
+
+        /// Verifies that an [FXMLMap] nested inside an [FXMLObject] property produces a map construction
+        /// in `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void fxmlMapNestedInPropertyProducesMapConstruction() throws Exception {
+            FXMLMap map = new FXMLMap(
+                    new FXMLExposedIdentifier("myMap"),
+                    new FXMLClassType(java.util.HashMap.class),
+                    new FXMLClassType(String.class),
+                    new FXMLClassType(String.class),
+                    Optional.empty(),
+                    Map.of()
+            );
+            FXMLObjectProperty prop = new FXMLObjectProperty(
+                    "data", "setData", new FXMLClassType(Object.class), map
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(prop)
+            );
+            FXMLDocument document = buildDocument(root);
+
+            String prologue = invokePrologue(document);
+
+            assertThat(prologue).contains("myMap = new java.util.HashMap();");
+        }
+
+        /// Verifies that an [FXMLMap] nested in a property with a nested [FXMLObject] entry value
+        /// also constructs the entry in `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void fxmlMapWithNestedEntryValueConstructsEntry() throws Exception {
+            FXMLObject entryValue = new FXMLObject(
+                    new FXMLExposedIdentifier("entryObj"),
+                    new FXMLClassType(String.class),
+                    Optional.empty(),
+                    List.of()
+            );
+            FXMLMap map = new FXMLMap(
+                    new FXMLExposedIdentifier("myMap"),
+                    new FXMLClassType(java.util.HashMap.class),
+                    new FXMLClassType(String.class),
+                    new FXMLClassType(Object.class),
+                    Optional.empty(),
+                    Map.of(new FXMLLiteral("key"), entryValue)
+            );
+            FXMLObjectProperty prop = new FXMLObjectProperty(
+                    "data", "setData", new FXMLClassType(Object.class), map
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(prop)
+            );
+            FXMLDocument document = buildDocument(root);
+
+            String prologue = invokePrologue(document);
+
+            assertThat(prologue).contains("entryObj = new java.lang.String();");
+        }
+
+        /// Verifies that no-op value types ([FXMLMethod], [FXMLConstant], [FXMLExpression],
+        /// [FXMLInlineScript], [FXMLLiteral], [FXMLResource], [FXMLTranslation]) nested inside an
+        /// [FXMLObject] property produce no construction lines in `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void noOpValueTypesNestedInObjectPropertyProduceNoConstruction() throws Exception {
+            FXMLMethod fxmlMethod = new FXMLMethod("onClick", List.of(), new FXMLClassType(void.class));
+            FXMLObjectProperty methodProp = new FXMLObjectProperty(
+                    "onAction", "setOnAction", new FXMLClassType(Object.class), fxmlMethod
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(methodProp)
+            );
+            FXMLDocument document = buildDocument(root);
+
+            String prologue = invokePrologue(document);
+
+            assertThat(prologue).isEmpty();
+        }
+
+        /// Verifies that an [FXMLObject] with a factory method nested inside a root property produces
+        /// a `Type.method(...)` call instead of `new Type(...)` in `CONSTRUCTOR_PROLOGUE`.
+        @Test
+        void fxmlObjectWithFactoryMethodProducesFactoryCallInPrologue() throws Exception {
+            FXMLFactoryMethod factoryMethod = new FXMLFactoryMethod(
+                    new FXMLClassType(java.util.Collections.class), "emptyList"
+            );
+            FXMLObject obj = new FXMLObject(
+                    new FXMLExposedIdentifier("myObj"),
+                    new FXMLClassType(java.util.List.class),
+                    Optional.of(factoryMethod),
+                    List.of()
+            );
+            FXMLObjectProperty prop = new FXMLObjectProperty(
+                    "items", "setItems", new FXMLClassType(Object.class), obj
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(prop)
+            );
+            FXMLDocument document = buildDocument(root);
+
+            String prologue = invokePrologue(document);
+
+            assertThat(prologue).contains("java.util.Collections.emptyList(");
+        }
+    }
+
+    /// Tests for the private `resolveConstructionOrder(List)` method accessed via reflection.
+    @Nested
+    class ResolveConstructionOrderPrivateTest {
+
+        /// Verifies that a cyclic dependency between two [FXMLObject] nodes throws
+        /// [IllegalArgumentException] when `addConstructorPrologue` is called.
+        @Test
+        void cyclicDependencyThrowsIllegalArgumentException() {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", new java.util.HashMap<>(), null
+            );
+            FXMLExposedIdentifier idA = new FXMLExposedIdentifier("objA");
+            FXMLExposedIdentifier idB = new FXMLExposedIdentifier("objB");
+            // objA depends on objB via constructor property
+            FXMLConstructorProperty propA = new FXMLConstructorProperty(
+                    "x", new FXMLClassType(double.class), new FXMLReference(idB.name())
+            );
+            // objB depends on objA via constructor property
+            FXMLConstructorProperty propB = new FXMLConstructorProperty(
+                    "x", new FXMLClassType(double.class), new FXMLReference(idA.name())
+            );
+            FXMLObject objA = new FXMLObject(
+                    idA, new FXMLClassType(javafx.geometry.Point2D.class),
+                    Optional.empty(), List.of(propA)
+            );
+            FXMLObject objB = new FXMLObject(
+                    idB, new FXMLClassType(javafx.geometry.Point2D.class),
+                    Optional.empty(), List.of(propB)
+            );
+            FXMLObjectProperty propObjA = new FXMLObjectProperty(
+                    "a", "setA", new FXMLClassType(Object.class), objA
+            );
+            FXMLObjectProperty propObjB = new FXMLObjectProperty(
+                    "b", "setB", new FXMLClassType(Object.class), objB
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of(propObjA, propObjB)
+            );
+            FXMLDocument document = new FXMLDocument(
+                    "MyView", root, List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
+            );
+
+            Method method;
+            try {
+                method = FXMLSourceCodeBuilder.class.getDeclaredMethod(
+                        "addConstructorPrologue", SourceCodeGeneratorContext.class, FXMLDocument.class
+                );
+                method.setAccessible(true);
+            } catch (NoSuchMethodException e) {
+                throw new RuntimeException(e);
+            }
+            final Method finalMethod = method;
+
+            assertThatThrownBy(() -> finalMethod.invoke(classUnderTest, context, document))
+                    .cause()
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Cyclic dependencies");
+        }
+    }
+
+    /// Tests for the private `findIdentifierForValue(AbstractFXMLValue)` method accessed via reflection.
+    @Nested
+    class FindIdentifierForValuePrivateTest {
+
+        /// Helper to invoke the private `findIdentifierForValue` method via reflection.
+        ///
+        /// @param value The value to find the identifier for.
+        /// @return The [Optional] result.
+        /// @throws Exception if reflection fails.
+        @SuppressWarnings("unchecked")
+        private Optional<Object> invokeFindIdentifierForValue(Object value) throws Exception {
+            Method method = FXMLSourceCodeBuilder.class.getDeclaredMethod(
+                    "findIdentifierForValue",
+                    io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue.class
+            );
+            method.setAccessible(true);
+            return (Optional<Object>) method.invoke(classUnderTest, value);
+        }
+
+        /// Verifies that an [FXMLObject] returns its identifier.
+        @Test
+        void fxmlObjectReturnsItsIdentifier() throws Exception {
+            FXMLExposedIdentifier id = new FXMLExposedIdentifier("myObj");
+            FXMLObject obj = new FXMLObject(id, new FXMLClassType(Object.class), Optional.empty(), List.of());
+
+            Optional<Object> result = invokeFindIdentifierForValue(obj);
+
+            assertThat(result).contains(id);
+        }
+
+        /// Verifies that an [FXMLCopy] returns its identifier.
+        @Test
+        void fxmlCopyReturnsItsIdentifier() throws Exception {
+            FXMLExposedIdentifier id = new FXMLExposedIdentifier("myCopy");
+            FXMLCopy copy = new FXMLCopy(id, new FXMLExposedIdentifier("source"));
+
+            Optional<Object> result = invokeFindIdentifierForValue(copy);
+
+            assertThat(result).contains(id);
+        }
+
+        /// Verifies that an [FXMLInclude] returns its identifier.
+        @Test
+        void fxmlIncludeReturnsItsIdentifier() throws Exception {
+            FXMLExposedIdentifier id = new FXMLExposedIdentifier("myInclude");
+            FXMLLazyLoadedDocument lazyDoc = new FXMLLazyLoadedDocument();
+            FXMLInclude include = new FXMLInclude(
+                    id, "inc.fxml", java.nio.charset.StandardCharsets.UTF_8, Optional.empty(), lazyDoc
+            );
+
+            Optional<Object> result = invokeFindIdentifierForValue(include);
+
+            assertThat(result).contains(id);
+        }
+
+        /// Verifies that an [FXMLReference] returns an [FXMLExposedIdentifier] with the reference name.
+        @Test
+        void fxmlReferenceReturnsExposedIdentifierWithName() throws Exception {
+            FXMLReference reference = new FXMLReference("myRef");
+
+            Optional<Object> result = invokeFindIdentifierForValue(reference);
+
+            assertThat(result).contains(new FXMLExposedIdentifier("myRef"));
+        }
+
+        /// Verifies that an [FXMLValue] with an identifier returns that identifier.
+        @Test
+        void fxmlValueWithIdentifierReturnsIdentifier() throws Exception {
+            FXMLExposedIdentifier id = new FXMLExposedIdentifier("myVal");
+            FXMLValue value = new FXMLValue(Optional.of(id), new FXMLClassType(String.class), "hello");
+
+            Optional<Object> result = invokeFindIdentifierForValue(value);
+
+            assertThat(result).contains(id);
+        }
+
+        /// Verifies that an [FXMLValue] without an identifier returns empty.
+        @Test
+        void fxmlValueWithoutIdentifierReturnsEmpty() throws Exception {
+            FXMLValue value = new FXMLValue(Optional.empty(), new FXMLClassType(String.class), "hello");
+
+            Optional<Object> result = invokeFindIdentifierForValue(value);
+
+            assertThat(result).isEmpty();
+        }
+
+        /// Verifies that [FXMLConstant] returns empty.
+        @Test
+        void fxmlConstantReturnsEmpty() throws Exception {
+            FXMLConstant constant = new FXMLConstant(new FXMLClassType(String.class), "MY_CONST", new FXMLClassType(String.class));
+
+            Optional<Object> result = invokeFindIdentifierForValue(constant);
+
+            assertThat(result).isEmpty();
+        }
+
+        /// Verifies that [FXMLExpression] returns empty.
+        @Test
+        void fxmlExpressionReturnsEmpty() throws Exception {
+            FXMLExpression expression = new FXMLExpression("myExpr");
+
+            Optional<Object> result = invokeFindIdentifierForValue(expression);
+
+            assertThat(result).isEmpty();
+        }
+
+        /// Verifies that [FXMLInlineScript] returns empty.
+        @Test
+        void fxmlInlineScriptReturnsEmpty() throws Exception {
+            FXMLInlineScript script = new FXMLInlineScript("var x = 1;");
+
+            Optional<Object> result = invokeFindIdentifierForValue(script);
+
+            assertThat(result).isEmpty();
+        }
+
+        /// Verifies that [FXMLLiteral] returns empty.
+        @Test
+        void fxmlLiteralReturnsEmpty() throws Exception {
+            FXMLLiteral literal = new FXMLLiteral("hello");
+
+            Optional<Object> result = invokeFindIdentifierForValue(literal);
+
+            assertThat(result).isEmpty();
+        }
+
+        /// Verifies that [FXMLMethod] returns empty.
+        @Test
+        void fxmlMethodReturnsEmpty() throws Exception {
+            FXMLMethod fxmlMethod = new FXMLMethod("onClick", List.of(), new FXMLClassType(void.class));
+
+            Optional<Object> result = invokeFindIdentifierForValue(fxmlMethod);
+
+            assertThat(result).isEmpty();
+        }
+
+        /// Verifies that [FXMLResource] returns empty.
+        @Test
+        void fxmlResourceReturnsEmpty() throws Exception {
+            FXMLResource resource = new FXMLResource("style.css");
+
+            Optional<Object> result = invokeFindIdentifierForValue(resource);
+
+            assertThat(result).isEmpty();
+        }
+
+        /// Verifies that [FXMLTranslation] returns empty.
+        @Test
+        void fxmlTranslationReturnsEmpty() throws Exception {
+            FXMLTranslation translation = new FXMLTranslation("key.label");
+
+            Optional<Object> result = invokeFindIdentifierForValue(translation);
+
+            assertThat(result).isEmpty();
+        }
+    }
+
+    /// Tests for the private `prepareArgumentsLists(StringBuilder, Constructions, SourceCodeGeneratorContext)` method.
+    @Nested
+    class PrepareArgumentsListsPrivateTest {
+
+        /// Invokes the private `prepareArgumentsLists` method via reflection.
+        ///
+        /// @param builder       The [StringBuilder] to append to.
+        /// @param constructions The [Constructions] instance to process.
+        /// @param context       The [SourceCodeGeneratorContext] to use.
+        /// @return The resulting [StringBuilder].
+        /// @throws Exception if reflection fails.
+        private StringBuilder invokePrepareArgumentsLists(
+                StringBuilder builder,
+                Constructions constructions,
+                SourceCodeGeneratorContext context
+        ) throws Exception {
+            Method method = FXMLSourceCodeBuilder.class.getDeclaredMethod(
+                    "prepareArgumentsLists",
+                    StringBuilder.class,
+                    Constructions.class,
+                    SourceCodeGeneratorContext.class
+            );
+            method.setAccessible(true);
+            return (StringBuilder) method.invoke(classUnderTest, builder, constructions, context);
+        }
+
+        /// Verifies that an [AbstractFXMLObjectAndDependencies] with no constructor properties
+        /// produces an empty argument list (no commas, no values appended).
+        @Test
+        void objectWithNoConstructorPropertiesProducesEmptyArgs() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLObject obj = new FXMLObject(
+                    new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                    Optional.empty(), List.of()
+            );
+            AbstractFXMLObjectAndDependencies construction = new AbstractFXMLObjectAndDependencies(
+                    obj, List.of(), List.of()
+            );
+            StringBuilder builder = new StringBuilder();
+
+            invokePrepareArgumentsLists(builder, construction, context);
+
+            assertThat(builder.toString()).isEmpty();
+        }
+
+        /// Verifies that an [AbstractFXMLObjectAndDependencies] with constructor properties matching
+        /// `javafx.geometry.Point2D`'s `x` and `y` `@NamedArg` parameters produces a comma-separated
+        /// argument list with the encoded values.
+        @Test
+        void objectWithMatchingConstructorPropertiesProducesCommaSeparatedArgs() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLConstructorProperty propX = new FXMLConstructorProperty(
+                    "x", new FXMLClassType(double.class), new FXMLLiteral("1.0")
+            );
+            FXMLConstructorProperty propY = new FXMLConstructorProperty(
+                    "y", new FXMLClassType(double.class), new FXMLLiteral("2.0")
+            );
+            FXMLObject obj = new FXMLObject(
+                    new FXMLExposedIdentifier("myPoint"),
+                    new FXMLClassType(javafx.geometry.Point2D.class),
+                    Optional.empty(), List.of(propX, propY)
+            );
+            AbstractFXMLObjectAndDependencies construction = new AbstractFXMLObjectAndDependencies(
+                    obj, List.of(propX, propY), List.of()
+            );
+            StringBuilder builder = new StringBuilder();
+
+            invokePrepareArgumentsLists(builder, construction, context);
+
+            assertThat(builder.toString()).contains("1.0").contains("2.0").contains(", ");
+        }
+
+        /// Verifies that when a constructor property is absent from the FXML properties map,
+        /// the default value from the `@NamedArg` annotation is used (or the type default).
+        @Test
+        void objectWithMissingConstructorPropertyUsesDefaultValue() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            // Point2D has x and y; provide only x — y should use default (0.0)
+            FXMLConstructorProperty propX = new FXMLConstructorProperty(
+                    "x", new FXMLClassType(double.class), new FXMLLiteral("3.0")
+            );
+            FXMLObject obj = new FXMLObject(
+                    new FXMLExposedIdentifier("myPoint"),
+                    new FXMLClassType(javafx.geometry.Point2D.class),
+                    Optional.empty(), List.of(propX)
+            );
+            AbstractFXMLObjectAndDependencies construction = new AbstractFXMLObjectAndDependencies(
+                    obj, List.of(propX), List.of()
+            );
+            StringBuilder builder = new StringBuilder();
+
+            invokePrepareArgumentsLists(builder, construction, context);
+
+            // x is provided, y falls back to default (0.0 from @NamedArg or type default)
+            assertThat(builder.toString()).contains("3.0");
+        }
+
+        /// Verifies that an [FXMLCopyAndDependencies] appends the `$$`-prefixed source name to the builder.
+        @Test
+        void fxmlCopyAndDependenciesAppendsPrefixedSourceName() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLExposedIdentifier sourceId = new FXMLExposedIdentifier("original");
+            FXMLCopy copy = new FXMLCopy(new FXMLExposedIdentifier("myCopy"), sourceId);
+            FXMLCopyAndDependencies construction = new FXMLCopyAndDependencies(copy, List.of());
+            StringBuilder builder = new StringBuilder();
+
+            invokePrepareArgumentsLists(builder, construction, context);
+
+            assertThat(builder.toString()).isEqualTo("$$original");
+        }
+
+        /// Verifies that an [FXMLIncludeAndDependencies] leaves the builder unchanged.
+        @Test
+        void fxmlIncludeAndDependenciesLeavesBuilderUnchanged() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLLazyLoadedDocument lazyDoc = new FXMLLazyLoadedDocument();
+            FXMLInclude include = new FXMLInclude(
+                    new FXMLExposedIdentifier("myInclude"),
+                    "view.fxml",
+                    java.nio.charset.StandardCharsets.UTF_8,
+                    Optional.empty(),
+                    lazyDoc
+            );
+            FXMLIncludeAndDependencies construction = new FXMLIncludeAndDependencies(include, List.of());
+            StringBuilder builder = new StringBuilder("prefix");
+
+            invokePrepareArgumentsLists(builder, construction, context);
+
+            assertThat(builder.toString()).isEqualTo("prefix");
+        }
+
+        /// Verifies that an [FXMLValueConstruction] leaves the builder unchanged.
+        @Test
+        void fxmlValueConstructionLeavesBuilderUnchanged() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLValue value = new FXMLValue(Optional.empty(), new FXMLClassType(String.class), "hello");
+            FXMLValueConstruction construction = new FXMLValueConstruction(value, List.of());
+            StringBuilder builder = new StringBuilder("prefix");
+
+            invokePrepareArgumentsLists(builder, construction, context);
+
+            assertThat(builder.toString()).isEqualTo("prefix");
+        }
+    }
+
+    /// Tests for the private `addPrologue` method of [FXMLSourceCodeBuilder].
+    @Nested
+    class AddProloguePrivateTest {
+
+        /// Invokes the private `addPrologue` method via reflection.
+        ///
+        /// @param context                  The source code generator context.
+        /// @param constructorDependencies  The set of identifiers that are constructor dependencies.
+        /// @param typeString               The type string for the identifier.
+        /// @param identifier               The FXML identifier to initialize.
+        /// @param sourceCodeConsumer       A consumer that appends additional source code logic.
+        /// @throws Exception If reflection fails or the method throws.
+        private void invokeAddPrologue(
+                SourceCodeGeneratorContext context,
+                Set<FXMLIdentifier> constructorDependencies,
+                String typeString,
+                FXMLIdentifier identifier,
+                Consumer<StringBuilder> sourceCodeConsumer
+        ) throws Exception {
+            Method method = FXMLSourceCodeBuilder.class.getDeclaredMethod(
+                    "addPrologue",
+                    SourceCodeGeneratorContext.class,
+                    Set.class,
+                    String.class,
+                    FXMLIdentifier.class,
+                    Consumer.class
+            );
+            method.setAccessible(true);
+            method.invoke(classUnderTest, context, constructorDependencies, typeString, identifier, sourceCodeConsumer);
+        }
+
+        /// Verifies that an [FXMLInternalIdentifier] produces a local variable declaration
+        /// with the type prefix and the `$internalVariable$`-prefixed id, and no bind line.
+        @Test
+        void internalIdentifierProducesLocalVarWithTypePrefix() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLInternalIdentifier id = new FXMLInternalIdentifier(1);
+
+            invokeAddPrologue(context, Set.of(), "javafx.scene.Node", id, sb -> sb.append("new javafx.scene.Node()"));
+
+            String result = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+            assertThat(result).isEqualTo("javafx.scene.Node $internalVariable$001 = new javafx.scene.Node();\n");
+        }
+
+        /// Verifies that an [FXMLExposedIdentifier] that is not a dependency produces a plain assignment
+        /// without a type prefix and without a bind line.
+        @Test
+        void exposedIdentifierNotDependencyProducesPlainAssignment() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLExposedIdentifier id = new FXMLExposedIdentifier("myLabel");
+
+            invokeAddPrologue(context, Set.of(), "javafx.scene.control.Label", id, sb -> sb.append("new javafx.scene.control.Label()"));
+
+            String result = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+            assertThat(result).isEqualTo("myLabel = new javafx.scene.control.Label();\n");
+        }
+
+        /// Verifies that an [FXMLExposedIdentifier] that is a constructor dependency produces a
+        /// `$$`-prefixed local variable declaration followed by a bind line assigning it to the field.
+        @Test
+        void exposedIdentifierAsDependencyProducesPrefixedVarAndBindLine() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLExposedIdentifier id = new FXMLExposedIdentifier("myButton");
+
+            invokeAddPrologue(context, Set.of(id), "javafx.scene.control.Button", id, sb -> sb.append("new javafx.scene.control.Button()"));
+
+            String result = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+            assertThat(result).contains("javafx.scene.control.Button $$myButton = new javafx.scene.control.Button();\n");
+            assertThat(result).contains("myButton = $$myButton;\n");
+        }
+
+        /// Verifies that the `sourceCodeConsumer` is called and its output is appended between
+        /// the identifier and the semicolon.
+        @Test
+        void sourceCodeConsumerOutputIsAppendedCorrectly() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLInternalIdentifier id = new FXMLInternalIdentifier(42);
+
+            invokeAddPrologue(context, Set.of(), "String", id, sb -> sb.append("\"hello\""));
+
+            String result = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+            assertThat(result).isEqualTo("String $internalVariable$042 = \"hello\";\n");
+        }
+
+        /// Verifies that an [FXMLInternalIdentifier] that is present in the constructor dependencies set
+        /// still produces a plain local variable declaration without a `$$` prefix and without a bind line,
+        /// because `isDependency` is `false` when `isInternalIdentifier` is `true`.
+        @Test
+        void internalIdentifierInDependencySetProducesLocalVarWithoutBindLine() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLInternalIdentifier id = new FXMLInternalIdentifier(5);
+
+            invokeAddPrologue(context, Set.of(id), "javafx.scene.Node", id, sb -> sb.append("new javafx.scene.Node()"));
+
+            String result = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+            assertThat(result).isEqualTo("javafx.scene.Node $internalVariable$005 = new javafx.scene.Node();\n");
+        }
+
+        /// Verifies that calling `addPrologue` twice appends both lines sequentially.
+        @Test
+        void callingTwiceAppendsBothLines() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLInternalIdentifier id1 = new FXMLInternalIdentifier(10);
+            FXMLInternalIdentifier id2 = new FXMLInternalIdentifier(20);
+
+            invokeAddPrologue(context, Set.of(), "int", id1, sb -> sb.append("1"));
+            invokeAddPrologue(context, Set.of(), "int", id2, sb -> sb.append("2"));
+
+            String result = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
+            assertThat(result).isEqualTo("int $internalVariable$010 = 1;\nint $internalVariable$020 = 2;\n");
+        }
+    }
+
+    /// Tests for the private `bindPrologueVariableToField` method of [FXMLSourceCodeBuilder].
+    @Nested
+    class BindPrologueVariableToFieldPrivateTest {
+
+        /// Invokes the private `bindPrologueVariableToField` method via reflection.
+        ///
+        /// @param sourceCode     The [StringBuilder] to append to.
+        /// @param fxmlIdentifier The FXML identifier to bind.
+        /// @throws Exception If reflection fails or the method throws.
+        private void invokeBindPrologueVariableToField(
+                StringBuilder sourceCode,
+                FXMLIdentifier fxmlIdentifier
+        ) throws Exception {
+            Method method = FXMLSourceCodeBuilder.class.getDeclaredMethod(
+                    "bindPrologueVariableToField",
+                    StringBuilder.class,
+                    FXMLIdentifier.class
+            );
+            method.setAccessible(true);
+            method.invoke(classUnderTest, sourceCode, fxmlIdentifier);
+        }
+
+        /// Verifies that an [FXMLExposedIdentifier] produces `name = $$name;\n`.
+        @Test
+        void exposedIdentifierProducesPrefixedBindLine() throws Exception {
+            StringBuilder sb = new StringBuilder();
+            FXMLExposedIdentifier id = new FXMLExposedIdentifier("myField");
+
+            invokeBindPrologueVariableToField(sb, id);
+
+            assertThat(sb.toString()).isEqualTo("myField = $$myField;\n");
+        }
+
+        /// Verifies that an [FXMLInternalIdentifier] produces `$internalVariable$NNN = $internalVariable$NNN;\n` (no `$$` prefix).
+        @Test
+        void internalIdentifierProducesUnprefixedBindLine() throws Exception {
+            StringBuilder sb = new StringBuilder();
+            FXMLInternalIdentifier id = new FXMLInternalIdentifier(7);
+
+            invokeBindPrologueVariableToField(sb, id);
+
+            assertThat(sb.toString()).isEqualTo("$internalVariable$007 = $internalVariable$007;\n");
+        }
+
+        /// Verifies that calling the method appends to existing content in the builder.
+        @Test
+        void appendsToExistingBuilderContent() throws Exception {
+            StringBuilder sb = new StringBuilder("existing;\n");
+            FXMLExposedIdentifier id = new FXMLExposedIdentifier("node");
+
+            invokeBindPrologueVariableToField(sb, id);
+
+            assertThat(sb.toString()).isEqualTo("existing;\nnode = $$node;\n");
         }
     }
 }
