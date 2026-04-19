@@ -15,10 +15,17 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdent
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLDocumentParser;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticObjectProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLUncompiledClassType;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLValue;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCollection;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLConstant;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCopy;
@@ -3174,6 +3181,1091 @@ public class FXMLSourceCodeBuilderTest {
             invokeBindPrologueVariableToField(sb, id);
 
             assertThat(sb.toString()).isEqualTo("existing;\nnode = $$node;\n");
+        }
+    }
+
+    /// Tests for the private `addConstructorEpilogue(SourceCodeGeneratorContext, FXMLDocument)` method
+    /// and all methods it calls.
+    @Nested
+    class AddConstructorEpiloguePrivateTest {
+
+        private SourceCodeGeneratorContext buildContext() {
+            return new SourceCodeGeneratorContext(new Imports(List.of(), Map.of()), "", Map.of(), null);
+        }
+
+        private FXMLDocument buildDocument(AbstractFXMLObject root, List<AbstractFXMLValue> definitions) {
+            return new FXMLDocument(
+                    "MyClass", root, List.of(), Optional.empty(), Optional.empty(),
+                    definitions, List.of()
+            );
+        }
+
+        private FXMLObject buildRoot(FXMLIdentifier identifier, List<FXMLProperty> properties) {
+            return new FXMLObject(identifier, new FXMLClassType(Object.class), Optional.empty(), properties);
+        }
+
+        private void invokeAddConstructorEpilogue(SourceCodeGeneratorContext context, FXMLDocument document)
+                throws Exception {
+            Method m = FXMLSourceCodeBuilder.class.getDeclaredMethod(
+                    "addConstructorEpilogue",
+                    SourceCodeGeneratorContext.class,
+                    FXMLDocument.class
+            );
+            m.setAccessible(true);
+            m.invoke(classUnderTest, context, document);
+        }
+
+        /// Verifies that a document with no properties and no definitions produces an empty epilogue.
+        @Test
+        void documentWithNoPropertiesProducesEmptyEpilogue() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLDocument document = buildDocument(
+                    buildRoot(FXMLRootIdentifier.INSTANCE, List.of()),
+                    List.of()
+            );
+
+            invokeAddConstructorEpilogue(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString()).isEmpty();
+        }
+
+        /// Verifies that a `FXMLCollection` root produces `.add(...)` calls for each child.
+        @Test
+        void fxmlCollectionRootProducesAddCalls() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLLiteral lit = new FXMLLiteral("hello");
+            FXMLCollection collection = new FXMLCollection(
+                    new FXMLExposedIdentifier("items"),
+                    new FXMLClassType(java.util.ArrayList.class),
+                    Optional.empty(),
+                    List.of(lit)
+            );
+            FXMLDocument document = buildDocument(collection, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString())
+                    .contains("items.add(");
+        }
+
+        /// Verifies that a `FXMLMap` root produces `.put(...)` calls for each entry.
+        @Test
+        void fxmlMapRootProducesPutCalls() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLLiteral key = new FXMLLiteral("k");
+            FXMLLiteral val = new FXMLLiteral("v");
+            FXMLMap map = new FXMLMap(
+                    new FXMLExposedIdentifier("myMap"),
+                    new FXMLClassType(java.util.HashMap.class),
+                    FXMLType.of(String.class),
+                    FXMLType.of(String.class),
+                    Optional.empty(),
+                    Map.of(key, val)
+            );
+            FXMLDocument document = buildDocument(map, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString())
+                    .contains("myMap.put(");
+        }
+
+        /// Verifies that a `FXMLObject` root with an `FXMLObjectProperty` produces a setter call.
+        @Test
+        void fxmlObjectWithObjectPropertyProducesSetterCall() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLLiteral value = new FXMLLiteral("42");
+            FXMLObjectProperty prop = new FXMLObjectProperty(
+                    "width", "setWidth", FXMLType.of(double.class), value
+            );
+            FXMLObject root = buildRoot(new FXMLExposedIdentifier("pane"), List.of(prop));
+            FXMLDocument document = buildDocument(root, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString())
+                    .contains("pane.setWidth(");
+        }
+
+        /// Verifies that a `FXMLObject` with a `FXMLCollectionProperties` produces `.add(...)` calls.
+        @Test
+        void fxmlObjectWithCollectionPropertyProducesAddCalls() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLLiteral item = new FXMLLiteral("item1");
+            FXMLCollectionProperties collProp = new FXMLCollectionProperties(
+                    "children", "getChildren",
+                    FXMLType.of(javafx.scene.layout.Pane.class),
+                    FXMLType.OBJECT,
+                    List.of(item),
+                    Optional.empty()
+            );
+            FXMLObject root = buildRoot(new FXMLExposedIdentifier("pane"), List.of(collProp));
+            FXMLDocument document = buildDocument(root, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString())
+                    .contains("pane.getChildren().add(");
+        }
+
+        /// Verifies that a `FXMLObject` with a `FXMLMapProperty` produces `.put(...)` calls.
+        @Test
+        void fxmlObjectWithMapPropertyProducesPutCalls() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLLiteral key = new FXMLLiteral("k");
+            FXMLLiteral val = new FXMLLiteral("v");
+            FXMLMapProperty mapProp = new FXMLMapProperty(
+                    "properties", "getProperties",
+                    FXMLType.of(java.util.Map.class),
+                    FXMLType.of(String.class),
+                    FXMLType.of(String.class),
+                    Map.of(key, val),
+                    Optional.empty()
+            );
+            FXMLObject root = buildRoot(new FXMLExposedIdentifier("node"), List.of(mapProp));
+            FXMLDocument document = buildDocument(root, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString())
+                    .contains("node.getProperties().put(");
+        }
+
+        /// Verifies that a `FXMLObject` with a `FXMLStaticObjectProperty` produces a static setter call.
+        @Test
+        void fxmlObjectWithStaticObjectPropertyProducesStaticSetterCall() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLLiteral value = new FXMLLiteral("0");
+            FXMLStaticObjectProperty staticProp = new FXMLStaticObjectProperty(
+                    "rowIndex",
+                    new FXMLClassType(javafx.scene.layout.GridPane.class),
+                    "setRowIndex",
+                    FXMLType.of(int.class),
+                    value
+            );
+            FXMLObject root = buildRoot(new FXMLExposedIdentifier("btn"), List.of(staticProp));
+            FXMLDocument document = buildDocument(root, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString())
+                    .contains("GridPane.setRowIndex(btn, ");
+        }
+
+        /// Verifies that a `FXMLObject` with a `FXMLConstructorProperty` recurses into the value.
+        @Test
+        void fxmlObjectWithConstructorPropertyRecursesIntoValue() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLLiteral innerLit = new FXMLLiteral("5");
+            FXMLConstructorProperty ctorProp = new FXMLConstructorProperty(
+                    "x", FXMLType.of(double.class), innerLit
+            );
+            FXMLObject root = buildRoot(new FXMLExposedIdentifier("pt"), List.of(ctorProp));
+            FXMLDocument document = buildDocument(root, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            // FXMLLiteral is a no-op in the value-level switch, so epilogue stays empty
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString()).isEmpty();
+        }
+
+        /// Verifies that a `FXMLInclude` with a controller produces the controller suffix assignment.
+        @Test
+        void fxmlIncludeWithControllerProducesControllerSuffixAssignment() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(), List.of()
+            );
+            FXMLDocument includedDoc = new FXMLDocument(
+                    "SubClass",
+                    buildRoot(FXMLRootIdentifier.INSTANCE, List.of()),
+                    List.of(),
+                    Optional.of(controller),
+                    Optional.empty(),
+                    List.of(),
+                    List.of()
+            );
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            lazy.set(includedDoc);
+            FXMLInclude include = new FXMLInclude(
+                    new FXMLExposedIdentifier("sub"),
+                    "sub.fxml",
+                    StandardCharsets.UTF_8,
+                    Optional.empty(),
+                    lazy
+            );
+            FXMLObject root = buildRoot(
+                    FXMLRootIdentifier.INSTANCE,
+                    List.of(new FXMLConstructorProperty("sub", FXMLType.OBJECT, include))
+            );
+            FXMLDocument document = buildDocument(root, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString())
+                    .contains("subController = sub.")
+                    .contains("controller");
+        }
+
+        /// Verifies that a `FXMLInclude` without a controller produces no epilogue output.
+        @Test
+        void fxmlIncludeWithoutControllerProducesNoOutput() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLDocument includedDoc = new FXMLDocument(
+                    "SubClass",
+                    buildRoot(FXMLRootIdentifier.INSTANCE, List.of()),
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    List.of(),
+                    List.of()
+            );
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            lazy.set(includedDoc);
+            FXMLInclude include = new FXMLInclude(
+                    new FXMLExposedIdentifier("sub"),
+                    "sub.fxml",
+                    StandardCharsets.UTF_8,
+                    Optional.empty(),
+                    lazy
+            );
+            FXMLObject root = buildRoot(
+                    FXMLRootIdentifier.INSTANCE,
+                    List.of(new FXMLConstructorProperty("sub", FXMLType.OBJECT, include))
+            );
+            FXMLDocument document = buildDocument(root, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString()).isEmpty();
+        }
+
+        /// Verifies that definitions are also processed in the epilogue.
+        @Test
+        void definitionsAreProcessedInEpilogue() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLLiteral lit = new FXMLLiteral("x");
+            FXMLCollection defCollection = new FXMLCollection(
+                    new FXMLExposedIdentifier("defItems"),
+                    new FXMLClassType(java.util.ArrayList.class),
+                    Optional.empty(),
+                    List.of(lit)
+            );
+            FXMLDocument document = buildDocument(
+                    buildRoot(FXMLRootIdentifier.INSTANCE, List.of()),
+                    List.of(defCollection)
+            );
+
+            invokeAddConstructorEpilogue(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString())
+                    .contains("defItems.add(");
+        }
+
+        /// Verifies that no-op value types (`FXMLConstant`, `FXMLCopy`, `FXMLExpression`,
+        /// `FXMLInlineScript`, `FXMLLiteral`, `FXMLMethod`, `FXMLReference`, `FXMLResource`,
+        /// `FXMLTranslation`, `FXMLValue`) produce no epilogue output when used as constructor
+        /// property values inside an `FXMLObject` root.
+        @Test
+        void noOpValueTypesProduceNoEpilogueOutput() throws Exception {
+            List<AbstractFXMLValue> noOps = List.of(
+                    new FXMLConstant(new FXMLClassType(Object.class), "CONST", new FXMLClassType(Object.class)),
+                    new FXMLCopy(new FXMLExposedIdentifier("cp"), new FXMLExposedIdentifier("src")),
+                    new FXMLExpression("1+1"),
+                    new FXMLInlineScript("var x = 1;"),
+                    new FXMLLiteral("lit"),
+                    new FXMLMethod("doIt", List.of(), new FXMLClassType(void.class)),
+                    new FXMLReference("someRef"),
+                    new FXMLResource("img.png"),
+                    new FXMLTranslation("key"),
+                    new FXMLValue(Optional.empty(), new FXMLClassType(String.class), "hello")
+            );
+            for (AbstractFXMLValue noOp : noOps) {
+                SourceCodeGeneratorContext context = buildContext();
+                FXMLObject root = buildRoot(
+                        FXMLRootIdentifier.INSTANCE,
+                        List.of(new FXMLConstructorProperty("x", FXMLType.OBJECT, noOp))
+                );
+                FXMLDocument document = buildDocument(root, List.of());
+                invokeAddConstructorEpilogue(context, document);
+                assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString())
+                        .as("Expected no epilogue for " + noOp.getClass().getSimpleName())
+                        .isEmpty();
+            }
+        }
+
+        /// Verifies that `FXMLCollection` children are recursed into for nested epilogue generation.
+        @Test
+        void fxmlCollectionChildrenAreRecursed() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLLiteral innerLit = new FXMLLiteral("inner");
+            FXMLCollection innerCollection = new FXMLCollection(
+                    new FXMLExposedIdentifier("inner"),
+                    new FXMLClassType(java.util.ArrayList.class),
+                    Optional.empty(),
+                    List.of(innerLit)
+            );
+            FXMLCollection outer = new FXMLCollection(
+                    new FXMLExposedIdentifier("outer"),
+                    new FXMLClassType(java.util.ArrayList.class),
+                    Optional.empty(),
+                    List.of(innerCollection)
+            );
+            FXMLDocument document = buildDocument(outer, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            String epilogue = context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString();
+            assertThat(epilogue).contains("outer.add(");
+            assertThat(epilogue).contains("inner.add(");
+        }
+
+        /// Verifies that `FXMLMap` entry values are recursed into for nested epilogue generation.
+        @Test
+        void fxmlMapEntryValuesAreRecursed() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLLiteral key = new FXMLLiteral("k");
+            FXMLCollection innerCollection = new FXMLCollection(
+                    new FXMLExposedIdentifier("nested"),
+                    new FXMLClassType(java.util.ArrayList.class),
+                    Optional.empty(),
+                    List.of(new FXMLLiteral("x"))
+            );
+            FXMLMap map = new FXMLMap(
+                    new FXMLExposedIdentifier("myMap"),
+                    new FXMLClassType(java.util.HashMap.class),
+                    FXMLType.of(String.class),
+                    FXMLType.OBJECT,
+                    Optional.empty(),
+                    Map.of(key, innerCollection)
+            );
+            FXMLDocument document = buildDocument(map, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            String epilogue = context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString();
+            assertThat(epilogue).contains("myMap.put(");
+            assertThat(epilogue).contains("nested.add(");
+        }
+
+        /// Verifies that `FXMLObjectProperty` value is recursed into for nested epilogue generation.
+        @Test
+        void fxmlObjectPropertyValueIsRecursed() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLCollection innerCollection = new FXMLCollection(
+                    new FXMLExposedIdentifier("inner"),
+                    new FXMLClassType(java.util.ArrayList.class),
+                    Optional.empty(),
+                    List.of(new FXMLLiteral("x"))
+            );
+            FXMLObjectProperty prop = new FXMLObjectProperty(
+                    "items", "setItems", FXMLType.OBJECT, innerCollection
+            );
+            FXMLObject root = buildRoot(new FXMLExposedIdentifier("ctrl"), List.of(prop));
+            FXMLDocument document = buildDocument(root, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            String epilogue = context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString();
+            assertThat(epilogue).contains("ctrl.setItems(");
+            assertThat(epilogue).contains("inner.add(");
+        }
+
+        /// Verifies that `FXMLStaticObjectProperty` value is recursed into for nested epilogue generation.
+        @Test
+        void fxmlStaticObjectPropertyValueIsRecursed() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLCollection innerCollection = new FXMLCollection(
+                    new FXMLExposedIdentifier("inner"),
+                    new FXMLClassType(java.util.ArrayList.class),
+                    Optional.empty(),
+                    List.of(new FXMLLiteral("x"))
+            );
+            FXMLStaticObjectProperty staticProp = new FXMLStaticObjectProperty(
+                    "constraint",
+                    new FXMLClassType(javafx.scene.layout.GridPane.class),
+                    "setConstraints",
+                    FXMLType.OBJECT,
+                    innerCollection
+            );
+            FXMLObject root = buildRoot(new FXMLExposedIdentifier("btn"), List.of(staticProp));
+            FXMLDocument document = buildDocument(root, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            String epilogue = context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString();
+            assertThat(epilogue).contains("GridPane.setConstraints(btn, ");
+            assertThat(epilogue).contains("inner.add(");
+        }
+
+        /// Verifies that `FXMLCollectionProperties` values are recursed into for nested epilogue generation.
+        @Test
+        void fxmlCollectionPropertiesValuesAreRecursed() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLCollection innerCollection = new FXMLCollection(
+                    new FXMLExposedIdentifier("inner"),
+                    new FXMLClassType(java.util.ArrayList.class),
+                    Optional.empty(),
+                    List.of(new FXMLLiteral("x"))
+            );
+            FXMLCollectionProperties collProp = new FXMLCollectionProperties(
+                    "children", "getChildren",
+                    FXMLType.of(javafx.scene.layout.Pane.class),
+                    FXMLType.OBJECT,
+                    List.of(innerCollection),
+                    Optional.empty()
+            );
+            FXMLObject root = buildRoot(new FXMLExposedIdentifier("pane"), List.of(collProp));
+            FXMLDocument document = buildDocument(root, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            String epilogue = context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString();
+            assertThat(epilogue).contains("pane.getChildren().add(");
+            assertThat(epilogue).contains("inner.add(");
+        }
+
+        /// Verifies that `FXMLMapProperty` entry values are recursed into for nested epilogue generation.
+        @Test
+        void fxmlMapPropertyEntryValuesAreRecursed() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLLiteral key = new FXMLLiteral("k");
+            FXMLCollection innerCollection = new FXMLCollection(
+                    new FXMLExposedIdentifier("inner"),
+                    new FXMLClassType(java.util.ArrayList.class),
+                    Optional.empty(),
+                    List.of(new FXMLLiteral("x"))
+            );
+            FXMLMapProperty mapProp = new FXMLMapProperty(
+                    "properties", "getProperties",
+                    FXMLType.of(java.util.Map.class),
+                    FXMLType.of(String.class),
+                    FXMLType.OBJECT,
+                    Map.of(key, innerCollection),
+                    Optional.empty()
+            );
+            FXMLObject root = buildRoot(new FXMLExposedIdentifier("node"), List.of(mapProp));
+            FXMLDocument document = buildDocument(root, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            String epilogue = context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString();
+            assertThat(epilogue).contains("node.getProperties().put(");
+            assertThat(epilogue).contains("inner.add(");
+        }
+    }
+
+    /// Tests for the private `bindControllerFields(SourceCodeGeneratorContext, FXMLDocument)` method
+    /// of [FXMLSourceCodeBuilder] and all methods it calls.
+    @Nested
+    class BindControllerFieldsPrivateTest {
+
+        /// Invokes the private `bindControllerFields(SourceCodeGeneratorContext, FXMLDocument)` method via reflection.
+        ///
+        /// @param context  The source code generator context.
+        /// @param document The FXML document to process.
+        /// @throws Exception If reflection fails or the method throws.
+        private void invokeBindControllerFields(
+                SourceCodeGeneratorContext context,
+                FXMLDocument document
+        ) throws Exception {
+            Method method = FXMLSourceCodeBuilder.class.getDeclaredMethod(
+                    "bindControllerFields",
+                    SourceCodeGeneratorContext.class,
+                    FXMLDocument.class
+            );
+            method.setAccessible(true);
+            method.invoke(classUnderTest, context, document);
+        }
+
+        /// Builds a minimal [FXMLDocument] with the given root and definitions.
+        ///
+        /// @param root        The root FXML object.
+        /// @param definitions The list of definition values.
+        /// @return A new [FXMLDocument].
+        private FXMLDocument buildDocument(AbstractFXMLObject root, List<AbstractFXMLValue> definitions) {
+            return new FXMLDocument(
+                    "TestClass", root, List.of(), Optional.empty(), Optional.empty(), definitions, List.of()
+            );
+        }
+
+        /// Builds a minimal [FXMLDocument] with the given root, definitions, and controller.
+        ///
+        /// @param root        The root FXML object.
+        /// @param definitions The list of definition values.
+        /// @param controller  The FXML controller.
+        /// @return A new [FXMLDocument].
+        private FXMLDocument buildDocument(
+                AbstractFXMLObject root,
+                List<AbstractFXMLValue> definitions,
+                FXMLController controller
+        ) {
+            return new FXMLDocument(
+                    "TestClass", root, List.of(), Optional.of(controller), Optional.empty(), definitions, List.of()
+            );
+        }
+
+        /// Wraps a non-[AbstractFXMLObject] value inside an [FXMLObject] via a [FXMLConstructorProperty],
+        /// so it can be used as the root of an [FXMLDocument].
+        ///
+        /// @param value The value to wrap.
+        /// @return An [FXMLObject] containing the value as a constructor property.
+        private FXMLObject wrapValue(AbstractFXMLValue value) {
+            return new FXMLObject(
+                    FXMLRootIdentifier.INSTANCE,
+                    new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(),
+                    List.of(new FXMLConstructorProperty("arg", new FXMLClassType(Object.class), value))
+            );
+        }
+
+        /// Builds a minimal root [FXMLObject] with the given identifier and no properties.
+        ///
+        /// @param identifier The identifier for the root object.
+        /// @return A new [FXMLObject].
+        private FXMLObject buildRoot(FXMLIdentifier identifier) {
+            return new FXMLObject(identifier, new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(), List.of());
+        }
+
+        /// Builds a [SourceCodeGeneratorContext] with the given package name.
+        ///
+        /// @param packageName The package name for the context.
+        /// @return A new [SourceCodeGeneratorContext].
+        private SourceCodeGeneratorContext buildContext(String packageName) {
+            return new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), packageName, Map.of(), null
+            );
+        }
+
+        /// Verifies that when no controller is present, no `BIND_CONTROLLER` feature is added
+        /// and the `CONTROLLER_FIELDS` source part remains empty.
+        @Test
+        void noControllerProducesNoBindings() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLDocument document = buildDocument(buildRoot(new FXMLExposedIdentifier("root")), List.of());
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString()).isEmpty();
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that when a controller has no fields, no `BIND_CONTROLLER` feature is added
+        /// and the `CONTROLLER_FIELDS` source part remains empty.
+        @Test
+        void controllerWithNoFieldsProducesNoBindings() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(), List.of()
+            );
+            FXMLDocument document = buildDocument(buildRoot(new FXMLExposedIdentifier("root")), List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString()).isEmpty();
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that when a controller has a field matching an [FXMLExposedIdentifier] on the root,
+        /// a direct assignment is generated and `BIND_CONTROLLER` feature is added.
+        @Test
+        void exposedIdentifierOnRootProducesDirectAssignmentAndBindControllerFeature() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "myNode", new FXMLClassType(javafx.scene.layout.Pane.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLDocument document = buildDocument(
+                    buildRoot(new FXMLExposedIdentifier("myNode")), List.of(), controller
+            );
+
+            invokeBindControllerFields(context, document);
+
+            String result = context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString();
+            assertThat(result).contains("myNode");
+            assertThat(context.features()).contains(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that when no identifier in the document matches any controller field,
+        /// no `BIND_CONTROLLER` feature is added.
+        @Test
+        void noMatchingFieldProducesNoBindControllerFeature() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "otherField", new FXMLClassType(javafx.scene.layout.Pane.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLDocument document = buildDocument(
+                    buildRoot(new FXMLExposedIdentifier("myNode")), List.of(), controller
+            );
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that definitions are also processed: an [FXMLExposedIdentifier] in the definitions list
+        /// matching a controller field produces a binding.
+        @Test
+        void definitionWithMatchingFieldProducesBinding() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "defNode", new FXMLClassType(javafx.scene.layout.Pane.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLObject defObj = new FXMLObject(
+                    new FXMLExposedIdentifier("defNode"),
+                    new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(), List.of()
+            );
+            FXMLDocument document = buildDocument(
+                    buildRoot(FXMLRootIdentifier.INSTANCE), List.of(defObj), controller
+            );
+
+            invokeBindControllerFields(context, document);
+
+            String result = context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString();
+            assertThat(result).contains("defNode");
+            assertThat(context.features()).contains(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that an [FXMLNamedRootIdentifier] on the root produces a binding using `this`
+        /// as the assign identifier.
+        @Test
+        void namedRootIdentifierProducesThisBinding() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "rootNode", new FXMLClassType(javafx.scene.layout.Pane.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLDocument document = buildDocument(
+                    buildRoot(new FXMLNamedRootIdentifier("rootNode")), List.of(), controller
+            );
+
+            invokeBindControllerFields(context, document);
+
+            String result = context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString();
+            assertThat(result).contains("this");
+            assertThat(context.features()).contains(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that an [FXMLRootIdentifier] on the root produces no binding.
+        @Test
+        void rootIdentifierProducesNoBinding() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "anyField", new FXMLClassType(javafx.scene.layout.Pane.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLDocument document = buildDocument(
+                    buildRoot(FXMLRootIdentifier.INSTANCE), List.of(), controller
+            );
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that an [FXMLInternalIdentifier] on the root produces no binding.
+        @Test
+        void internalIdentifierProducesNoBinding() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "anyField", new FXMLClassType(javafx.scene.layout.Pane.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLDocument document = buildDocument(
+                    buildRoot(new FXMLInternalIdentifier(1)), List.of(), controller
+            );
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that a PRIVATE controller field produces a reflective field mapping.
+        @Test
+        void privateControllerFieldProducesReflectiveMapping() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PRIVATE, "myNode", new FXMLClassType(javafx.scene.layout.Pane.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLDocument document = buildDocument(
+                    buildRoot(new FXMLExposedIdentifier("myNode")), List.of(), controller
+            );
+
+            invokeBindControllerFields(context, document);
+
+            String result = context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString();
+            assertThat(result).contains("setAccessible");
+            assertThat(context.features()).contains(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that an [FXMLCollection] root binds its own identifier and recurses into children.
+        @Test
+        void fxmlCollectionBindsIdentifierAndRecursesChildren() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField fieldParent = new FXMLControllerField(
+                    Visibility.PUBLIC, "myList", new FXMLClassType(java.util.ArrayList.class)
+            );
+            FXMLControllerField fieldChild = new FXMLControllerField(
+                    Visibility.PUBLIC, "childNode", new FXMLClassType(javafx.scene.layout.Pane.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(fieldParent, fieldChild), List.of()
+            );
+            FXMLObject child = new FXMLObject(
+                    new FXMLExposedIdentifier("childNode"),
+                    new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(), List.of()
+            );
+            FXMLCollection collection = new FXMLCollection(
+                    new FXMLExposedIdentifier("myList"),
+                    new FXMLClassType(java.util.ArrayList.class),
+                    Optional.empty(),
+                    List.of(child)
+            );
+            FXMLDocument document = buildDocument(collection, List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            String result = context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString();
+            assertThat(result).contains("myList");
+            assertThat(result).contains("childNode");
+            assertThat(context.features()).contains(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that an [FXMLMap] root binds its own identifier and recurses into entry values.
+        @Test
+        void fxmlMapBindsIdentifierAndRecursesEntries() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField fieldMap = new FXMLControllerField(
+                    Visibility.PUBLIC, "myMap", new FXMLClassType(java.util.HashMap.class)
+            );
+            FXMLControllerField fieldEntry = new FXMLControllerField(
+                    Visibility.PUBLIC, "entryNode", new FXMLClassType(javafx.scene.layout.Pane.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(fieldMap, fieldEntry), List.of()
+            );
+            FXMLObject entryValue = new FXMLObject(
+                    new FXMLExposedIdentifier("entryNode"),
+                    new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(), List.of()
+            );
+            FXMLMap map = new FXMLMap(
+                    new FXMLExposedIdentifier("myMap"),
+                    new FXMLClassType(java.util.HashMap.class),
+                    FXMLType.OBJECT,
+                    FXMLType.OBJECT,
+                    Optional.empty(),
+                    Map.of(new FXMLLiteral("k"), entryValue)
+            );
+            FXMLDocument document = buildDocument(map, List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            String result = context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString();
+            assertThat(result).contains("myMap");
+            assertThat(result).contains("entryNode");
+            assertThat(context.features()).contains(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that an [FXMLObject] root binds its own identifier and recurses into properties.
+        @Test
+        void fxmlObjectBindsIdentifierAndRecursesProperties() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField fieldRoot = new FXMLControllerField(
+                    Visibility.PUBLIC, "myPane", new FXMLClassType(javafx.scene.layout.Pane.class)
+            );
+            FXMLControllerField fieldChild = new FXMLControllerField(
+                    Visibility.PUBLIC, "childBtn", new FXMLClassType(javafx.scene.control.Button.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(fieldRoot, fieldChild), List.of()
+            );
+            FXMLObject child = new FXMLObject(
+                    new FXMLExposedIdentifier("childBtn"),
+                    new FXMLClassType(javafx.scene.control.Button.class),
+                    Optional.empty(), List.of()
+            );
+            FXMLCollectionProperties prop = new FXMLCollectionProperties(
+                    "children", "getChildren",
+                    FXMLType.of(javafx.scene.layout.Pane.class),
+                    FXMLType.OBJECT,
+                    List.of(child),
+                    Optional.empty()
+            );
+            FXMLObject root = new FXMLObject(
+                    new FXMLExposedIdentifier("myPane"),
+                    new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(), List.of(prop)
+            );
+            FXMLDocument document = buildDocument(root, List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            String result = context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString();
+            assertThat(result).contains("myPane");
+            assertThat(result).contains("childBtn");
+            assertThat(context.features()).contains(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that an [FXMLCopy] root binds its identifier when it matches a controller field.
+        @Test
+        void fxmlCopyBindsIdentifier() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "myCopy", new FXMLClassType(javafx.scene.layout.Pane.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLObject source = new FXMLObject(
+                    new FXMLExposedIdentifier("src"),
+                    new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(), List.of()
+            );
+            FXMLCopy copy = new FXMLCopy(new FXMLExposedIdentifier("myCopy"), new FXMLExposedIdentifier("src"));
+            FXMLDocument document = buildDocument(wrapValue(copy), List.of(source), controller);
+
+            invokeBindControllerFields(context, document);
+
+            String result = context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString();
+            assertThat(result).contains("myCopy");
+            assertThat(context.features()).contains(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that an [FXMLInclude] root binds its identifier when it matches a controller field.
+        @Test
+        void fxmlIncludeBindsIdentifier() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "myInclude", new FXMLClassType(javafx.scene.layout.Pane.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLInclude include = new FXMLInclude(
+                    new FXMLExposedIdentifier("myInclude"),
+                    "view.fxml",
+                    StandardCharsets.UTF_8,
+                    Optional.empty(),
+                    new FXMLLazyLoadedDocument()
+            );
+            FXMLDocument document = buildDocument(wrapValue(include), List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            String result = context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString();
+            assertThat(result).contains("myInclude");
+            assertThat(context.features()).contains(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that an [FXMLValue] with a matching identifier binds the field.
+        @Test
+        void fxmlValueWithMatchingIdentifierBindsField() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "myVal", new FXMLClassType(String.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLValue value = new FXMLValue(
+                    Optional.of(new FXMLExposedIdentifier("myVal")),
+                    new FXMLClassType(String.class),
+                    "hello"
+            );
+            FXMLDocument document = buildDocument(wrapValue(value), List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            String result = context.sourceCode(SourcePart.CONTROLLER_FIELDS).toString();
+            assertThat(result).contains("myVal");
+            assertThat(context.features()).contains(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that an [FXMLValue] without an identifier produces no binding.
+        @Test
+        void fxmlValueWithoutIdentifierProducesNoBinding() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "myVal", new FXMLClassType(String.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLValue value = new FXMLValue(
+                    Optional.empty(),
+                    new FXMLClassType(String.class),
+                    "hello"
+            );
+            FXMLDocument document = buildDocument(wrapValue(value), List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that [FXMLMethod] produces no binding (no-op branch).
+        @Test
+        void fxmlMethodProducesNoBinding() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "anyField", new FXMLClassType(String.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLMethod method = new FXMLMethod("onClick", List.of(), new FXMLClassType(void.class));
+            FXMLDocument document = buildDocument(wrapValue(method), List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that [FXMLInlineScript] produces no binding (no-op branch).
+        @Test
+        void fxmlInlineScriptProducesNoBinding() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "anyField", new FXMLClassType(String.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLInlineScript script = new FXMLInlineScript("var x = 1;");
+            FXMLDocument document = buildDocument(wrapValue(script), List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that [FXMLLiteral] produces no binding (no-op branch).
+        @Test
+        void fxmlLiteralProducesNoBinding() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "anyField", new FXMLClassType(String.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLLiteral literal = new FXMLLiteral("hello");
+            FXMLDocument document = buildDocument(wrapValue(literal), List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that [FXMLConstant] produces no binding (no-op branch).
+        @Test
+        void fxmlConstantProducesNoBinding() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "anyField", new FXMLClassType(String.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLConstant constant = new FXMLConstant(new FXMLClassType(String.class), "EMPTY", new FXMLClassType(String.class));
+            FXMLDocument document = buildDocument(wrapValue(constant), List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that [FXMLExpression] produces no binding (no-op branch).
+        @Test
+        void fxmlExpressionProducesNoBinding() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "anyField", new FXMLClassType(String.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLExpression expression = new FXMLExpression("someExpr");
+            FXMLDocument document = buildDocument(wrapValue(expression), List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that [FXMLReference] produces no binding (no-op branch).
+        @Test
+        void fxmlReferenceProducesNoBinding() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "anyField", new FXMLClassType(String.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLReference reference = new FXMLReference("src");
+            FXMLDocument document = buildDocument(wrapValue(reference), List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that [FXMLResource] produces no binding (no-op branch).
+        @Test
+        void fxmlResourceProducesNoBinding() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "anyField", new FXMLClassType(String.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLResource resource = new FXMLResource("image.png");
+            FXMLDocument document = buildDocument(wrapValue(resource), List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
+        }
+
+        /// Verifies that [FXMLTranslation] produces no binding (no-op branch).
+        @Test
+        void fxmlTranslationProducesNoBinding() throws Exception {
+            SourceCodeGeneratorContext context = buildContext("");
+            FXMLControllerField field = new FXMLControllerField(
+                    Visibility.PUBLIC, "anyField", new FXMLClassType(String.class)
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(Object.class), List.of(field), List.of()
+            );
+            FXMLTranslation translation = new FXMLTranslation("key");
+            FXMLDocument document = buildDocument(wrapValue(translation), List.of(), controller);
+
+            invokeBindControllerFields(context, document);
+
+            assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
         }
     }
 }
