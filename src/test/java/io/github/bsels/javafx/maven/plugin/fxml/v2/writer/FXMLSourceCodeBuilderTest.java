@@ -4581,4 +4581,175 @@ public class FXMLSourceCodeBuilderTest {
             }
         }
     }
+
+    /// Tests for the public `generateSourceCode(FXMLDocument, String)` method of [FXMLSourceCodeBuilder].
+    @Nested
+    class GenerateSourceCodePublicTest {
+
+        /// Builds a minimal [FXMLDocument] with the given class name and root object.
+        private FXMLDocument buildDocument(String className, AbstractFXMLObject root) {
+            return new FXMLDocument(
+                    className, root,
+                    List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
+            );
+        }
+
+        /// Builds a simple [FXMLObject] root with no properties.
+        private FXMLObject buildRoot() {
+            return new FXMLObject(
+                    FXMLRootIdentifier.INSTANCE,
+                    new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(),
+                    List.of()
+            );
+        }
+
+        /// Verifies that passing a null document throws [NullPointerException].
+        @Test
+        void nullDocumentThrowsNullPointerException() {
+            assertThatThrownBy(() -> classUnderTest.generateSourceCode(null, "com.example"))
+                    .isInstanceOf(NullPointerException.class);
+        }
+
+        /// Verifies that a minimal document with a package name produces a `package` declaration.
+        @Test
+        void documentWithPackageNameProducesPackageDeclaration() {
+            FXMLDocument document = buildDocument("MyView", buildRoot());
+
+            String result = classUnderTest.generateSourceCode(document, "com.example");
+
+            assertThat(result).startsWith("package com.example;\n");
+        }
+
+        /// Verifies that a null package name produces no `package` declaration.
+        @Test
+        void nullPackageNameProducesNoPackageDeclaration() {
+            FXMLDocument document = buildDocument("MyView", buildRoot());
+
+            String result = classUnderTest.generateSourceCode(document, null);
+
+            assertThat(result).doesNotContain("package ");
+        }
+
+        /// Verifies that the generated source contains the class name in the class declaration.
+        @Test
+        void generatedSourceContainsClassName() {
+            FXMLDocument document = buildDocument("MyView", buildRoot());
+
+            String result = classUnderTest.generateSourceCode(document, "com.example");
+
+            assertThat(result).contains("class MyView");
+        }
+
+        /// Verifies that the `@Generated` annotation is included when `addGeneratedAnnotation` is true.
+        @Test
+        void generatedAnnotationIncludedWhenEnabled() {
+            FXMLDocument document = buildDocument("MyView", buildRoot());
+
+            String result = classUnderTest.generateSourceCode(document, "com.example");
+
+            assertThat(result).contains("@Generated").contains(FXMLSourceCodeBuilder.class.getName());
+        }
+
+        /// Verifies that the `@Generated` annotation is omitted when `addGeneratedAnnotation` is false.
+        @Test
+        void generatedAnnotationOmittedWhenDisabled() {
+            DefaultLog log = new DefaultLog(new ConsoleLogger());
+            FXMLSourceCodeBuilder builder = new FXMLSourceCodeBuilder(log, "org.example.Bundle", false);
+            FXMLDocument document = buildDocument("MyView", buildRoot());
+
+            String result = builder.generateSourceCode(document, "com.example");
+
+            assertThat(result).doesNotContain("@Generated");
+        }
+
+        /// Verifies that the generated source contains a constructor matching the class name.
+        @Test
+        void generatedSourceContainsConstructor() {
+            FXMLDocument document = buildDocument("MyView", buildRoot());
+
+            String result = classUnderTest.generateSourceCode(document, "com.example");
+
+            assertThat(result).contains("MyView()");
+        }
+
+        /// Verifies that the generated source ends with a closing brace.
+        @Test
+        void generatedSourceEndsWithClosingBrace() {
+            FXMLDocument document = buildDocument("MyView", buildRoot());
+
+            String result = classUnderTest.generateSourceCode(document, "com.example");
+
+            assertThat(result).endsWith("}\n");
+        }
+
+        /// Verifies that a document with an exposed identifier produces a `protected final` field.
+        @Test
+        void documentWithExposedIdentifierProducesProtectedField() {
+            FXMLObject root = new FXMLObject(
+                    FXMLRootIdentifier.INSTANCE,
+                    new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(),
+                    List.of(new FXMLObjectProperty(
+                            "children", "getChildren",
+                            FXMLType.of(javafx.scene.layout.Pane.class),
+                            new FXMLObject(
+                                    new FXMLExposedIdentifier("myButton"),
+                                    new FXMLClassType(javafx.scene.control.Button.class),
+                                    Optional.empty(),
+                                    List.of()
+                            )
+                    ))
+            );
+            FXMLDocument document = buildDocument("MyView", root);
+
+            String result = classUnderTest.generateSourceCode(document, "com.example");
+
+            assertThat(result).contains("protected final").contains("myButton");
+        }
+
+        /// Verifies that a document with an [FXMLInclude] produces a nested inner class.
+        @Test
+        void documentWithIncludeProducesInnerClass() {
+            FXMLDocument includedDoc = new FXMLDocument(
+                    "SubView",
+                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()),
+                    List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
+            );
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            lazy.set(includedDoc);
+            FXMLInclude include = new FXMLInclude(
+                    new FXMLExposedIdentifier("sub"),
+                    "sub.fxml",
+                    StandardCharsets.UTF_8,
+                    Optional.empty(),
+                    lazy
+            );
+            FXMLObject root = new FXMLObject(
+                    FXMLRootIdentifier.INSTANCE,
+                    new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(),
+                    List.of(new FXMLObjectProperty("content", "getContent",
+                            FXMLType.of(javafx.scene.layout.Pane.class), include))
+            );
+            FXMLDocument document = buildDocument("MainView", root);
+
+            String result = classUnderTest.generateSourceCode(document, "com.example");
+
+            assertThat(result).contains("SubView");
+        }
+
+        /// Verifies that the `import` statements appear before the class declaration.
+        @Test
+        void importsAppearBeforeClassDeclaration() {
+            FXMLDocument document = buildDocument("MyView", buildRoot());
+
+            String result = classUnderTest.generateSourceCode(document, "com.example");
+
+            int importIndex = result.indexOf("import ");
+            int classIndex = result.indexOf("class MyView");
+            assertThat(importIndex).isLessThan(classIndex);
+        }
+    }
 }
