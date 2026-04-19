@@ -4268,4 +4268,317 @@ public class FXMLSourceCodeBuilderTest {
             assertThat(context.features()).doesNotContain(Feature.BIND_CONTROLLER);
         }
     }
+
+    /// Tests for the private `addInnerClass(FXMLDocument, SourceCodeGeneratorContext)` method
+    /// of [FXMLSourceCodeBuilder].
+    @Nested
+    class AddInnerClassPrivateTest {
+
+        /// Invokes the private `addInnerClass(FXMLDocument, SourceCodeGeneratorContext)` method via reflection.
+        ///
+        /// @param document The [FXMLDocument] to process.
+        /// @param context  The [SourceCodeGeneratorContext] to use.
+        /// @throws Exception if reflection fails or the method throws.
+        private void invokeAddInnerClass(
+                FXMLDocument document,
+                SourceCodeGeneratorContext context
+        ) throws Exception {
+            Method method = FXMLSourceCodeBuilder.class.getDeclaredMethod(
+                    "addInnerClass",
+                    FXMLDocument.class,
+                    SourceCodeGeneratorContext.class
+            );
+            method.setAccessible(true);
+            method.invoke(classUnderTest, document, context);
+        }
+
+        /// Builds a minimal [FXMLDocument] with the given root and no definitions.
+        ///
+        /// @param root The root FXML object.
+        /// @return A new [FXMLDocument].
+        private FXMLDocument buildDocument(AbstractFXMLObject root) {
+            return new FXMLDocument(
+                    "TestClass", root, List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
+            );
+        }
+
+        /// Builds a minimal [FXMLDocument] with the given root and definitions.
+        ///
+        /// @param root        The root FXML object.
+        /// @param definitions The list of definition values.
+        /// @return A new [FXMLDocument].
+        private FXMLDocument buildDocument(AbstractFXMLObject root, List<AbstractFXMLValue> definitions) {
+            return new FXMLDocument(
+                    "TestClass", root, List.of(), Optional.empty(), Optional.empty(), definitions, List.of()
+            );
+        }
+
+        /// Builds a minimal root [FXMLObject] with no identifier and no properties.
+        ///
+        /// @return A new [FXMLObject].
+        private FXMLObject buildRoot() {
+            return new FXMLObject(
+                    FXMLRootIdentifier.INSTANCE,
+                    new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(), List.of()
+            );
+        }
+
+        /// Builds a [SourceCodeGeneratorContext] with an empty package name.
+        ///
+        /// @return A new [SourceCodeGeneratorContext].
+        private SourceCodeGeneratorContext buildContext() {
+            return new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+        }
+
+        /// Builds a loaded [FXMLLazyLoadedDocument] wrapping the given [FXMLDocument].
+        ///
+        /// @param document The document to wrap.
+        /// @return A loaded [FXMLLazyLoadedDocument].
+        private FXMLLazyLoadedDocument buildLazy(FXMLDocument document) {
+            FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
+            lazy.set(document);
+            return lazy;
+        }
+
+        /// Verifies that a document with no includes produces only a trailing newline in `NESTED_TYPES`.
+        @Test
+        void documentWithNoIncludesProducesOnlyTrailingNewline() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLDocument document = buildDocument(buildRoot());
+
+            invokeAddInnerClass(document, context);
+
+            assertThat(context.sourceCode(SourcePart.NESTED_TYPES).toString()).isEqualTo("\n");
+        }
+
+        /// Verifies that an [FXMLInclude] in the root produces a generated inner class in `NESTED_TYPES`.
+        @Test
+        void fxmlIncludeInRootProducesInnerClass() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLDocument includedDoc = new FXMLDocument(
+                    "SubView",
+                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()),
+                    List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
+            );
+            FXMLLazyLoadedDocument lazy = buildLazy(includedDoc);
+            FXMLInclude include = new FXMLInclude(
+                    new FXMLExposedIdentifier("sub"),
+                    "sub.fxml",
+                    java.nio.charset.StandardCharsets.UTF_8,
+                    Optional.empty(),
+                    lazy
+            );
+            FXMLObject root = new FXMLObject(
+                    FXMLRootIdentifier.INSTANCE,
+                    new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(),
+                    List.of(new FXMLObjectProperty("content", "getContent",
+                            FXMLType.of(javafx.scene.layout.Pane.class), include))
+            );
+            FXMLDocument document = buildDocument(root);
+
+            invokeAddInnerClass(document, context);
+
+            String result = context.sourceCode(SourcePart.NESTED_TYPES).toString();
+            assertThat(result).contains("SubView");
+        }
+
+        /// Verifies that two different [FXMLInclude] source files produce two separate inner classes.
+        @Test
+        void twoDifferentFxmlIncludesProduceTwoInnerClasses() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLDocument includedDoc1 = new FXMLDocument(
+                    "FirstView",
+                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()),
+                    List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
+            );
+            FXMLDocument includedDoc2 = new FXMLDocument(
+                    "SecondView",
+                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()),
+                    List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
+            );
+            FXMLInclude include1 = new FXMLInclude(
+                    new FXMLExposedIdentifier("first"),
+                    "first.fxml",
+                    java.nio.charset.StandardCharsets.UTF_8,
+                    Optional.empty(),
+                    buildLazy(includedDoc1)
+            );
+            FXMLInclude include2 = new FXMLInclude(
+                    new FXMLExposedIdentifier("second"),
+                    "second.fxml",
+                    java.nio.charset.StandardCharsets.UTF_8,
+                    Optional.empty(),
+                    buildLazy(includedDoc2)
+            );
+            FXMLDocument document = buildDocument(buildRoot(), List.of(include1, include2));
+
+            invokeAddInnerClass(document, context);
+
+            String result = context.sourceCode(SourcePart.NESTED_TYPES).toString();
+            assertThat(result).contains("FirstView");
+            assertThat(result).contains("SecondView");
+        }
+
+        /// Verifies that an [FXMLInclude] in the definitions list produces a generated inner class.
+        @Test
+        void fxmlIncludeInDefinitionsProducesInnerClass() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLDocument includedDoc = new FXMLDocument(
+                    "DefView",
+                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()),
+                    List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
+            );
+            FXMLLazyLoadedDocument lazy = buildLazy(includedDoc);
+            FXMLInclude include = new FXMLInclude(
+                    new FXMLExposedIdentifier("defInclude"),
+                    "def.fxml",
+                    java.nio.charset.StandardCharsets.UTF_8,
+                    Optional.empty(),
+                    lazy
+            );
+            FXMLDocument document = buildDocument(buildRoot(), List.of(include));
+
+            invokeAddInnerClass(document, context);
+
+            String result = context.sourceCode(SourcePart.NESTED_TYPES).toString();
+            assertThat(result).contains("DefView");
+        }
+
+        /// Verifies that an [FXMLCollection] root with an [FXMLInclude] child recurses and generates an inner class.
+        @Test
+        void fxmlCollectionWithIncludeChildProducesInnerClass() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLDocument includedDoc = new FXMLDocument(
+                    "CollectionChild",
+                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()),
+                    List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
+            );
+            FXMLLazyLoadedDocument lazy = buildLazy(includedDoc);
+            FXMLInclude include = new FXMLInclude(
+                    new FXMLExposedIdentifier("child"),
+                    "child.fxml",
+                    java.nio.charset.StandardCharsets.UTF_8,
+                    Optional.empty(),
+                    lazy
+            );
+            FXMLCollection collection = new FXMLCollection(
+                    FXMLRootIdentifier.INSTANCE,
+                    new FXMLClassType(java.util.ArrayList.class),
+                    Optional.empty(),
+                    List.of(include)
+            );
+            FXMLDocument document = buildDocument(collection);
+
+            invokeAddInnerClass(document, context);
+
+            String result = context.sourceCode(SourcePart.NESTED_TYPES).toString();
+            assertThat(result).contains("CollectionChild");
+        }
+
+        /// Verifies that an [FXMLMap] root with an [FXMLInclude] entry value recurses and generates an inner class.
+        @Test
+        void fxmlMapWithIncludeEntryProducesInnerClass() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLDocument includedDoc = new FXMLDocument(
+                    "MapEntry",
+                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()),
+                    List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
+            );
+            FXMLLazyLoadedDocument lazy = buildLazy(includedDoc);
+            FXMLInclude include = new FXMLInclude(
+                    new FXMLExposedIdentifier("entry"),
+                    "entry.fxml",
+                    java.nio.charset.StandardCharsets.UTF_8,
+                    Optional.empty(),
+                    lazy
+            );
+            FXMLMap map = new FXMLMap(
+                    FXMLRootIdentifier.INSTANCE,
+                    new FXMLClassType(java.util.HashMap.class),
+                    FXMLType.OBJECT,
+                    FXMLType.OBJECT,
+                    Optional.empty(),
+                    Map.of(new FXMLLiteral("k"), include)
+            );
+            FXMLDocument document = buildDocument(map);
+
+            invokeAddInnerClass(document, context);
+
+            String result = context.sourceCode(SourcePart.NESTED_TYPES).toString();
+            assertThat(result).contains("MapEntry");
+        }
+
+        /// Verifies that an [FXMLInclude] with a resource bundle uses the encoded resource bundle expression
+        /// in the generated inner class context.
+        @Test
+        void fxmlIncludeWithResourceBundlePassesResourceBundleToInnerClass() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLDocument includedDoc = new FXMLDocument(
+                    "ResourceView",
+                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()),
+                    List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
+            );
+            FXMLLazyLoadedDocument lazy = buildLazy(includedDoc);
+            FXMLInclude include = new FXMLInclude(
+                    new FXMLExposedIdentifier("res"),
+                    "res.fxml",
+                    java.nio.charset.StandardCharsets.UTF_8,
+                    Optional.of("com.example.Messages"),
+                    lazy
+            );
+            FXMLObject root = new FXMLObject(
+                    FXMLRootIdentifier.INSTANCE,
+                    new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(),
+                    List.of(new FXMLObjectProperty("content", "getContent",
+                            FXMLType.of(javafx.scene.layout.Pane.class), include))
+            );
+            FXMLDocument document = buildDocument(root);
+
+            invokeAddInnerClass(document, context);
+
+            String result = context.sourceCode(SourcePart.NESTED_TYPES).toString();
+            assertThat(result).contains("ResourceView");
+        }
+
+        /// Verifies that all no-op value types (`FXMLConstant`, `FXMLCopy`, `FXMLExpression`,
+        /// `FXMLInlineScript`, `FXMLLiteral`, `FXMLMethod`, `FXMLReference`, `FXMLResource`,
+        /// `FXMLTranslation`, `FXMLValue`) produce only a trailing newline in `NESTED_TYPES`.
+        @Test
+        void noOpValueTypesProduceOnlyTrailingNewline() throws Exception {
+            List<AbstractFXMLValue> noOpValues = List.of(
+                    new FXMLConstant(new FXMLClassType(String.class), "EMPTY", new FXMLClassType(String.class)),
+                    new FXMLCopy(new FXMLExposedIdentifier("copy"), new FXMLExposedIdentifier("src")),
+                    new FXMLExpression("x + 1"),
+                    new FXMLInlineScript("var x = 1;"),
+                    new FXMLLiteral("hello"),
+                    new FXMLMethod("handler", List.of(), FXMLType.OBJECT),
+                    new FXMLReference("src"),
+                    new FXMLResource("img.png"),
+                    new FXMLTranslation("key"),
+                    new FXMLValue(Optional.empty(), new FXMLClassType(String.class), "val")
+            );
+            for (AbstractFXMLValue noOpValue : noOpValues) {
+                SourceCodeGeneratorContext context = buildContext();
+                FXMLDocument document = buildDocument(buildRoot(), List.of(noOpValue));
+
+                invokeAddInnerClass(document, context);
+
+                assertThat(context.sourceCode(SourcePart.NESTED_TYPES).toString())
+                        .as("Expected only trailing newline for %s", noOpValue.getClass().getSimpleName())
+                        .isEqualTo("\n");
+            }
+        }
+    }
 }
