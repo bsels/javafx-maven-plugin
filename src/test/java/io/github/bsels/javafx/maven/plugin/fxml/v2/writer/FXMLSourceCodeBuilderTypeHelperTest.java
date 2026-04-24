@@ -984,7 +984,6 @@ class FXMLSourceCodeBuilderTypeHelperTest {
     // createIdentifierToTypeMapEntry (private reflection test)
     // -------------------------------------------------------------------------
 
-    /// Tests for [FXMLSourceCodeBuilderTypeHelper#createIdentifierToTypeMapEntry].
     @Nested
     class CreateIdentifierToTypeMapEntryTest {
 
@@ -1463,7 +1462,6 @@ class FXMLSourceCodeBuilderTypeHelperTest {
     // findMethodInController (private reflection test)
     // -------------------------------------------------------------------------
 
-    /// Tests for [FXMLSourceCodeBuilderTypeHelper#findMethodInController].
     @Nested
     class FindMethodInControllerTest {
 
@@ -1703,7 +1701,7 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     FXMLType.of(void.class),
                     List.of()
             );
-            assertThatThrownBy(() -> classUnderTest.renderControllerInitialization(null, ct, m))
+            assertThatThrownBy(() -> classUnderTest.renderControllerInitialization(null, new FXMLController(ct, List.of(), List.of()), m))
                     .isInstanceOf(NullPointerException.class);
         }
 
@@ -1725,7 +1723,7 @@ class FXMLSourceCodeBuilderTypeHelperTest {
         @Test
         void nullInitializeMethodThrows() {
             FXMLClassType ct = new FXMLClassType(NamedArgBean.class);
-            assertThatThrownBy(() -> classUnderTest.renderControllerInitialization(context, ct, null))
+            assertThatThrownBy(() -> classUnderTest.renderControllerInitialization(context, new FXMLController(ct, List.of(), List.of()), null))
                     .isInstanceOf(NullPointerException.class);
         }
 
@@ -1740,7 +1738,7 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     FXMLType.of(void.class),
                     List.of()
             );
-            String result = classUnderTest.renderControllerInitialization(context, ct, m);
+            String result = classUnderTest.renderControllerInitialization(context, new FXMLController(ct, List.of(), List.of()), m);
             assertThat(result).contains("initialize").doesNotContain("getDeclaredMethod");
         }
 
@@ -1752,7 +1750,7 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     Visibility.PUBLIC, "initialize", false, FXMLType.of(void.class),
                     List.of(FXMLType.of(URL.class), FXMLType.of(java.util.ResourceBundle.class))
             );
-            String result = classUnderTest.renderControllerInitialization(context, ct, m);
+            String result = classUnderTest.renderControllerInitialization(context, new FXMLController(ct, List.of(), List.of()), m);
             assertThat(result).contains("initialize").contains("null");
         }
 
@@ -1767,7 +1765,7 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     FXMLType.of(void.class),
                     List.of()
             );
-            String result = classUnderTest.renderControllerInitialization(context, ct, m);
+            String result = classUnderTest.renderControllerInitialization(context, new FXMLController(ct, List.of(), List.of()), m);
             assertThat(result).contains("getDeclaredMethod").contains("initialize");
         }
 
@@ -1779,7 +1777,7 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     Visibility.PRIVATE, "initialize", false, FXMLType.of(void.class),
                     List.of(FXMLType.of(URL.class), FXMLType.of(java.util.ResourceBundle.class))
             );
-            String result = classUnderTest.renderControllerInitialization(context, ct, m);
+            String result = classUnderTest.renderControllerInitialization(context, new FXMLController(ct, List.of(), List.of()), m);
             assertThat(result).contains("getDeclaredMethod").contains("ResourceBundle");
         }
 
@@ -1799,7 +1797,7 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     FXMLType.of(void.class),
                     List.of()
             );
-            String result = classUnderTest.renderControllerInitialization(pkgContext, ct, m);
+            String result = classUnderTest.renderControllerInitialization(pkgContext, new FXMLController(ct, List.of(), List.of()), m);
             assertThat(result).contains("initialize").doesNotContain("getDeclaredMethod");
         }
 
@@ -1814,7 +1812,7 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     FXMLType.of(void.class),
                     List.of()
             );
-            String result = classUnderTest.renderControllerInitialization(context, ct, m);
+            String result = classUnderTest.renderControllerInitialization(context, new FXMLController(ct, List.of(), List.of()), m);
             assertThat(result).contains("getDeclaredMethod");
         }
 
@@ -1834,7 +1832,7 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     FXMLType.of(void.class),
                     List.of()
             );
-            String result = classUnderTest.renderControllerInitialization(pkgContext, ct, m);
+            String result = classUnderTest.renderControllerInitialization(pkgContext, new FXMLController(ct, List.of(), List.of()), m);
             assertThat(result).contains("initialize").doesNotContain("getDeclaredMethod");
         }
     }
