@@ -496,28 +496,24 @@ final class FXMLSourceCodeBuilderTypeHelper {
     /// based on the visibility of the controller's `initialize` method.
     ///
     /// @param context          The [SourceCodeGeneratorContext] used for code generation.
-    /// @param controllerClass  The [FXMLClassType] of the controller.
+    /// @param controller  The [FXMLClassType] of the controller.
     /// @param initializeMethod The [FXMLControllerMethod] representing the `initialize` method.
     /// @return A string containing the Java source code to call the initialization method.
     public String renderControllerInitialization(
             SourceCodeGeneratorContext context,
-            FXMLClassType controllerClass,
+            FXMLController controller,
             FXMLControllerMethod initializeMethod
     ) {
         Objects.requireNonNull(context, "`context` must not be null");
-        Objects.requireNonNull(controllerClass, "`controllerClass` must not be null");
+        Objects.requireNonNull(controller, "`controllerClass` must not be null");
         Objects.requireNonNull(initializeMethod, "`initializeMethod` must not be null");
-        return switch (initializeMethod.visibility()) {
-            case PUBLIC -> renderControllerDirectInitialization(context, initializeMethod);
-            case PROTECTED, PACKAGE_PRIVATE -> {
-                if (isClassInPackage(context, controllerClass)) {
-                    yield renderControllerDirectInitialization(context, initializeMethod);
-                } else {
-                    yield renderControllerReflectionInitialization(context, controllerClass, initializeMethod);
-                }
-            }
-            case PRIVATE -> renderControllerReflectionInitialization(context, controllerClass, initializeMethod);
-        };
+        boolean needsReflection = needReflection(initializeMethod.visibility(), context, controller);
+        FXMLClassType controllerClass = controller.controllerClass();
+        if (needsReflection) {
+            return renderControllerReflectionInitialization(context, controllerClass, initializeMethod);
+        } else {
+            return renderControllerDirectInitialization(context, initializeMethod);
+        }
     }
 
     /// Determines whether reflection is needed for the specified visibility in the given context and controller.

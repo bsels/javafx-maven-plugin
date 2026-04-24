@@ -369,7 +369,7 @@ public final class FXMLSourceCodeBuilder {
         FXMLControllerMethod initializeMethod = initializeMethodOptional.get();
         context.addFeature(Feature.BIND_CONTROLLER);
         context.sourceCode(SourcePart.CONTROLLER_INITIALIZATION)
-                .append(typeHelper.renderControllerInitialization(context, controllerClass, initializeMethod));
+                .append(typeHelper.renderControllerInitialization(context, controller, initializeMethod));
     }
 
     /// Adds sorted import statements to the source code context.
