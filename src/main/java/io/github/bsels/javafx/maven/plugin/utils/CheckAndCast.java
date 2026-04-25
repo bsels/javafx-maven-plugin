@@ -48,6 +48,6 @@ public record CheckAndCast<I, O>(Class<O> clazz) implements Gatherer<I, Void, O>
         if (clazz.isInstance(element)) {
             return downstream.push(clazz.cast(element));
         }
-        return true;
+        return !downstream.isRejecting();
     }
 }

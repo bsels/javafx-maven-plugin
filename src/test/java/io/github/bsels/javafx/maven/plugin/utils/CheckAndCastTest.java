@@ -51,12 +51,15 @@ class CheckAndCastTest {
                 .isEqualTo(expectedResult);
     }
 
-    @Test
-    void testIntegratorWithNonMatchingType() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testIntegratorWithNonMatchingType(boolean isRejecting) {
         // Arrange
         Class<Integer> targetClass = Integer.class;
         CheckAndCast<Object, Integer> checkAndCast = CheckAndCast.of(targetClass);
         Object element = "NonMatchingString";
+        when(integerDownstream.isRejecting())
+                .thenReturn(isRejecting);
 
         // Act
         boolean result = checkAndCast.integrator().integrate(null, element, integerDownstream);
@@ -64,15 +67,18 @@ class CheckAndCastTest {
         // Assert
         verify(integerDownstream, never()).push(any());
         assertThat(result)
-                .isTrue();
+                .isEqualTo(!isRejecting);
     }
 
-    @Test
-    void testIntegratorWithNullElement() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testIntegratorWithNullElement(boolean isRejecting) {
         // Arrange
         Class<String> targetClass = String.class;
         CheckAndCast<Object, String> checkAndCast = CheckAndCast.of(targetClass);
         Object element = null;
+        when(stringDownstream.isRejecting())
+                .thenReturn(isRejecting);
 
         // Act
         boolean result = checkAndCast.integrator().integrate(null, element, stringDownstream);
@@ -80,7 +86,7 @@ class CheckAndCastTest {
         // Assert
         verify(stringDownstream, never()).push(any());
         assertThat(result)
-                .isTrue();
+                .isEqualTo(!isRejecting);
     }
 
     @Test
