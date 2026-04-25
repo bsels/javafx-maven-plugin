@@ -81,6 +81,9 @@ final class FXMLSourceCodeBuilderTypeHelper {
     private static final Set<String> PRIMITIVE_TYPES = Set.of(
             "boolean", "byte", "char", "short", "int", "long", "float", "double", "void"
     );
+    /// Logger instance used for logging messages and debugging information within the `FXMLSourceCodeBuilderTypeHelper`
+    /// class.
+    /// It leverages the SLF4J logging framework for standardized logging.
     private static final Logger log = LoggerFactory.getLogger(FXMLSourceCodeBuilderTypeHelper.class);
 
     /// Cache for storing and reusing [FXMLConstructor]s associated with a [Class].
