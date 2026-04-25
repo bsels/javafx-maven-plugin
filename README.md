@@ -86,7 +86,7 @@ Each `FXMLDirectory` entry supports:
         <plugin>
             <groupId>io.github.bsels</groupId>
             <artifactId>javafx-maven-plugin</artifactId>
-            <version>1.3.2</version>
+            <version>2.0.0</version>
 
             <executions>
                 <execution>
@@ -275,7 +275,7 @@ binaries, logging configuration, optional ZIP packaging, etc.).
 <plugin>
     <groupId>io.github.bsels</groupId>
     <artifactId>javafx-maven-plugin</artifactId>
-    <version>1.3.2</version>
+    <version>2.0.0</version>
 
     <executions>
         <execution>
@@ -410,7 +410,7 @@ The goal executes during the `process-classes` phase and requires **runtime** de
 <plugin>
     <groupId>io.github.bsels</groupId>
     <artifactId>javafx-maven-plugin</artifactId>
-    <version>1.3.2</version>
+    <version>2.0.0</version>
 
     <executions>
         <execution>

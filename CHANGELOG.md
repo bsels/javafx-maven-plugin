@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0 - 2026-04-25
+
+### Major
+
+Refactor the internal model structure and inline interfaces in the FXML comments. And improve the configuration for the fxml source code generation Mojo.
+
 ## 1.3.2 - 2026-04-09
 
 ### Patch
