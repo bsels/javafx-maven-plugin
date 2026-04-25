@@ -37,7 +37,10 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLResource;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLTranslation;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
 import io.github.bsels.javafx.maven.plugin.utils.ObjectMapperProvider;
+import io.github.bsels.javafx.maven.plugin.utils.Utils;
 import javafx.beans.NamedArg;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
@@ -55,8 +58,10 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static io.github.bsels.javafx.maven.plugin.fxml.v2.writer.FXMLSourceCodeBuilder.INITIALIZE_METHOD;
@@ -76,6 +81,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
     private static final Set<String> PRIMITIVE_TYPES = Set.of(
             "boolean", "byte", "char", "short", "int", "long", "float", "double", "void"
     );
+    private static final Logger log = LoggerFactory.getLogger(FXMLSourceCodeBuilderTypeHelper.class);
 
     /// Cache for storing and reusing [FXMLConstructor]s associated with a [Class].
     private final Map<Class<?>, List<FXMLConstructor>> constructorCache;
@@ -425,13 +431,17 @@ final class FXMLSourceCodeBuilderTypeHelper {
         Objects.requireNonNull(method, "`method` must not be null");
         String name = method.name();
         Optional<FXMLControllerMethod> controllerMethod = findMethodInController(controller, method);
+        Optional<FXMLControllerMethod> interfaceMethod = findMethodInController(method, interfaces);
         StringBuilder sourceCode = new StringBuilder();
         if (controllerMethod.isEmpty()) {
-            // TODO: Check for interface methods
             context.addFeature(Feature.ABSTRACT_CLASS);
         }
-        sourceCode.append("protected ")
-                .append(controllerMethod.map(_ -> "").orElse("abstract "))
+        if (interfaceMethod.isPresent()) {
+            sourceCode.append("java.lang.Override\npublic ");
+        } else {
+            sourceCode.append("protected ");
+        }
+        sourceCode.append(controllerMethod.map(_ -> "").orElse("abstract "))
                 .append(typeToSourceCode(context, method.returnType()))
                 .append(' ')
                 .append(name)
@@ -496,7 +506,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
     /// based on the visibility of the controller's `initialize` method.
     ///
     /// @param context          The [SourceCodeGeneratorContext] used for code generation.
-    /// @param controller  The [FXMLClassType] of the controller.
+    /// @param controller       The [FXMLClassType] of the controller.
     /// @param initializeMethod The [FXMLControllerMethod] representing the `initialize` method.
     /// @return A string containing the Java source code to call the initialization method.
     public String renderControllerInitialization(
@@ -514,6 +524,64 @@ final class FXMLSourceCodeBuilderTypeHelper {
         } else {
             return renderControllerDirectInitialization(context, initializeMethod);
         }
+    }
+
+    /// Searches for a method in the specified controller that matches the given FXML method
+    /// and the provided list of FXML interfaces.
+    ///
+    /// @param method     The FXML method to look for in the controller
+    /// @param interfaces The list of FXML interfaces to consider during the search
+    /// @return an [Optional] containing the FXMLControllerMethod if a match is found, or an empty [Optional] if no match is found
+    private Optional<FXMLControllerMethod> findMethodInController(FXMLMethod method, List<FXMLInterface> interfaces) {
+        String name = method.name();
+        int parameters = method.parameters().size();
+        List<FXMLControllerMethod> methods = interfaces.stream()
+                .map(FXMLInterface::methods)
+                .flatMap(List::stream)
+                .filter(interfaceMethod -> name.equals(interfaceMethod.name()))
+                .filter(interfaceMethod -> parameters == interfaceMethod.parameterTypes().size())
+                .toList();
+        log.debug(
+                "Found {} methods for FXML method name '{}', continue filtering on type information",
+                methods.size(),
+                name
+        );
+        FXMLType returnType = method.returnType();
+        List<FXMLType> parameterTypes = method.parameters();
+        BiPredicate<Class<?>, Class<?>> predicateReturnType = Class::isAssignableFrom;
+        BiPredicate<Class<?>, Class<?>> predicateParameters = Utils.swap(Class::isAssignableFrom);
+        return methods.stream()
+                .filter(interfaceMethod -> canMatchType(returnType, interfaceMethod.returnType(), predicateReturnType))
+                .filter(interfaceMethod -> IntStream.range(0, parameters)
+                        .mapToObj(i -> new FXMLTypePair(parameterTypes.get(i), interfaceMethod.parameterTypes().get(i)))
+                        .allMatch(i -> canMatchType(i.type(), i.interfaceType(), predicateParameters)))
+                .findFirst();
+    }
+
+    /// Determines whether the given FXML type can match the specified interface type using the provided predicate.
+    ///
+    /// @param type          The FXML type to be checked against the interface type.
+    /// @param interfaceType The FXML interface type to compare with the given type.
+    /// @param predicate     A predicate to test the compatibility of the given and interface types based on their classes.
+    /// @return `true` if the given type can match the specified interface type, `false` otherwise.
+    private boolean canMatchType(FXMLType type, FXMLType interfaceType, BiPredicate<Class<?>, Class<?>> predicate) {
+        return switch (type) {
+            case FXMLClassType(Class<?> typeClass) -> switch (interfaceType) {
+                case FXMLClassType(Class<?> interfaceClass) -> predicate.test(typeClass, interfaceClass);
+                case FXMLGenericType(Class<?> interfaceClass, _) -> predicate.test(typeClass, interfaceClass);
+                case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> true;
+            };
+            case FXMLGenericType(Class<?> typeClass, List<FXMLType> parameters) -> switch (interfaceType) {
+                case FXMLClassType(Class<?> interfaceClass) -> predicate.test(typeClass, interfaceClass);
+                case FXMLGenericType(Class<?> interfaceClass, List<FXMLType> interfaceParameters) ->
+                        IntStream.range(0, parameters.size())
+                                .mapToObj(i -> new FXMLTypePair(parameters.get(i), interfaceParameters.get(i)))
+                                .map(typePair -> canMatchType(typePair.type(), typePair.interfaceType(), predicate))
+                                .reduce(predicate.test(typeClass, interfaceClass), Boolean::logicalAnd);
+                case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> true;
+            };
+            case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> true;
+        };
     }
 
     /// Determines whether reflection is needed for the specified visibility in the given context and controller.

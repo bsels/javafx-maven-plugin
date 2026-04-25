@@ -25,6 +25,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -304,6 +305,16 @@ public final class Utils {
             function.apply(a, b);
             return a;
         };
+    }
+
+    /// Returns a new [BiPredicate] that swaps the order of the arguments when testing the given predicate.
+    ///
+    /// @param <A>       the type of the first argument to the resulting [BiPredicate]
+    /// @param <B>       the type of the second argument to the resulting [BiPredicate]
+    /// @param predicate the [BiPredicate] whose arguments should be swapped
+    /// @return a [BiPredicate] that tests with swapped argument order
+    public static <A, B> BiPredicate<A, B> swap(BiPredicate<B, A> predicate) {
+        return (a, b) -> predicate.test(b, a);
     }
 
     /// Finds parameterized types for a property name in public constructors.
