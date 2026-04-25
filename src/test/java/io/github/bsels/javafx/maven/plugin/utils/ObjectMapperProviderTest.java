@@ -1,0 +1,141 @@
+package io.github.bsels.javafx.maven.plugin.utils;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/// Unit tests for the `ObjectMapperProvider` class.
+///
+/// This class focuses on testing the functionality of the `getObjectMapper` method
+/// to ensure it provides a singleton instance of the `ObjectMapper`.
+class ObjectMapperProviderTest {
+
+    /// Verifies that `getObjectMapper` returns a non-null instance of `ObjectMapper`.
+    @Test
+    void testGetObjectMapperReturnsNonNull() {
+        // Act
+        ObjectMapper objectMapper = ObjectMapperProvider.getObjectMapper();
+
+        // Assert
+        assertThat(objectMapper)
+                .isNotNull();
+    }
+
+    /// Verifies that `getObjectMapper` always returns the same singleton instance of `ObjectMapper`.
+    @Test
+    void testGetObjectMapperReturnsSingletonInstance() {
+        // Act
+        ObjectMapper firstInstance = ObjectMapperProvider.getObjectMapper();
+        ObjectMapper secondInstance = ObjectMapperProvider.getObjectMapper();
+
+        // Assert
+        assertThat(firstInstance)
+                .isSameAs(secondInstance);
+    }
+
+    @Test
+    void constructionFailsWithIllegalStateException() throws NoSuchMethodException {
+        Constructor<?> constructor = ObjectMapperProvider.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        assertThatThrownBy(constructor::newInstance)
+                .isInstanceOf(InvocationTargetException.class)
+                .hasCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("Cannot instantiate ObjectMapperProvider class");
+    }
+
+    @Test
+    void checkBuilder() throws NoSuchFieldException, IllegalAccessException {
+        Field field = ObjectMapperProvider.class.getDeclaredField("OBJECT_MAPPER");
+        field.setAccessible(true);
+        field.set(null, null);
+
+        assertThat(ObjectMapperProvider.getObjectMapper())
+                .isSameAs(ObjectMapperProvider.getObjectMapper());
+    }
+
+    @Test
+    void testTypeSerialization() throws Exception {
+        ObjectMapper objectMapper = ObjectMapperProvider.getObjectMapper();
+        assertThat(objectMapper.writeValueAsString(Field.class))
+                .isEqualTo("\"class java.lang.reflect.Field\"");
+    }
+
+    private static class TestClass {
+
+        public String getButThrowsError() {
+            throw new RuntimeException("Test exception");
+        }
+    }
+
+    @Nested
+    class PrettyPrintTest {
+
+        @Test
+        void prettyPrintSucceeds() {
+            assertThat(ObjectMapperProvider.prettyPrint(Map.of("key", "value")))
+                    .contains("key")
+                    .contains("value");
+        }
+
+        @Test
+        void prettyPrintReturnsSameInstanceOnSecondCall() throws NoSuchFieldException, IllegalAccessException {
+            // Reset OBJECT_WRITER to null to force re-creation
+            Field field = ObjectMapperProvider.class.getDeclaredField("OBJECT_WRITER");
+            field.setAccessible(true);
+            field.set(null, null);
+
+            // First call creates the writer
+            String first = ObjectMapperProvider.prettyPrint("test");
+            // Second call reuses the writer
+            String second = ObjectMapperProvider.prettyPrint("test");
+
+            assertThat(first).isEqualTo(second);
+        }
+
+        private static class UnserializableClass {
+
+            public String getButThrowsError() {
+                throw new RuntimeException("Pretty print test exception");
+            }
+        }
+
+        @Test
+        void prettyPrintFailsWithIllegalArgumentException() {
+            assertThatThrownBy(() -> ObjectMapperProvider.prettyPrint(new UnserializableClass()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Unable to pretty print the object value")
+                    .cause()
+                    .isInstanceOf(JsonProcessingException.class)
+                    .hasMessageStartingWith("Pretty print test exception");
+        }
+    }
+
+    @Nested
+    class EncodeObjectTest {
+
+        @Test
+        void jsonSerializationFails() {
+            assertThatThrownBy(() -> ObjectMapperProvider.encodeObject(new TestClass()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Unable to escape the object value")
+                    .cause()
+                    .isInstanceOf(JsonProcessingException.class)
+                    .hasMessageStartingWith("Test exception");
+        }
+
+        @Test
+        void jsonSerializationSucceeds() {
+            assertThat(ObjectMapperProvider.encodeObject("test"))
+                    .isEqualTo("\"test\"");
+        }
+    }
+}

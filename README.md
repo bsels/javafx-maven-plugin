@@ -9,7 +9,7 @@
 ![Java Version 25](https://img.shields.io/badge/Java_Version-25-purple?logo=data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMjAwcHgiIHZlcnNpb249IjEuMSIgaWQ9IkNhcGFfMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmlld0JveD0iMCAwIDUwMi42MzIgNTAyLjYzMiIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSIgZmlsbD0iIzAwMDAwMCI+PGcgaWQ9IlNWR1JlcG9fYmdDYXJyaWVyIiBzdHJva2Utd2hpdGVpZHRoPSIwIj48L2c+PGcgaWQ9IlNWR1JlcG9fdHJhY2VyQ2FycmllciIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48L2c+PGcgaWQ9IlNWR1JlcG9faWNvbkNhcnJpZXIiPiA8Zz4gPGc+IDxwYXRoIHN0eWxlPSJmaWxsOndoaXRlOyIgZD0iTTI0MC44NjQsMjY5Ljg5NGMwLDAtMjguMDItNTMuOTkyLTI2Ljk4NS05My40NDVjMC43NTUtMjguMTkzLDY0LjMyNC01Ni4wNjIsODkuMjgxLTk2LjUyOSBDMzI4LjA3NCwzOS40MzEsMzAwLjA1NCwwLDMwMC4wNTQsMHM2LjIzNCwyOS4wNzctMTAuMzc2LDU5LjE0N2MtMTYuNjA5LDMwLjExMy03Ny45MTQsNDcuNzc5LTEwMS43NDksOTkuNjc5IFMyNDAuODY0LDI2OS44OTQsMjQwLjg2NCwyNjkuODk0eiI+PC9wYXRoPiA8cGF0aCBzdHlsZT0iZmlsbDp3aGl0ZTsiIGQ9Ik0zNDUuNzQxLDEwNS44NjljMCwwLTk1LjQ5NCwzNi4zNDctOTUuNDk0LDc3Ljg0OWMwLDQxLjU0NSwyNS45MjgsNTUuMDI3LDMwLjExMyw2OC41MDkgYzQuMTQyLDEzLjUyNS03LjI2OSwzNi4zNDctNy4yNjksMzYuMzQ3czM3LjM2MS0yNS45NSwzMS4xMDUtNTYuMDYyYy02LjIzNC0zMC4xMTMtMzUuMjktMzkuNDc1LTE4LjY1OS02OS41NDQgQzI5Ni42NDYsMTQyLjc5OSwzNDUuNzQxLDEwNS44NjksMzQ1Ljc0MSwxMDUuODY5eiI+PC9wYXRoPiA8cGF0aCBzdHlsZT0iZmlsbDp3aGl0ZTsiIGQ9Ik0yMzAuNTEsMzI0Ljc0OGM4OC4yNDYtMy4xNDksMTIwLjQzLTMwLjk5NywxMjAuNDMtMzAuOTk3IGMtNTcuMDc2LDE1LjU1My0yMDguNjU0LDE0LjUzOS0yMDkuNzExLDMuMTI4Yy0xLjAxNC0xMS40MTEsNDYuNzAxLTIwLjc3Myw0Ni43MDEtMjAuNzczcy03NC43MjEsMC04MC45NTUsMTguNjggQzEwMC43NCwzMTMuNDY3LDE0Mi4zMjgsMzI3LjgzMywyMzAuNTEsMzI0Ljc0OHoiPjwvcGF0aD4gPHBhdGggc3R5bGU9ImZpbGw6d2hpdGU7IiBkPSJNMzU4LjE4NywzNjguNDk0YzAsMCw4Ni4zNjktMTguNDIxLDc3LjgyNy02NS4zMzhjLTEwLjM1NC01Ny4xMTktNzAuNTgtMjQuOTM2LTcwLjU4LTI0LjkzNiBzNDIuNjAyLDAsNDYuNzIyLDI1LjkyOEM0MTYuMzIsMzMwLjA5OCwzNTguMTg3LDM2OC40OTQsMzU4LjE4NywzNjguNDk0eiI+PC9wYXRoPiA8cGF0aCBzdHlsZT0iZmlsbDp3aGl0ZTsiIGQ9Ik0zMTUuNjI4LDM0My42MDFjMCwwLTIxLjc2NSw1LjcxNi01NC4wMTMsOS4zNGMtNDMuMjI4LDQuODUzLTk1LjQ5NCwxLjAxNC05OS42NTctNi4yNTYgYy00LjA5OC03LjI2OSw3LjI2OS0xMS40MTEsNy4yNjktMTEuNDExYy01MS45MjEsMTIuNDY4LTIzLjUxMiwzNC4yMzMsMzcuMzM5LDM4LjQxOGM1Mi4xNTgsMy41NTksMTI5Ljc5MS0xNS41NzQsMTI5Ljc5MS0xNS41NzQgTDMxNS42MjgsMzQzLjYwMXoiPjwvcGF0aD4gPHBhdGggc3R5bGU9ImZpbGw6d2hpdGU7IiBkPSJNMTgxLjczOCwzODguOTQzYzAsMC0yMy41NTUsMC42NjktMjQuOTM2LDEzLjEzN2MtMS4zNTksMTIuMzgyLDE0LjQ5NiwyMy41MTIsNzIuNjUsMjYuOTY0IGM1OC4xMzMsMy40NTEsOTguOTg4LTE1Ljg5OCw5OC45ODgtMTUuODk4bC0yNi4yOTUtMTUuOTYyYzAsMC0xNi42MzEsMy40OTQtNDIuMjM2LDYuOTQ2IGMtMjUuNjI2LDMuNDczLTc4LjE3My0yLjc4My04MC4yNDMtNy41OTNDMTc3LjU1MywzOTEuNjgyLDE4MS43MzgsMzg4Ljk0MywxODEuNzM4LDM4OC45NDN6Ij48L3BhdGg+IDxwYXRoIHN0eWxlPSJmaWxsOndoaXRlOyIgZD0iTTQwNy45OTQsNDQ1LjAwNWM4Ljk5NS05LjcwNy0yLjc4My0xNy4zMjEtMi43ODMtMTcuMzIxczQuMTQyLDQuODUzLTEuMzM3LDEwLjM3NiBjLTUuNTQ0LDUuNTIyLTU2LjA4NCwxOS4zNDktMTM3LjA2MSwyMy41MTJjLTgwLjk1NSw0LjE2My0xNjguODU2LTcuNjE1LTE3MS42MzktMTcuOTkgYy0yLjY5Ni0xMC4zNzYsNDUuMDE4LTE4LjY1OSw0NS4wMTgtMTguNjU5Yy01LjUyMiwwLjY5LTcxLjk2LDIuMDcxLTc0LjA3NCwyMC4wODJjLTIuMDcxLDE3Ljk2OCwyOS4wNTYsMzIuNTA3LDE1My42NywzMi41MDcgQzM0NC4zMzksNDc3LjQ5MSwzOTkuMDQyLDQ1NC42NDcsNDA3Ljk5NCw0NDUuMDA1eiI+PC9wYXRoPiA8cGF0aCBzdHlsZT0iZmlsbDp3aGl0ZTsiIGQ9Ik0zNTkuNTY4LDQ4NS44MTdjLTU0LjY4MiwxMS4wNDQtMjIwLjczNCw0LjA3Ny0yMjAuNzM0LDQuMDc3czEwNy45MTksMjUuNjI2LDIzMS4xMDksNC4xODUgYzU4Ljg4OC0xMC4yNjgsNjIuMzE4LTM4Ljc2Myw2Mi4zMTgtMzguNzYzUzQxNC4yNSw0NzQuNzA4LDM1OS41NjgsNDg1LjgxN3oiPjwvcGF0aD4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8Zz4gPC9nPiA8L2c+IDwvZz48L3N2Zz4=)
 
 A concise Maven plugin that has been inspired from the JavaFX Maven Plugin
-([openjfx/javafx‑maven‑plugin](https://github.com/openjfx/javafx-maven-plugin)).
+([openjfx/javafx‑maven‑plugin](https://github.com/openjfx/javafx-maven-plugin)) for the `jlink` and `run` goals.
 
 ## Features
 
@@ -29,7 +29,7 @@ rapidly (`run`), and finally produce a lean, portable executable bundle (`jlink`
   introduced in recent JDK releases.
 - **Modular architecture**: The application is built as a **Java module** (using `module-info.java`).
   All source files, libraries, and resources must be declared in explicit modules, allowing the JDK to enforce strong
-  encapsulation and reliable configuration at compile‑time and run‑time.
+  encapsulation and reliable configuration at compile time and run‑time.
 - **FXML handling**:
     - All **FXML files** reference **classes that are part of the compiled classpath** (i.e., they must already be
       compiled into the module), or that can be compiled without the source code that needs to be generated
@@ -46,25 +46,36 @@ It is used to reduce runtime dependencies because the JavaFX FXML loader is not 
 
 ### What It Does
 
-1. **Scans** a user‑specified directory for `*.fxml` files.
-2. **Parses** each file (`FXMLReader`) and builds an internal model (`FXMLProcesor`).
-3. **Generates** a Java class that mirrors the FXML hierarchy – fields, methods, imports, and optional resource‑bundle
-   handling.
-4. **Writes** the generated `.java` files into a configurable output folder and adds that folder to the project’s
-   compile source roots so the classes are compiled together with the rest of the codebase.
+1. **Scans** one or more user‑specified directories for `*.fxml` files.
+2. **Reads** each file into an intermediate representation (`FXMLReader`).
+3. **Parses** the file into an `fxml.v2` document model (`FXMLDocumentParser`).
+4. **Generates** Java source code (`FXMLSourceCodeBuilder`) that mirrors the FXML hierarchy (fields, methods, imports,
+   resource bundle lookups, etc.).
+5. **Writes/updates** the generated `.java` files (existing files are overwritten) into a configurable output folder
+   and adds that folder to the project’s compiler source roots so the generated classes are compiled with the rest of
+   the project.
+6. **(Optional)** Extends class discovery with an optimistic in‑memory compilation step so the parser can resolve as
+   many project classes as possible even if the project is not fully compiled yet.
 
 ### Key Configuration Parameters
 
-| Parameter                            | Property                               | Required?      | Default                                             | Description                                                                                                                                                                                       |
-|--------------------------------------|----------------------------------------|----------------|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `project`                            | `${project}`                           | Yes (injected) | –                                                   | Maven project reference – used to add the generated source directory to the compile classpath.                                                                                                    |
-| `fxmlDirectory`                      | `javafx.fxml.directory`                | Yes            | –                                                   | Directory that contains the FXML files to process.                                                                                                                                                |
-| `packageName`                        | `javafx.fxml.package`                  | No             | (no package)                                        | Base Java package for the generated classes. If omitted, classes are placed directly under the generated‑source folder.                                                                           |
-| `resourceBundleObject`               | `javafx.fxml.resourceBundleObject`     | No             | –                                                   | Fully‑qualified name of a resource‑bundle class used for i18n look‑ups inside the generated code.                                                                                                 |
-| `generatedSourceDirectory`           | `javafx.fxml.generatedSourceDirectory` | Yes            | `${project.build.directory}/generated-sources/fxml` | Destination folder for the generated Java files.                                                                                                                                                  |
-| `debugInternalModel`                 | `javafx.fxml.debug.internal.model`     | No             | `false`                                             | When `true`, the plugin logs the intermediate JSON representation of the parsed and processed FXML models for troubleshooting.                                                                    |
-| `fxmlParameterizations`              | `javafx.fxml.parameterization`         | No             | –                                                   | A list of `FXMLParameterized` objects that allow custom root parameters, interface mappings, and other fine‑grained tweaks to the generated code.                                                 |
-| `includeSourceFilesInClassDiscovery` | `javafx.fxml.include.source.discovery` | No             | `false`                                             | When `true`, the plugin tries to add as much of the uncompiled source code to the discovery classpath. It will only include classes that can be compiled without errors (optimistic compilation). |
+| Parameter                            | Property                               | Required?      | Default                                             | Description                                                                                                                                                                                                |
+|--------------------------------------|----------------------------------------|----------------|-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `project`                            | `${project}`                           | Yes (injected) | –                                                   | Maven project reference – used to add the generated source directory to the compile classpath.                                                                                                             |
+| `fxmlDirectories`                    | (n/a; XML config)                      | Yes            | –                                                   | One or more `FXMLDirectory` entries that point to directories with `*.fxml` files. Each entry can also define an output package and exclusions (see below).                                                |
+| `resourceBundleObject`               | `javafx.fxml.resourceBundleObject`     | No             | –                                                   | Fully‑qualified name of a resource‑bundle class used for i18n lookups inside the generated code.                                                                                                           |
+| `generatedSourceDirectory`           | `javafx.fxml.generatedSourceDirectory` | Yes            | `${project.build.directory}/generated-sources/fxml` | Destination folder for the generated Java files.                                                                                                                                                           |
+| `includeSourceFilesInClassDiscovery` | `javafx.fxml.include.source.discovery` | No             | `true`                                              | When `true`, the plugin performs an optimistic in‑memory compilation step to include as many project classes as possible in the discovery classpath (helpful when FXML references project types/generics). |
+| `defaultCharset`                     | `javafx.fxml.charset`                  | Yes            | `UTF-8`                                             | Character set used to read the FXML files and to drive parsing/generation.                                                                                                                                 |
+| `addGeneratedAnnotation`             | `javafx.fxml.add.generated.annotation` | No             | `true`                                              | When `true`, the plugin adds an `@Generated` marker to generated sources.                                                                                                                                  |
+
+Each `FXMLDirectory` entry supports:
+
+| `FXMLDirectory` field | Required? | Default      | Description                                                 |
+|-----------------------|-----------|--------------|-------------------------------------------------------------|
+| `directory`           | Yes       | –            | Directory containing FXML files to process.                 |
+| `packageName`         | No        | (no package) | Package for the generated classes from this directory.      |
+| `excludedFiles`       | No        | (empty)      | Paths (relative to `directory`) to exclude from processing. |
 
 ### Typical Usage in `pom.xml`
 
@@ -85,32 +96,32 @@ It is used to reduce runtime dependencies because the JavaFX FXML loader is not 
                     </goals>
                     <phase>generate-sources</phase>
                     <configuration>
-                        <!-- Where your .fxml files live -->
-                        <fxmlDirectory>${project.basedir}/src/main/resources/fxml</fxmlDirectory>
+                        <fxmlDirectories>
+                            <fxmlDirectory>
+                                <!-- Where your .fxml files live -->
+                                <directory>${project.basedir}/src/main/resources/fxml</directory>
 
-                        <!-- Package for the generated classes -->
-                        <packageName>com.myapp.ui.generated</packageName>
+                                <!-- Package for the generated classes from this directory -->
+                                <packageName>com.myapp.ui.generated</packageName>
+
+                                <!-- Optional: exclude specific files (relative to <directory>) -->
+                                <excludedFiles>
+                                    <excludedFile>legacy/OldView.fxml</excludedFile>
+                                </excludedFiles>
+                            </fxmlDirectory>
+                        </fxmlDirectories>
 
                         <!-- Optional: custom resource bundle -->
                         <resourceBundleObject>com.myapp.i18n.Messages</resourceBundleObject>
 
-                        <!-- Enable debugging of the internal model (optional) -->
-                        <debugInternalModel>true</debugInternalModel>
+                        <!-- Optional: class discovery from project sources (default: true) -->
+                        <includeSourceFilesInClassDiscovery>true</includeSourceFilesInClassDiscovery>
 
-                        <!-- Example of parameterization (optional) -->
-                        <fxmlParameterizations>
-                            <FXMLParameterized>
-                                <className>MyView</className>
-                                <interfaces>
-                                    <InterfacesWithMethod>
-                                        <interfaceName>com.myapp.api.Viewable</interfaceName>
-                                        <methodNames>
-                                            <method>initialize</method>
-                                        </methodNames>
-                                    </InterfacesWithMethod>
-                                </interfaces>
-                            </FXMLParameterized>
-                        </fxmlParameterizations>
+                        <!-- Optional: parsing/generation charset (default: UTF-8) -->
+                        <defaultCharset>UTF-8</defaultCharset>
+
+                        <!-- Optional: add @Generated marker (default: true) -->
+                        <addGeneratedAnnotation>true</addGeneratedAnnotation>
                     </configuration>
                 </execution>
             </executions>
@@ -130,14 +141,44 @@ It is used to reduce runtime dependencies because the JavaFX FXML loader is not 
 
 - **Package name:** If omitted, generated classes end up in the root of the generated‑source folder, which can cause
   naming collisions.
-- **Debug mode:** Turn on debugInternalModel only when troubleshooting; the JSON dumps can be large.
 - **Classpath:** Ensure any custom JavaFX controls or third‑party libraries used in the FXML are declared as Maven
   dependencies; otherwise class loading will fail.
+- **Scripts and expressions:** Scripts and expression bindings (e.g., `<fx:script>`, `${...}`) are not supported yet.
 - **Incremental builds:** The plugin does not currently check timestamps, so it regenerates all files on each run.
   Consider cleaning the generated folder only when necessary.
-- **Use generics:** Generics need to be explicitly declared in the FXML file, otherwise the plugin will fail.
+- **Use generics:** Generics need to be explicitly declared in the FXML file.
   This is done by XML comment: `<!-- generic <index>: <full.qualified.type> -->`, e.g.
   `<!-- generic 0: java.lang.Integer -->`.
+- **Declare interfaces:** If the generated class should implement one or more interfaces,
+  you must declare them in the FXML as XML comments.
+  The supported format is:
+    - `<!-- interface: <fully.qualified.InterfaceType> -->`
+    - `<!-- interface: <fully.qualified.InterfaceType>; methods: <returnType> <methodName>(<paramType>, ...); ... -->`
+
+  If the interface type can be resolved from the classpath, the plugin will reflectively discover its methods,
+  and you can omit the `methods` part.
+  If the interface type cannot be resolved during parsing (e.g., it is not yet compiled and cannot be found via class
+  discovery), you must provide the `methods` signature list in the comment so the generator can still bind method
+  references.
+
+  Example:
+    - `<!-- interface: com.myapp.ui.contracts.HasSave -->`
+    -
+    `<!-- interface: com.myapp.ui.contracts.HasLoad; methods: void load(java.lang.String); java.lang.String title() -->`
+
+### Important changes in V2
+
+This section describes differences between the current implementation (V2) and the README’s previous state (V1).
+
+- **Configuration shape changed**: V2 uses `fxmlDirectories` (a list of `FXMLDirectory` entries) instead of single
+  `fxmlDirectory` + top‑level `packageName`.
+- **Per-directory exclusions**: V2 adds `excludedFiles` per `FXMLDirectory` to skip specific FXML files.
+- **Source discovery default changed**: V2 enables optimistic class discovery by default via
+  `includeSourceFilesInClassDiscovery` (`javafx.fxml.include.source.discovery`, default `true`).
+- **New generation toggles**: V2 adds `defaultCharset` (`javafx.fxml.charset`) and `addGeneratedAnnotation`
+  (`javafx.fxml.add.generated.annotation`).
+- **Removed/obsolete options**: V1’s `debugInternalModel` and `fxmlParameterizations` are not part of the V2 mojo
+  configuration surface.
 
 ### Example FXML File
 
@@ -191,8 +232,8 @@ preserving the declarative benefits of FXML.
 
 The **`jlink`** goal creates a custom, minimal Java runtime image that contains only the modules required by your JavaFX
 application.
-It leverages the JDK’s `jlink` tool and aads JavaFX‑specific handling (native access, launcher scripts, additional
-binaries,logging configuration, optional ZIP packaging, etc.).
+It leverages the JDK’s `jlink` tool and adds JavaFX‑specific handling (native access, launcher scripts, additional
+binaries, logging configuration, optional ZIP packaging, etc.).
 
 ### When to Use It
 
@@ -250,7 +291,7 @@ binaries,logging configuration, optional ZIP packaging, etc.).
                 <!-- Optional – customise the image -->
                 <jlinkExecutable>jlink</jlinkExecutable><!-- path to jlink -->
                 <jmodsPath>${java.home}/jmods</jmodsPath><!-- custom JavaFX jmods -->
-                <jlinkImageName>my-ap-image</jlinkImageName><!-- output folder -->
+                <jlinkImageName>my-app-image</jlinkImageName><!-- output folder -->
                 <jlinkZipName>my-app-runtime</jlinkZipName> <!-- ZIP name (omit to skip) -->
 
                 <!-- Launcher configuration -->
@@ -298,7 +339,7 @@ target/
  │   │   └─ myapp.bat          ← launcher script (Windows)
  │   ├─ conf/
  │   │   └─ logging.properties ← patched format
- │   ├─ lib/…                  ← JavaFX modules + ap modules
+ │   ├─ lib/…                  ← JavaFX modules + app modules
  │   └─ …
  └─ my-app-runtime.zip         ← optional distribution archive
 ```
@@ -343,7 +384,7 @@ The **`run`** goal launches a JavaFX application directly from the Maven build l
 - Running the application with custom JVM options, debugger attachment, or additional native binaries.
 - Integrating UI tests into a CI pipeline that can start the app in head‑less mode (if the test harness supports it).
 
-The goal executes during the `proces-classes` phase and requires **runtime** dependency resolution.
+The goal executes during the `process-classes` phase and requires **runtime** dependency resolution.
 
 ### Key Configuration Parameters
 
@@ -429,7 +470,7 @@ The goal executes during the `proces-classes` phase and requires **runtime** dep
   runtime image for repeated runs.
 - **Headless CI** – If the CI environment lacks a display, add `-Djava.awt.headless=true` to options or configure a
   virtual frame buffer (e.g., Xvfb on Linux).
-- _\*Skipping Execution_ – Set `-Djavafx.skip=true` on the command line to bypass the run step (useful for multi‑module
+- _*Skipping Execution_ – Set `-Djavafx.skip=true` on the command line to bypass the run step (useful for multi‑module
   builds where only some modules need to be executed).
 
 ---
@@ -441,7 +482,7 @@ Add the snippet above to your project's pom.xml and run:
 mvn javafx:run
 ```
 
-The console will display the exact command that is executed by the plugin, for example:
+The console will display the exact command executed by the plugin, for example:
 
 ```shell
 java -Djava.util.logging.SimpleFormatter.format=%1$tF %1$tT %4$s %2$s - %5$s%6$s%n \

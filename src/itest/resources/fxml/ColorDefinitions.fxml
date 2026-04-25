@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.paint.Color?>
+<?import java.lang.Object?>
+<Object xmlns:fx="http://javafx.com/fxml">
+    <fx:define>
+        <Color fx:id="primary" red="1.0" green="0.0" blue="0.0"/>
+        <Color fx:id="secondary" red="0.0" green="0.0" blue="1.0"/>
+    </fx:define>
+</Object>

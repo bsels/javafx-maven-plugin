@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+
+<Button xmlns:fx="http://javafx.com/fxml" 
+        text="%button.text" 
+        style="-fx-background-image: url(&quot;@background.png&quot;);">
+    <graphic>
+        <Label text="@label_resource"/>
+    </graphic>
+</Button>

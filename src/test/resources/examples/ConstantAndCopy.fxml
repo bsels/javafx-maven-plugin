@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import io.github.bsels.javafx.maven.plugin.examples.ConstantAndCopyBean?>
+<?import javafx.scene.paint.Color?>
+<?import java.lang.String?>
+
+<ConstantAndCopyBean xmlns:fx="http://javafx.com/fxml">
+    <fx:define>
+        <String fx:id="original" fx:value="OriginalValue"/>
+    </fx:define>
+    <value>
+        <ConstantAndCopyBean fx:constant="MY_CONSTANT"/>
+    </value>
+    <other>
+        <fx:copy source="original"/>
+    </other>
+    <items>
+        <Color fx:constant="RED"/>
+        <fx:copy fx:id="copied" source="original"/>
+    </items>
+</ConstantAndCopyBean>

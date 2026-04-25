@@ -10,7 +10,7 @@ Updated project dependencies:
 - Added an override for `plexus-utils` to **3.6.1** to address transitive dependency concerns
 - Bumped  semantic versioning plugin to **1.3.3**
 
-## 1.3.1 - 2026-03-73
+## 1.3.1 - 2026-03-14
 
 ### Patch
 
@@ -24,13 +24,13 @@ Bumped dependencies:
 
 Added JaCoCo code coverage reporting
 
-## 1.3.0 - 2026-02-46
+## 1.3.0 - 2026-02-15
 
 ### Minor
 
 Added nested generics support using the standard Java notation.
 
-## 1.2.3 - 2026-02-45
+## 1.2.3 - 2026-02-14
 
 ### Patch
 

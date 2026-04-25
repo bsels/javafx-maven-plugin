@@ -1,0 +1,14 @@
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.layout.VBox?>
+<?import java.lang.String?>
+<VBox xmlns:fx="http://javafx.com/fxml">
+    <Button text="Ignored" properties="ignored"/>
+    <Button text="Properties">
+        <properties attribute="Attribute">
+            <element>Element</element>
+            <elementValue>
+                <String fx:value="ElementValue"/>
+            </elementValue>
+        </properties>
+    </Button>
+</VBox>

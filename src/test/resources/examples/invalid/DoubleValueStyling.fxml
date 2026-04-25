@@ -1,0 +1,9 @@
+<?import javafx.scene.control.Button?>
+<?import java.lang.String?>
+<Button xmlns:fx="http://javafx.com/fxml">
+    <style>
+        <!-- Should throw error -->
+        <String fx:value="Data"/>
+        <String fx:value="Data"/>
+    </style>
+</Button>

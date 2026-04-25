@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import io.github.bsels.javafx.maven.plugin.examples.OnChangeTestBean?>
+<?import java.lang.String?>
+
+<OnChangeTestBean xmlns:fx="http://javafx.com/fxml">
+    <observableSet onChange="onSetChanged">
+        <String fx:value="X"/>
+        <String fx:value="Y"/>
+    </observableSet>
+</OnChangeTestBean>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import java.util.*?>
+
+<Button xmlns:fx="http://javafx.com/fxml">
+    <properties onChange="onPropertiesChange" String="key1" Label="key2"/>
+</Button>

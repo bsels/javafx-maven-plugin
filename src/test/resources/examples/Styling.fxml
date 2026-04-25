@@ -1,0 +1,4 @@
+<?import javafx.scene.control.Button?>
+<Button styleClass="single-style-class">
+    <style/><!-- Skip this -->
+</Button>

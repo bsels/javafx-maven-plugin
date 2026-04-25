@@ -1,0 +1,13 @@
+<?import javafx.collections.FXCollections?>
+<?import java.lang.Object?>
+<?import java.lang.String?>
+<Object xmlns:fx="http://javafx.com/fxml">
+    <fx:define>
+        <FXCollections fx:id="myList" fx:factory="observableArrayList">
+            <!-- generic 0: String -->
+            <String fx:value="A"/>
+            <String fx:value="B"/>
+            <String fx:value="C"/>
+        </FXCollections>
+    </fx:define>
+</Object>

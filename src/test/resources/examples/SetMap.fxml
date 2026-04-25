@@ -1,0 +1,10 @@
+<?import io.github.bsels.javafx.maven.plugin.examples.MetaDataHolder?>
+<?import java.util.HashMap?>
+<MetaDataHolder>
+    <metaData>
+        <HashMap item="Data">
+            <!-- generic 0: java.lang.String -->
+            <!-- generic 1: java.lang.String -->
+        </HashMap>
+    </metaData>
+</MetaDataHolder>

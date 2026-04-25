@@ -20,3 +20,5 @@ buildNumber.properties
 # JetBrains
 .idea
 .junie
+.env
+.output.txt
