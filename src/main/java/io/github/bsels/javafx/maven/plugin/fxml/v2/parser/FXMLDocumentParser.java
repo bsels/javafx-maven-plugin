@@ -290,7 +290,8 @@ public final class FXMLDocumentParser {
         Map<String, String> properties = structure.properties();
         String source = properties.get(FXMLConstants.SOURCE_ATTRIBUTE);
         if (source == null) {
-            throw new IllegalArgumentException("`source` attribute is required for fx:copy");
+            throw new IllegalArgumentException("`source` attribute is required for fx:copy in <%s>".formatted(
+                    structure.name()));
         }
         FXMLIdentifier copyId = helper.resolveOptionalIdentifier(properties)
                 .orElseGet(() -> new FXMLInternalIdentifier(buildContext.nextInternalId()));
@@ -329,7 +330,8 @@ public final class FXMLDocumentParser {
         Map<String, String> properties = structure.properties();
         String source = properties.get(FXMLConstants.SOURCE_ATTRIBUTE);
         if (source == null) {
-            throw new IllegalArgumentException("`source` attribute is required for fx:include");
+            throw new IllegalArgumentException("`source` attribute is required for fx:include in <%s>".formatted(
+                    structure.name()));
         }
         FXMLIdentifier includeId = helper.resolveOptionalIdentifier(properties)
                 .orElseGet(() -> new FXMLInternalIdentifier(buildContext.nextInternalId()));
@@ -353,7 +355,8 @@ public final class FXMLDocumentParser {
         Map<String, String> properties = structure.properties();
         String typeName = properties.get(FXMLConstants.TYPE_ATTRIBUTE);
         if (typeName == null) {
-            throw new IllegalArgumentException("fx:root must have a 'type' attribute");
+            throw new IllegalArgumentException("fx:root must have a 'type' attribute in <%s>".formatted(
+                    structure.name()));
         }
         Class<?> clazz = Utils.findType(buildContext.imports(), typeName);
         log.debug("Parsing fx:root with type: %s".formatted(clazz.getName()));
@@ -377,7 +380,8 @@ public final class FXMLDocumentParser {
         String source = structure.properties()
                 .get(FXMLConstants.SOURCE_ATTRIBUTE);
         if (source == null) {
-            throw new IllegalArgumentException("`source` attribute is required for fx:reference");
+            throw new IllegalArgumentException("`source` attribute is required for fx:reference in <%s>".formatted(
+                    structure.name()));
         }
         return Optional.of(new FXMLReference(source));
     }
@@ -486,8 +490,8 @@ public final class FXMLDocumentParser {
                             .toList();
                     if (grandChildren.size() != 1) {
                         throw new IllegalArgumentException(
-                                "Map entry element `%s` must have exactly one child element representing the value".formatted(
-                                        childName));
+                                "Map entry element `%s` in <%s> must have exactly one child element representing the value"
+                                        .formatted(childName, structure.name()));
                     }
                     value = grandChildren.getFirst();
                 }

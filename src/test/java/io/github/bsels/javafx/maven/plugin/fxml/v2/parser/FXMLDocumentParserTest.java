@@ -2424,7 +2424,7 @@ public class FXMLDocumentParserTest {
             // Act and Assert
             assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("`source` attribute is required for fx:copy");
+                    .hasMessage("`source` attribute is required for fx:copy in <fx:copy>");
         }
 
         @Test
@@ -2435,7 +2435,7 @@ public class FXMLDocumentParserTest {
             // Act and Assert
             assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("`source` attribute is required for fx:include");
+                    .hasMessage("`source` attribute is required for fx:include in <fx:include>");
         }
 
         @Test
@@ -2446,7 +2446,7 @@ public class FXMLDocumentParserTest {
             // Act and Assert
             assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("fx:root must have a 'type' attribute");
+                    .hasMessage("fx:root must have a 'type' attribute in <fx:root>");
         }
 
         @Test
@@ -2457,7 +2457,7 @@ public class FXMLDocumentParserTest {
             // Act and Assert
             assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("`source` attribute is required for fx:reference");
+                    .hasMessage("`source` attribute is required for fx:reference in <fx:reference>");
         }
 
         @ParameterizedTest
@@ -2469,7 +2469,9 @@ public class FXMLDocumentParserTest {
             // Act and Assert
             assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples/invalid/", getRootPath()))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Map entry element `test` must have exactly one child element representing the value");
+                    .hasMessage(
+                            "Map entry element `test` in <HashMap> must have exactly one child element representing the value"
+                    );
         }
 
         @ParameterizedTest
