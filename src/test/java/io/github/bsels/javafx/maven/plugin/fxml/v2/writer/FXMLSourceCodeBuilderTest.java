@@ -47,7 +47,6 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -125,29 +124,223 @@ public class FXMLSourceCodeBuilderTest {
     @Nested
     class GenerateSourceCodeTest {
 
-        @ParameterizedTest
-        @ValueSource(strings = {
-                "/examples/ColorDefinitions.fxml",
-                "/examples/SetList.fxml",
-                "/examples/MapWithReferences.fxml",
-                "/examples/GridPaneStaticPropertyElement.fxml",
-                "/examples/GridPaneStaticPropertyAttribute.fxml",
-                "/examples/GridPaneStaticPropertyElementExplicitValue.fxml",
-                "/examples/MyButtonWithConstants.fxml",
-                "/examples/MyHashMap.fxml",
-                "/examples/NodeProperties.fxml",
-                "/examples/FXInclude.fxml",
-                "/examples/ButtonWithNoControllerAction.fxml",
-                "/examples/ButtonWithControllerAction.fxml",
-                "/examples/FXIncludeNestedController.fxml",
-        })
-        @Disabled("working on it")
-        void dummy(String file) throws MojoExecutionException {
-            FXMLDocument document = parse(file);
-            String sourceCode = classUnderTest.generateSourceCode(document, "com.example");
+        /// Verifies that `ColorDefinitions.fxml` generates a class extending `Object` with four `Color` fields
+        /// and constructor assignments using both direct and variable-based construction.
+        @Test
+        void colorDefinitions() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/ColorDefinitions.fxml"), "com.example");
             assertThat(sourceCode)
-                    .isNotNull()
-                    .isEqualTo("");
+                    .contains("package com.example;")
+                    .contains("import javafx.scene.paint.Color;")
+                    .contains("public class ColorDefinitions extends Object {")
+                    .contains("protected final Color attributes;")
+                    .contains("protected final Color elements;")
+                    .contains("protected final Color valueOfMethod;")
+                    .contains("protected final Color values;")
+                    .contains("attributes = new Color(1.0, 0.5, 0.01, 1);")
+                    .contains("elements = new Color(0.5, 1.0, 0.5, 1);")
+                    .contains("valueOfMethod = Color.valueOf(\"#f0f0f0\");")
+                    .contains("super();");
+        }
+
+        /// Verifies that `SetList.fxml` generates a class extending `TableView<String>` with an observable list
+        /// populated with three string items.
+        @Test
+        void setList() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/SetList.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("package com.example;")
+                    .contains("import javafx.collections.FXCollections;")
+                    .contains("import javafx.collections.ObservableList;")
+                    .contains("public class SetList extends TableView<String> {")
+                    .contains("ObservableList<String> $internalVariable$000 = FXCollections.observableArrayList();")
+                    .contains("this.setItems($internalVariable$000);")
+                    .contains("String $internalVariable$001 = \"Item 0\";")
+                    .contains("String $internalVariable$002 = \"Item 1\";")
+                    .contains("String $internalVariable$003 = \"Item 2\";")
+                    .contains("$internalVariable$000.add($internalVariable$001);")
+                    .contains("$internalVariable$000.add($internalVariable$002);")
+                    .contains("$internalVariable$000.add($internalVariable$003);");
+        }
+
+        /// Verifies that `MapWithReferences.fxml` generates a class extending `HashMap` with a named `Button`
+        /// field and map entries for both a copy and a reference.
+        @Test
+        void mapWithReferences() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/MapWithReferences.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("package com.example;")
+                    .contains("import java.util.HashMap;")
+                    .contains("import javafx.scene.control.Button;")
+                    .contains("public class MapWithReferences extends HashMap {")
+                    .contains("protected final Button myButton;")
+                    .contains("Button $$myButton = new Button();")
+                    .contains("myButton = $$myButton;")
+                    .contains("myButton.setText(\"Original\");")
+                    .contains("this.put(\"refEntry\", myButton)")
+                    .contains("this.put(\"copyEntry\",");
+        }
+
+        /// Verifies that `GridPaneStaticPropertyElement.fxml` generates a class extending `GridPane`
+        /// with a `Label` child and static property calls using element syntax.
+        @Test
+        void gridPaneStaticPropertyElement() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/GridPaneStaticPropertyElement.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("package com.example;")
+                    .contains("import javafx.scene.layout.GridPane;")
+                    .contains("import javafx.scene.control.Label;")
+                    .contains("public class GridPaneStaticPropertyElement extends GridPane {")
+                    .contains("Label $internalVariable$000 = new Label();")
+                    .contains("this.getChildren().add($internalVariable$000);")
+                    .contains("$internalVariable$000.setText(\"My Label\");")
+                    .contains("GridPane.setRowIndex($internalVariable$000, 0);")
+                    .contains("GridPane.setColumnIndex($internalVariable$000, 0);");
+        }
+
+        /// Verifies that `GridPaneStaticPropertyAttribute.fxml` generates a class extending `GridPane`
+        /// with a `Label` child and static property calls using attribute syntax.
+        @Test
+        void gridPaneStaticPropertyAttribute() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/GridPaneStaticPropertyAttribute.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("package com.example;")
+                    .contains("import javafx.scene.layout.GridPane;")
+                    .contains("import javafx.scene.control.Label;")
+                    .contains("public class GridPaneStaticPropertyAttribute extends GridPane {")
+                    .contains("Label $internalVariable$000 = new Label();")
+                    .contains("this.getChildren().add($internalVariable$000);")
+                    .contains("$internalVariable$000.setText(\"My Label\");")
+                    .contains("GridPane.setColumnIndex($internalVariable$000, 0);")
+                    .contains("GridPane.setRowIndex($internalVariable$000, 0);");
+        }
+
+        /// Verifies that `GridPaneStaticPropertyElementExplicitValue.fxml` generates a class extending `GridPane`
+        /// with explicit `Integer` variables for row and column indices.
+        @Test
+        void gridPaneStaticPropertyElementExplicitValue() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/GridPaneStaticPropertyElementExplicitValue.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("package com.example;")
+                    .contains("import javafx.scene.layout.GridPane;")
+                    .contains("import javafx.scene.control.Label;")
+                    .contains("public class GridPaneStaticPropertyElementExplicitValue extends GridPane {")
+                    .contains("Label $internalVariable$000 = new Label();")
+                    .contains("Integer $internalVariable$001 = 0;")
+                    .contains("Integer $internalVariable$002 = 0;")
+                    .contains("GridPane.setRowIndex($internalVariable$000, $internalVariable$001);")
+                    .contains("GridPane.setColumnIndex($internalVariable$000, $internalVariable$002);");
+        }
+
+        /// Verifies that `MyButtonWithConstants.fxml` generates a class extending `Button`
+        /// that sets a constant field value via `Double.NEGATIVE_INFINITY`.
+        @Test
+        void myButtonWithConstants() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/MyButtonWithConstants.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("package com.example;")
+                    .contains("import javafx.scene.control.Button;")
+                    .contains("public class MyButtonWithConstants extends Button {")
+                    .contains("this.setMinHeight(Double.NEGATIVE_INFINITY);");
+        }
+
+        /// Verifies that `MyHashMap.fxml` generates a class extending `HashMap<String, String>`
+        /// with three map entries put into the map.
+        @Test
+        void myHashMap() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/MyHashMap.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("package com.example;")
+                    .contains("import java.util.HashMap;")
+                    .contains("public class MyHashMap extends HashMap<String, String> {")
+                    .contains("this.put(\"foo\", \"123\");")
+                    .contains("this.put(\"bar\", \"456\");")
+                    .contains("this.put(\"test\",");
+        }
+
+        /// Verifies that `NodeProperties.fxml` generates a class extending `VBox` with two `Button` children
+        /// and property assignments including `getProperties().put(...)`.
+        @Test
+        void nodeProperties() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/NodeProperties.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("package com.example;")
+                    .contains("import javafx.scene.layout.VBox;")
+                    .contains("import javafx.scene.control.Button;")
+                    .contains("public class NodeProperties extends VBox {")
+                    .contains("Button $internalVariable$000 = new Button();")
+                    .contains("Button $internalVariable$001 = new Button();")
+                    .contains("this.getChildren().add($internalVariable$000);")
+                    .contains("this.getChildren().add($internalVariable$001);")
+                    .contains("$internalVariable$000.setText(\"Ignored\");")
+                    .contains("$internalVariable$001.setText(\"Properties\");")
+                    .contains("$internalVariable$001.getProperties().put(");
+        }
+
+        /// Verifies that `FXInclude.fxml` generates a class extending `VBox` with two nested `ExplicitDefault`
+        /// instances and a private static nested class for the included document.
+        @Test
+        void fxInclude() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/FXInclude.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("package com.example;")
+                    .contains("import javafx.scene.layout.VBox;")
+                    .contains("public class FXInclude extends VBox {")
+                    .contains("FXInclude.ExplicitDefault $internalVariable$000 = new FXInclude.ExplicitDefault();")
+                    .contains("FXInclude.ExplicitDefault $internalVariable$001 = new FXInclude.ExplicitDefault();")
+                    .contains("this.getChildren().add($internalVariable$000);")
+                    .contains("this.getChildren().add($internalVariable$001);")
+                    .contains("private static class ExplicitDefault extends VBox {")
+                    .contains("$internalVariable$000.setText(\"Button 1\");")
+                    .contains("$internalVariable$002.setText(\"Button 2\");");
+        }
+
+        /// Verifies that `ButtonWithNoControllerAction.fxml` generates an abstract class extending `Button`
+        /// with an abstract event handler method and a `setOnAction` call using a method reference.
+        @Test
+        void buttonWithNoControllerAction() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/ButtonWithNoControllerAction.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("package com.example;")
+                    .contains("import javafx.scene.control.Button;")
+                    .contains("import javafx.event.ActionEvent;")
+                    .contains("public abstract class ButtonWithNoControllerAction extends Button {")
+                    .contains("this.setOnAction(this::onButtonClick);")
+                    .contains("this.setText(\"Click here...\");")
+                    .contains("protected abstract void onButtonClick(ActionEvent param0);");
+        }
+
+        /// Verifies that `ButtonWithControllerAction.fxml` generates a class extending `Button`
+        /// with a controller field, bind method, and `setOnAction` delegation.
+        @Test
+        void buttonWithControllerAction() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/ButtonWithControllerAction.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("package com.example;")
+                    .contains("import javafx.scene.control.Button;")
+                    .contains("public class ButtonWithControllerAction extends Button {")
+                    .contains("private final TestController $internalField$controller$;")
+                    .contains("$internalField$controller$ = new TestController();")
+                    .contains("this.setOnAction(this::onButtonClick);")
+                    .contains("this.setText(\"Click here...\");")
+                    .contains("$bindController$();")
+                    .contains("private void $bindController$()");
+        }
+
+        /// Verifies that `FXIncludeNestedController.fxml` generates a class extending `VBox`
+        /// with exposed fields for the nested controller and its controller instance.
+        @Test
+        void fxIncludeNestedController() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/FXIncludeNestedController.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("package com.example;")
+                    .contains("import javafx.scene.layout.VBox;")
+                    .contains("public class FXIncludeNestedController extends VBox {")
+                    .contains("protected final FXIncludeNestedController.ButtonWithControllerAction myButton;")
+                    .contains("protected final TestController myButtonController;")
+                    .contains("myButton = new FXIncludeNestedController.ButtonWithControllerAction();")
+                    .contains("this.getChildren().add(myButton);")
+                    .contains("myButtonController = myButton.$internalField$controller$;");
         }
     }
 
