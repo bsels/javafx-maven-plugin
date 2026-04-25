@@ -17,6 +17,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.function.BiPredicate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -2337,6 +2338,49 @@ class UtilsTest {
 
             // Then - each match's group(1) is collected
             assertThat(result).containsExactly("hello", "world");
+        }
+    }
+
+    @Nested
+    class SwapTest {
+
+        @Test
+        void shouldReturnTrueWhenSwappedPredicateMatches() {
+            // Given - predicate that checks b.startsWith(a), i.e. (b, a) -> b.startsWith(a)
+            BiPredicate<String, String> original = String::startsWith;
+            BiPredicate<String, String> swapped = Utils.swap(original);
+
+            // When & Then - swapped(a, b) calls original.test(b, a) = "hello".startsWith("hel") = true
+            assertThat(swapped.test("hel", "hello")).isTrue();
+        }
+
+        @Test
+        void shouldReturnFalseWhenSwappedPredicateDoesNotMatch() {
+            // Given
+            BiPredicate<String, String> original = String::startsWith;
+            BiPredicate<String, String> swapped = Utils.swap(original);
+
+            // When & Then - swapped(a, b) calls original.test(b, a) = "hel".startsWith("hello") = false
+            assertThat(swapped.test("hello", "hel")).isFalse();
+        }
+
+        @Test
+        void shouldPassArgumentsInReversedOrder() {
+            // Given - capture which arguments the predicate receives
+            String[] received = new String[2];
+            BiPredicate<String, String> original = (b, a) -> {
+                received[0] = b;
+                received[1] = a;
+                return true;
+            };
+            BiPredicate<String, String> swapped = Utils.swap(original);
+
+            // When
+            swapped.test("first", "second");
+
+            // Then - original receives (b="second", a="first")
+            assertThat(received[0]).isEqualTo("second");
+            assertThat(received[1]).isEqualTo("first");
         }
     }
 

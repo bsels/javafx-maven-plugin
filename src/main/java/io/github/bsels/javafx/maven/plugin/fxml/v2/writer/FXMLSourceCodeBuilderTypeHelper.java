@@ -440,7 +440,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
             context.addFeature(Feature.ABSTRACT_CLASS);
         }
         if (interfaceMethod.isPresent()) {
-            sourceCode.append("java.lang.Override\npublic ");
+            sourceCode.append("@java.lang.Override\npublic ");
         } else {
             sourceCode.append("protected ");
         }

@@ -5,6 +5,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLInterface;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.Visibility;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
@@ -1456,6 +1457,138 @@ class FXMLSourceCodeBuilderTypeHelperTest {
                     .reduce("", String::concat);
             assertThat(result).contains("abstract");
         }
+
+        /// Verifies that when an interface declares the method, the generated code contains `@java.lang.Override` and `public`.
+        @Test
+        void interfaceMethodMatchGeneratesOverrideAndPublic() {
+            FXMLControllerMethod interfaceCm = new FXMLControllerMethod(
+                    Visibility.PUBLIC, "onClick", false,
+                    FXMLType.of(void.class), List.of()
+            );
+            FXMLInterface fxmlInterface = new FXMLInterface(
+                    FXMLType.of(Runnable.class),
+                    List.of(interfaceCm)
+            );
+            FXMLMethod method = new FXMLMethod("onClick", List.of(), FXMLType.of(void.class));
+            String result = classUnderTest.renderMethod(context, null, List.of(fxmlInterface), method)
+                    .reduce("", String::concat);
+            assertThat(result)
+                    .contains("@java.lang.Override")
+                    .contains("public ")
+                    .doesNotContain("protected ");
+        }
+
+        /// Verifies that when an interface declares the method and a controller provides the implementation,
+        /// the generated code contains `@java.lang.Override`, `public`, and the direct call body.
+        @Test
+        void interfaceMethodWithControllerImplementationGeneratesOverridePublicAndBody() {
+            FXMLControllerMethod controllerCm = new FXMLControllerMethod(
+                    Visibility.PUBLIC, "onClick", false,
+                    FXMLType.of(void.class), List.of()
+            );
+            FXMLController controller = new FXMLController(
+                    new FXMLClassType(NamedArgBean.class),
+                    List.of(),
+                    List.of(controllerCm)
+            );
+            FXMLControllerMethod interfaceCm = new FXMLControllerMethod(
+                    Visibility.PUBLIC, "onClick", false,
+                    FXMLType.of(void.class), List.of()
+            );
+            FXMLInterface fxmlInterface = new FXMLInterface(
+                    FXMLType.of(Runnable.class),
+                    List.of(interfaceCm)
+            );
+            FXMLMethod method = new FXMLMethod("onClick", List.of(), FXMLType.of(void.class));
+            String result = classUnderTest.renderMethod(context, controller, List.of(fxmlInterface), method)
+                    .reduce("", String::concat);
+            assertThat(result)
+                    .contains("@java.lang.Override")
+                    .contains("public ")
+                    .contains("onClick")
+                    .doesNotContain("abstract");
+        }
+
+        /// Verifies that when an interface declares the method with parameters, the generated code
+        /// contains `@java.lang.Override`, `public`, and the parameter list.
+        @Test
+        void interfaceMethodWithParametersGeneratesOverrideAndParameterList() {
+            FXMLControllerMethod interfaceCm = new FXMLControllerMethod(
+                    Visibility.PUBLIC, "onEvent", false,
+                    FXMLType.of(void.class), List.of(FXMLType.of(String.class))
+            );
+            FXMLInterface fxmlInterface = new FXMLInterface(
+                    FXMLType.of(Runnable.class),
+                    List.of(interfaceCm)
+            );
+            FXMLMethod method = new FXMLMethod("onEvent", List.of(FXMLType.of(String.class)), FXMLType.of(void.class));
+            String result = classUnderTest.renderMethod(context, null, List.of(fxmlInterface), method)
+                    .reduce("", String::concat);
+            assertThat(result)
+                    .contains("@java.lang.Override")
+                    .contains("public ")
+                    .contains("param0");
+        }
+
+        /// Verifies that when the interface method name matches but parameter count differs, no override is generated.
+        @Test
+        void interfaceMethodNameMatchButDifferentParamCountDoesNotGenerateOverride() {
+            FXMLControllerMethod interfaceCm = new FXMLControllerMethod(
+                    Visibility.PUBLIC, "onClick", false,
+                    FXMLType.of(void.class), List.of(FXMLType.of(String.class))
+            );
+            FXMLInterface fxmlInterface = new FXMLInterface(
+                    FXMLType.of(Runnable.class),
+                    List.of(interfaceCm)
+            );
+            // FXML method has no parameters, interface method has one — no match
+            FXMLMethod method = new FXMLMethod("onClick", List.of(), FXMLType.of(void.class));
+            String result = classUnderTest.renderMethod(context, null, List.of(fxmlInterface), method)
+                    .reduce("", String::concat);
+            assertThat(result)
+                    .doesNotContain("@java.lang.Override")
+                    .contains("protected ");
+        }
+
+        /// Verifies that when the interface method name matches but return type is incompatible, no override is generated.
+        @Test
+        void interfaceMethodReturnTypeMismatchDoesNotGenerateOverride() {
+            FXMLControllerMethod interfaceCm = new FXMLControllerMethod(
+                    Visibility.PUBLIC, "getValue", false,
+                    FXMLType.of(Integer.class), List.of()
+            );
+            FXMLInterface fxmlInterface = new FXMLInterface(
+                    FXMLType.of(Runnable.class),
+                    List.of(interfaceCm)
+            );
+            // FXML method returns String, interface returns Integer — incompatible
+            FXMLMethod method = new FXMLMethod("getValue", List.of(), FXMLType.of(String.class));
+            String result = classUnderTest.renderMethod(context, null, List.of(fxmlInterface), method)
+                    .reduce("", String::concat);
+            assertThat(result)
+                    .doesNotContain("@java.lang.Override")
+                    .contains("protected ");
+        }
+
+        /// Verifies that when the interface method parameter type is incompatible, no override is generated.
+        @Test
+        void interfaceMethodParameterTypeMismatchDoesNotGenerateOverride() {
+            FXMLControllerMethod interfaceCm = new FXMLControllerMethod(
+                    Visibility.PUBLIC, "onEvent", false,
+                    FXMLType.of(void.class), List.of(FXMLType.of(Integer.class))
+            );
+            FXMLInterface fxmlInterface = new FXMLInterface(
+                    FXMLType.of(Runnable.class),
+                    List.of(interfaceCm)
+            );
+            // FXML method has String param, interface has Integer param — incompatible
+            FXMLMethod method = new FXMLMethod("onEvent", List.of(FXMLType.of(String.class)), FXMLType.of(void.class));
+            String result = classUnderTest.renderMethod(context, null, List.of(fxmlInterface), method)
+                    .reduce("", String::concat);
+            assertThat(result)
+                    .doesNotContain("@java.lang.Override")
+                    .contains("protected ");
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -1834,6 +1967,214 @@ class FXMLSourceCodeBuilderTypeHelperTest {
             );
             String result = classUnderTest.renderControllerInitialization(pkgContext, new FXMLController(ct, List.of(), List.of()), m);
             assertThat(result).contains("initialize").doesNotContain("getDeclaredMethod");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // canMatchType (private reflection tests)
+    // -------------------------------------------------------------------------
+
+    /// Tests for the private `canMatchType` method via reflection, covering all branches.
+    @Nested
+    class CanMatchTypeTest {
+
+        /// Invokes the private `canMatchType` method via reflection.
+        ///
+        /// @param type          The FXML type.
+        /// @param interfaceType The interface FXML type.
+        /// @param predicate     The predicate to use.
+        /// @return The result of `canMatchType`.
+        private boolean invokeCanMatchType(
+                FXMLType type,
+                FXMLType interfaceType,
+                java.util.function.BiPredicate<Class<?>, Class<?>> predicate
+        ) throws Exception {
+            Method m = FXMLSourceCodeBuilderTypeHelper.class.getDeclaredMethod(
+                    "canMatchType", FXMLType.class, FXMLType.class, java.util.function.BiPredicate.class
+            );
+            m.setAccessible(true);
+            return (boolean) m.invoke(classUnderTest, type, interfaceType, predicate);
+        }
+
+        /// Verifies `FXMLClassType` vs `FXMLClassType` — compatible types return `true`.
+        @Test
+        void classTypeVsClassTypeCompatibleReturnsTrue() throws Exception {
+            assertThat(invokeCanMatchType(
+                    FXMLType.of(String.class),
+                    FXMLType.of(String.class),
+                    Class::isAssignableFrom
+            )).isTrue();
+        }
+
+        /// Verifies `FXMLClassType` vs `FXMLClassType` — incompatible types return `false`.
+        @Test
+        void classTypeVsClassTypeIncompatibleReturnsFalse() throws Exception {
+            assertThat(invokeCanMatchType(
+                    FXMLType.of(Integer.class),
+                    FXMLType.of(String.class),
+                    Class::isAssignableFrom
+            )).isFalse();
+        }
+
+        /// Verifies `FXMLClassType` vs `FXMLGenericType` — compatible raw types return `true`.
+        @Test
+        void classTypeVsGenericTypeCompatibleReturnsTrue() throws Exception {
+            FXMLGenericType listOfString = new FXMLGenericType(List.class, List.of(FXMLType.of(String.class)));
+            assertThat(invokeCanMatchType(
+                    FXMLType.of(List.class),
+                    listOfString,
+                    Class::isAssignableFrom
+            )).isTrue();
+        }
+
+        /// Verifies `FXMLClassType` vs `FXMLGenericType` — incompatible raw types return `false`.
+        @Test
+        void classTypeVsGenericTypeIncompatibleReturnsFalse() throws Exception {
+            FXMLGenericType listOfString = new FXMLGenericType(List.class, List.of(FXMLType.of(String.class)));
+            assertThat(invokeCanMatchType(
+                    FXMLType.of(String.class),
+                    listOfString,
+                    Class::isAssignableFrom
+            )).isFalse();
+        }
+
+        /// Verifies `FXMLClassType` vs `FXMLUncompiledClassType` always returns `true`.
+        @Test
+        void classTypeVsUncompiledClassTypeReturnsTrue() throws Exception {
+            assertThat(invokeCanMatchType(
+                    FXMLType.of(String.class),
+                    new FXMLUncompiledClassType("com.example.Foo"),
+                    Class::isAssignableFrom
+            )).isTrue();
+        }
+
+        /// Verifies `FXMLClassType` vs `FXMLUncompiledGenericType` always returns `true`.
+        @Test
+        void classTypeVsUncompiledGenericTypeReturnsTrue() throws Exception {
+            assertThat(invokeCanMatchType(
+                    FXMLType.of(String.class),
+                    new FXMLUncompiledGenericType("com.example.Foo", List.of()),
+                    Class::isAssignableFrom
+            )).isTrue();
+        }
+
+        /// Verifies `FXMLClassType` vs `FXMLWildcardType` always returns `true`.
+        @Test
+        void classTypeVsWildcardTypeReturnsTrue() throws Exception {
+            assertThat(invokeCanMatchType(
+                    FXMLType.of(String.class),
+                    FXMLWildcardType.INSTANCE,
+                    Class::isAssignableFrom
+            )).isTrue();
+        }
+
+        /// Verifies `FXMLGenericType` vs `FXMLClassType` — compatible raw types return `true`.
+        @Test
+        void genericTypeVsClassTypeCompatibleReturnsTrue() throws Exception {
+            FXMLGenericType listOfString = new FXMLGenericType(List.class, List.of(FXMLType.of(String.class)));
+            assertThat(invokeCanMatchType(
+                    listOfString,
+                    FXMLType.of(List.class),
+                    Class::isAssignableFrom
+            )).isTrue();
+        }
+
+        /// Verifies `FXMLGenericType` vs `FXMLClassType` — incompatible raw types return `false`.
+        @Test
+        void genericTypeVsClassTypeIncompatibleReturnsFalse() throws Exception {
+            FXMLGenericType listOfString = new FXMLGenericType(List.class, List.of(FXMLType.of(String.class)));
+            assertThat(invokeCanMatchType(
+                    listOfString,
+                    FXMLType.of(String.class),
+                    Class::isAssignableFrom
+            )).isFalse();
+        }
+
+        /// Verifies `FXMLGenericType` vs `FXMLGenericType` — compatible raw and type parameters return `true`.
+        @Test
+        void genericTypeVsGenericTypeCompatibleReturnsTrue() throws Exception {
+            FXMLGenericType listOfString = new FXMLGenericType(List.class, List.of(FXMLType.of(String.class)));
+            FXMLGenericType listOfString2 = new FXMLGenericType(List.class, List.of(FXMLType.of(String.class)));
+            assertThat(invokeCanMatchType(
+                    listOfString,
+                    listOfString2,
+                    Class::isAssignableFrom
+            )).isTrue();
+        }
+
+        /// Verifies `FXMLGenericType` vs `FXMLGenericType` — incompatible type parameters return `false`.
+        @Test
+        void genericTypeVsGenericTypeIncompatibleParamsReturnsFalse() throws Exception {
+            FXMLGenericType listOfString = new FXMLGenericType(List.class, List.of(FXMLType.of(String.class)));
+            FXMLGenericType listOfInteger = new FXMLGenericType(List.class, List.of(FXMLType.of(Integer.class)));
+            assertThat(invokeCanMatchType(
+                    listOfString,
+                    listOfInteger,
+                    Class::isAssignableFrom
+            )).isFalse();
+        }
+
+        /// Verifies `FXMLGenericType` vs `FXMLUncompiledClassType` always returns `true`.
+        @Test
+        void genericTypeVsUncompiledClassTypeReturnsTrue() throws Exception {
+            FXMLGenericType listOfString = new FXMLGenericType(List.class, List.of(FXMLType.of(String.class)));
+            assertThat(invokeCanMatchType(
+                    listOfString,
+                    new FXMLUncompiledClassType("com.example.Foo"),
+                    Class::isAssignableFrom
+            )).isTrue();
+        }
+
+        /// Verifies `FXMLGenericType` vs `FXMLUncompiledGenericType` always returns `true`.
+        @Test
+        void genericTypeVsUncompiledGenericTypeReturnsTrue() throws Exception {
+            FXMLGenericType listOfString = new FXMLGenericType(List.class, List.of(FXMLType.of(String.class)));
+            assertThat(invokeCanMatchType(
+                    listOfString,
+                    new FXMLUncompiledGenericType("com.example.Foo", List.of()),
+                    Class::isAssignableFrom
+            )).isTrue();
+        }
+
+        /// Verifies `FXMLGenericType` vs `FXMLWildcardType` always returns `true`.
+        @Test
+        void genericTypeVsWildcardTypeReturnsTrue() throws Exception {
+            FXMLGenericType listOfString = new FXMLGenericType(List.class, List.of(FXMLType.of(String.class)));
+            assertThat(invokeCanMatchType(
+                    listOfString,
+                    FXMLWildcardType.INSTANCE,
+                    Class::isAssignableFrom
+            )).isTrue();
+        }
+
+        /// Verifies `FXMLUncompiledClassType` as type always returns `true` regardless of interface type.
+        @Test
+        void uncompiledClassTypeAlwaysReturnsTrue() throws Exception {
+            assertThat(invokeCanMatchType(
+                    new FXMLUncompiledClassType("com.example.Foo"),
+                    FXMLType.of(String.class),
+                    Class::isAssignableFrom
+            )).isTrue();
+        }
+
+        /// Verifies `FXMLUncompiledGenericType` as type always returns `true` regardless of interface type.
+        @Test
+        void uncompiledGenericTypeAlwaysReturnsTrue() throws Exception {
+            assertThat(invokeCanMatchType(
+                    new FXMLUncompiledGenericType("com.example.Foo", List.of()),
+                    FXMLType.of(String.class),
+                    Class::isAssignableFrom
+            )).isTrue();
+        }
+
+        /// Verifies `FXMLWildcardType` as type always returns `true` regardless of interface type.
+        @Test
+        void wildcardTypeAlwaysReturnsTrue() throws Exception {
+            assertThat(invokeCanMatchType(
+                    FXMLWildcardType.INSTANCE,
+                    FXMLType.of(String.class),
+                    Class::isAssignableFrom
+            )).isTrue();
         }
     }
 }
