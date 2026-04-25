@@ -53,6 +53,10 @@
         <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-surefire-plugin -->
         <maven.surefire.plugin.version>3.5.5</maven.surefire.plugin.version>
+        <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-failsafe-plugin -->
+        <maven.failsafe.plugin.version>3.5.5</maven.failsafe.plugin.version>
+        <!-- https://central.sonatype.com/artifact/org.codehaus.mojo/build-helper-maven-plugin -->
+        <build.helper.maven.plugin.version>3.6.1</build.helper.maven.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-plugin-plugin -->
         <maven.plugin.plugin.version>3.15.2</maven.plugin.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-gpg-plugin -->
@@ -241,6 +245,55 @@
                 <groupId>io.github.bsels</groupId>
                 <artifactId>semantic-version-maven-plugin</artifactId>
                 <version>${semantic.versioning.plugin}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>${build.helper.maven.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>add-itest-sources</id>
+                        <phase>generate-test-sources</phase>
+                        <goals>
+                            <goal>add-test-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>src/itest/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>add-itest-resources</id>
+                        <phase>generate-test-resources</phase>
+                        <goals>
+                            <goal>add-test-resource</goal>
+                        </goals>
+                        <configuration>
+                            <resources>
+                                <resource>
+                                    <directory>src/itest/resources</directory>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>${maven.failsafe.plugin.version}</version>
+                <configuration>
+                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
