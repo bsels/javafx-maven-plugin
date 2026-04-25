@@ -4,7 +4,7 @@
 
     <groupId>io.github.bsels</groupId>
     <artifactId>javafx-maven-plugin</artifactId>
-    <version>2.0.0-SNAPSHOT</version>
+    <version>1.3.2</version>
     <packaging>maven-plugin</packaging>
     <name>${project.groupId}:${project.artifactId}</name>
     <description>
@@ -178,7 +178,7 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>${maven.javadoc.plugin.version}</version>
                 <configuration>
-                    <show>private</show>
+                    <show>protected</show>
                     <failOnWarnings>true</failOnWarnings>
                 </configuration>
                 <executions>
