@@ -107,8 +107,9 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         try (var _ = new ContextClassLoaderClosable(this::constructClasspathDependenciesClassLoader)) {
             if (includeSourceFilesInClassDiscovery) {
                 executeWithOptimisticCompiler(() -> executeInternal(charset));
+            } else {
+                executeInternal(charset);
             }
-            executeInternal(charset);
         }
     }
 

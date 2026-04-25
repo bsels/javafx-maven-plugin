@@ -367,13 +367,13 @@ class FXMLToSourceCodeMojoTest {
                  MockedConstruction<FXMLSourceCodeBuilder> builderMock = mockConstruction(FXMLSourceCodeBuilder.class);
                  MockedConstruction<OptimisticInMemoryCompiler> compilerMock = mockConstruction(
                          OptimisticInMemoryCompiler.class,
-                         (mock, ctx) -> when(mock.optimisticCompileIntoClassLoader(any(), any()))
+                         (mock, _) -> when(mock.optimisticCompileIntoClassLoader(any(), any()))
                                  .thenReturn(UnaryOperator.identity()))) {
 
                 mojo.execute();
 
                 // executeInternal is called twice: once inside optimistic compiler scope, once outside
-                assertThat(readerMock.constructed()).hasSize(2);
+                assertThat(readerMock.constructed()).hasSize(1);
             }
         }
 
