@@ -578,6 +578,9 @@ final class FXMLDocumentParserHelper {
                 .findFirst()
                 .map(matchResult -> {
                     String interfaceTypeString = matchResult.group("interface").strip();
+                    if (interfaceTypeString.endsWith(";")) {
+                        interfaceTypeString = interfaceTypeString.substring(0, interfaceTypeString.length() - 1);
+                    }
                     FXMLType interfaceType = parseGenericString(interfaceTypeString, buildContext.imports());
                     List<FXMLControllerMethod> interfaceMethods = switch (interfaceType) {
                         case FXMLClassType(Class<?> clazz) -> findMethodsOfInterface(clazz, List.of(), buildContext);
@@ -602,7 +605,9 @@ final class FXMLDocumentParserHelper {
             String methodsString,
             BuildContext buildContext
     ) {
-        return Utils.splitString(methodsString, ';')
+        return Stream.ofNullable(methodsString)
+                .map(String::strip)
+                .flatMap(methods -> Utils.splitString(methods, ';'))
                 .map(String::strip)
                 .map(methodString -> parseInterfaceMethod(methodString, buildContext))
                 .gather(Utils.optional())

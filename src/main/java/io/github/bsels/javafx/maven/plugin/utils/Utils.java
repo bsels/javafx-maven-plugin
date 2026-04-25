@@ -453,7 +453,9 @@ public final class Utils {
     /// @param string    The input string
     /// @param character The delimiter character
     /// @return A stream of substrings
-    public static Stream<String> splitString(String string, char character) {
+    /// @throws NullPointerException if `string` is null
+    public static Stream<String> splitString(String string, char character) throws NullPointerException {
+        Objects.requireNonNull(string, "`string` must not be null");
         Stream.Builder<String> builder = Stream.builder();
         int size = string.length();
         int lastIndex = -1;
@@ -480,7 +482,9 @@ public final class Utils {
     ///
     /// @param string The string to split
     /// @return A stream of substrings split by commas outside brackets
-    public static Stream<String> splitByCommaOutsideBrackets(String string) {
+    /// @throws NullPointerException if `string` is null
+    public static Stream<String> splitByCommaOutsideBrackets(String string) throws NullPointerException {
+        Objects.requireNonNull(string, "`string` must not be null");
         Stream.Builder<String> builder = Stream.builder();
         int size = string.length();
         int lastIndex = -1;
