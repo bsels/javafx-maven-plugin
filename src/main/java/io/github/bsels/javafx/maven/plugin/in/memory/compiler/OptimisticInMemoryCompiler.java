@@ -82,7 +82,6 @@ public final class OptimisticInMemoryCompiler {
             return Map.of();
         }
         List<Path> sourceFiles = getSourceFiles(sourceFolders);
-        int originalSize = sourceFiles.size();
         JavaCompiler javaCompiler = ToolProvider.getSystemJavaCompiler();
         try (
                 StandardJavaFileManager standardJavaFileManager = javaCompiler.getStandardFileManager(null, null, null);
@@ -106,7 +105,8 @@ public final class OptimisticInMemoryCompiler {
                 }
             }
             Map<String, InMemoryCompiledClass> compiledClasses = javaFileManager.getCompiledClasses();
-            logger.info("Compiled %d of %d source files".formatted(compiledClasses.size(), originalSize));
+            logger.info("Compiled %d classes".formatted(compiledClasses.size()));
+            logger.debug("Compiled classes: %s".formatted(compiledClasses.keySet()));
             return compiledClasses;
         }
     }

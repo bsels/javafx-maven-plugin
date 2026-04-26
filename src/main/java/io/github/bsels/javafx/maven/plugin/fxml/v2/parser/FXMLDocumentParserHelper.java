@@ -69,7 +69,7 @@ final class FXMLDocumentParserHelper {
     /// This pattern is used recursively to decompose strings like `Map<String, List<Integer>>`.
     private static final Pattern NESTED_GENERICS = Pattern.compile("""
             ^\\s*((?<first>((((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*),\
-            \\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?)$\
+            \\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?);?$\
             """);
     /// Regular expression pattern for identifying FXML interfaces and their methods in a string.
     /// It matches the format `interface : <type> [; methods : <method_signatures>]`.
@@ -602,7 +602,9 @@ final class FXMLDocumentParserHelper {
             String methodsString,
             BuildContext buildContext
     ) {
-        return Utils.splitString(methodsString, ';')
+        return Stream.ofNullable(methodsString)
+                .map(String::strip)
+                .flatMap(methods -> Utils.splitString(methods, ';'))
                 .map(String::strip)
                 .map(methodString -> parseInterfaceMethod(methodString, buildContext))
                 .gather(Utils.optional())

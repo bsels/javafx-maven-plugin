@@ -1176,6 +1176,32 @@ class FXMLDocumentParserHelperTest {
                             .containsExactly("onStart", "onStop"));
         }
 
+        /// Verifies that parseInterfaces handles blank methods by omitting the methods part.
+        @Test
+        void uncompiledInterfaceWithBlankMethodsString() {
+            BuildContext ctx = new BuildContext(List.of(), "/");
+            List<FXMLInterface> result = helper.parseInterfaces(
+                    List.of("interface : com.example.MyListener"),
+                    ctx
+            );
+            assertThat(result)
+                    .hasSize(1)
+                    .first()
+                    .satisfies(iface -> assertThat(iface.methods()).isEmpty());
+        }
+
+        /// Verifies the NESTED_GENERICS pattern with a trailing semicolon.
+        @Test
+        void constructGenericTypeWithTrailingSemicolon() {
+            BuildContext buildContext = new BuildContext(List.of(), "/base/path");
+            FXMLType result = helper.constructGenericType(
+                    List.class,
+                    List.of("generic 0: java.lang.String;"),
+                    buildContext
+            );
+            assertThat(result).isEqualTo(FXMLType.of(List.class, List.of(FXMLType.of(String.class))));
+        }
+
         /// Verifies that [findMethodsOfInterface] throws when generic type count mismatches.
         @Test
         void compiledGenericInterfaceWithWrongGenericCountThrows() {

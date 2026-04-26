@@ -1,5 +1,8 @@
 package io.github.bsels.javafx.maven.plugin.in.memory.compiler;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Map;
 import java.util.Objects;
 
@@ -8,6 +11,9 @@ import java.util.Objects;
 /// It enables dynamic loading of classes that have been compiled on-the-fly,
 /// such as those generated from FXML files during the plugin's execution.
 public final class InMemoryClassLoader extends ClassLoader {
+    /// The logger for this class.
+    private static final Logger log = LoggerFactory.getLogger(InMemoryClassLoader.class);
+
     /// A [Map] where keys are fully qualified class names and values are their corresponding
     /// [InMemoryCompiledClass] instances containing the bytecode.
     private final Map<String, InMemoryCompiledClass> compiledClasses;
@@ -42,7 +48,9 @@ public final class InMemoryClassLoader extends ClassLoader {
     /// @throws ClassFormatError       If the bytecode of the class is invalid or malformed.
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException, ClassFormatError {
+        log.debug("Searching class: {}", name);
         if (compiledClasses.containsKey(name)) {
+            log.debug("Found class: {}", name);
             InMemoryCompiledClass inMemoryCompiledClass = compiledClasses.get(name);
             byte[] byteCode = inMemoryCompiledClass.getBytes();
             return defineClass(name, byteCode, 0, byteCode.length);
