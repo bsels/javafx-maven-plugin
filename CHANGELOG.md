@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.1 - 2026-04-26
+
+### Patch
+
+- Bumped `maven-core` from `3.9.14` to `3.9.15`.
+- Bumped `semantic-version-maven-plugin` from `1.3.3` to `1.3.4`.
+- Fixed MOJO execution.
+- Fixed bugs in processing the interface FXML comments.
+
 ## 2.0.0 - 2026-04-25
 
 ### Major
