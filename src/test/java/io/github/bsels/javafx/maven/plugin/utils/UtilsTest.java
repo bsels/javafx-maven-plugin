@@ -1910,6 +1910,13 @@ class UtilsTest {
             // Then
             assertThat(result).isEmpty();
         }
+
+        @Test
+        void shouldThrowExceptionForNullInput() {
+            assertThatThrownBy(() -> Utils.splitString(null, ':'))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessageContaining("`string` must not be null");
+        }
     }
 
     @Nested
@@ -1985,6 +1992,13 @@ class UtilsTest {
 
             // Then
             assertThat(result).isEmpty();
+        }
+
+        @Test
+        void shouldThrowExceptionForNullInput() {
+            assertThatThrownBy(() -> Utils.splitByCommaOutsideBrackets(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessageContaining("`string` must not be null");
         }
     }
 
