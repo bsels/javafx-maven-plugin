@@ -44,7 +44,7 @@
         <!-- https://central.sonatype.com/artifact/org.jacoco/jacoco-maven-plugin -->
         <jacoco.version>0.8.14</jacoco.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven/maven-core -->
-        <maven.plugin.api.version>3.9.14</maven.plugin.api.version>
+        <maven.plugin.api.version>3.9.15</maven.plugin.api.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-enforcer-plugin -->
         <maven.enforcer.plugin.version>3.6.2</maven.enforcer.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-dependency-plugin -->
@@ -68,7 +68,7 @@
         <!-- https://central.sonatype.com/artifact/org.sonatype.central/central-publishing-maven-plugin -->
         <central.publishing.maven.plugin.version>0.10.0</central.publishing.maven.plugin.version>
         <!-- https://central.sonatype.com/artifact/io.github.bsels/semantic-version-maven-plugin -->
-        <semantic.versioning.plugin>1.3.3</semantic.versioning.plugin>
+        <semantic.versioning.plugin>1.3.4</semantic.versioning.plugin>
         <!--endregion-->
         <!--region Dependency versions -->
         <!-- https://central.sonatype.com/artifact/org.assertj/assertj-core -->
