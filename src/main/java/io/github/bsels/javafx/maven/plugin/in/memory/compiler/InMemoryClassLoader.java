@@ -12,7 +12,7 @@ import java.util.Objects;
 /// such as those generated from FXML files during the plugin's execution.
 public final class InMemoryClassLoader extends ClassLoader {
     /// The logger for this class.
-    private static final Logger LOGGER = LoggerFactory.getLogger(InMemoryClassLoader.class);
+    private static final Logger log = LoggerFactory.getLogger(InMemoryClassLoader.class);
 
     /// A [Map] where keys are fully qualified class names and values are their corresponding
     /// [InMemoryCompiledClass] instances containing the bytecode.
@@ -48,9 +48,9 @@ public final class InMemoryClassLoader extends ClassLoader {
     /// @throws ClassFormatError       If the bytecode of the class is invalid or malformed.
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException, ClassFormatError {
-        LOGGER.debug("Searching class: {}", name);
+        log.debug("Searching class: {}", name);
         if (compiledClasses.containsKey(name)) {
-            LOGGER.debug("Found class: {}", name);
+            log.debug("Found class: {}", name);
             InMemoryCompiledClass inMemoryCompiledClass = compiledClasses.get(name);
             byte[] byteCode = inMemoryCompiledClass.getBytes();
             return defineClass(name, byteCode, 0, byteCode.length);
