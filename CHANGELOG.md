@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0-SNAPSHOT - 2026-05-10
+
+### Minor
+
+- Bumped Jackson from 2.x.x to 3.x.x.
+- Bumped JavaFX from 25.0.2 to 25.0.3.
+- Bumped Semantic Version plugin from 1.3.4 to 1.4.0.
+
 ## 2.0.1 - 2026-04-26
 
 ### Patch
