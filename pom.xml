@@ -86,7 +86,7 @@
         <!-- https://central.sonatype.com/artifact/org.codehaus.plexus/plexus-archiver -->
         <plexus.archiver.version>4.11.0</plexus.archiver.version>
         <!-- https://central.sonatype.com/artifact/org.openjfx/javafx-controls -->
-        <javafx.version>25.0.2</javafx.version>
+        <javafx.version>25.0.3</javafx.version>
         <!--endregion-->
         <!-- region Source code info -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
