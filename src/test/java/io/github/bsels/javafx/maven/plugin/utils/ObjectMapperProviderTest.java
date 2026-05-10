@@ -1,9 +1,9 @@
 package io.github.bsels.javafx.maven.plugin.utils;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -114,7 +114,7 @@ class ObjectMapperProviderTest {
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Unable to pretty print the object value")
                     .cause()
-                    .isInstanceOf(JsonProcessingException.class)
+                    .isInstanceOf(JacksonException.class)
                     .hasMessageStartingWith("Pretty print test exception");
         }
     }
@@ -128,7 +128,7 @@ class ObjectMapperProviderTest {
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Unable to escape the object value")
                     .cause()
-                    .isInstanceOf(JsonProcessingException.class)
+                    .isInstanceOf(JacksonException.class)
                     .hasMessageStartingWith("Test exception");
         }
 
