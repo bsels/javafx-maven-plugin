@@ -1,14 +1,14 @@
 package io.github.bsels.javafx.maven.plugin.utils;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectWriter;
+import tools.jackson.databind.SerializationContext;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.module.SimpleModule;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -33,9 +33,13 @@ public final class ObjectMapperProvider {
         OBJECT_MAPPER = Optional.ofNullable(OBJECT_MAPPER)
                 .orElseGet(
                         () -> new ObjectMapper()
+                                .rebuild()
                                 .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
-                                .registerModule(new Jdk8Module())
-                                .registerModule(new SimpleModule().addSerializer(Type.class, new TypeJsonSerializer()))
+                                .addModules(
+                                        new SimpleModule()
+                                                .addSerializer(Type.class, new TypeJsonSerializer())
+                                )
+                                .build()
                 );
         return OBJECT_MAPPER;
     }
@@ -57,7 +61,7 @@ public final class ObjectMapperProvider {
     public static String encodeObject(Object value) {
         try {
             return ObjectMapperProvider.getObjectMapper().writeValueAsString(value);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Unable to escape the object value", e);
         }
     }
@@ -70,13 +74,13 @@ public final class ObjectMapperProvider {
     public static String prettyPrint(Object value) {
         try {
             return getWriter().writeValueAsString(value);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("Unable to pretty print the object value", e);
         }
     }
 
     /// Custom serializer for the [Type] class.
-    private static class TypeJsonSerializer extends JsonSerializer<Type> {
+    private static class TypeJsonSerializer extends ValueSerializer<Type> {
 
         /// Initializes a new [TypeJsonSerializer] instance.
         private TypeJsonSerializer() {
@@ -86,11 +90,9 @@ public final class ObjectMapperProvider {
         ///
         /// @param type               The [Type] object to serialize
         /// @param jsonGenerator      The [JsonGenerator]
-        /// @param serializerProvider The [SerializerProvider]
-        /// @throws IOException If serialization fails
+        /// @param serializationContext The [SerializationContext]
         @Override
-        public void serialize(Type type, JsonGenerator jsonGenerator, SerializerProvider serializerProvider)
-                throws IOException {
+        public void serialize(Type type, JsonGenerator jsonGenerator, SerializationContext serializationContext) {
             jsonGenerator.writeString(type.toString());
         }
     }
