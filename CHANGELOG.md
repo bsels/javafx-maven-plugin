@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.1.1 - 2026-06-06
+
+### Patch
+
+Bump plugin and dependency versions in `pom.xml`:
+
+- `org.jacoco:jacoco-maven-plugin`: 0.8.14 -\> 0.8.15
+- `org.apache.maven:maven-core`: 3.9.15 -\> 3.9.16
+- `org.apache.maven.plugins:maven-enforcer-plugin`: 3.6.2 -\> 3.6.3
+- `org.apache.maven.plugins:maven-dependency-plugin`: 3.10.0 -\> 3.11.0
+- `org.apache.maven.plugins:maven-surefire-plugin`: 3.5.5 -\> 3.5.6
+- `org.apache.maven.plugins:maven-failsafe-plugin`: 3.5.5 -\> 3.5.6
+- `io.github.bsels:semantic-version-maven-plugin`: 1.4.0 -\> 1.4.1
+- `tools.jackson:jackson-bom`: 3.1.3 -\> 3.1.4
+- `org.junit.jupiter:junit-jupiter-api`: 6.0.3 -\> 6.1.0
+- Removed `org.codehaus.plexus:plexus-utils` override.
+
 ## 2.1.0 - 2026-05-10
 
 ### Minor
