@@ -42,19 +42,19 @@
         <java.version>25</java.version>
         <!--region Plugin versions -->
         <!-- https://central.sonatype.com/artifact/org.jacoco/jacoco-maven-plugin -->
-        <jacoco.version>0.8.14</jacoco.version>
+        <jacoco.version>0.8.15</jacoco.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven/maven-core -->
-        <maven.plugin.api.version>3.9.15</maven.plugin.api.version>
+        <maven.plugin.api.version>3.9.16</maven.plugin.api.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-enforcer-plugin -->
-        <maven.enforcer.plugin.version>3.6.2</maven.enforcer.plugin.version>
+        <maven.enforcer.plugin.version>3.6.3</maven.enforcer.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-dependency-plugin -->
-        <maven.dependency.plugin.version>3.10.0</maven.dependency.plugin.version>
+        <maven.dependency.plugin.version>3.11.0</maven.dependency.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-compiler-plugin -->
         <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-surefire-plugin -->
-        <maven.surefire.plugin.version>3.5.5</maven.surefire.plugin.version>
+        <maven.surefire.plugin.version>3.5.6</maven.surefire.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-failsafe-plugin -->
-        <maven.failsafe.plugin.version>3.5.5</maven.failsafe.plugin.version>
+        <maven.failsafe.plugin.version>3.5.6</maven.failsafe.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.codehaus.mojo/build-helper-maven-plugin -->
         <build.helper.maven.plugin.version>3.6.1</build.helper.maven.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-plugin-plugin -->
@@ -68,15 +68,15 @@
         <!-- https://central.sonatype.com/artifact/org.sonatype.central/central-publishing-maven-plugin -->
         <central.publishing.maven.plugin.version>0.10.0</central.publishing.maven.plugin.version>
         <!-- https://central.sonatype.com/artifact/io.github.bsels/semantic-version-maven-plugin -->
-        <semantic.versioning.plugin>1.4.0</semantic.versioning.plugin>
+        <semantic.versioning.plugin>1.4.1</semantic.versioning.plugin>
         <!--endregion-->
         <!--region Dependency versions -->
         <!-- https://central.sonatype.com/artifact/org.assertj/assertj-core -->
         <assertj.version>3.27.7</assertj.version>
         <!-- https://central.sonatype.com/artifact/tools.jackson/jackson-bom -->
-        <jackson.version>3.1.3</jackson.version>
+        <jackson.version>3.1.4</jackson.version>
         <!-- https://central.sonatype.com/artifact/org.junit.jupiter/junit-jupiter-api -->
-        <junit.version>6.0.3</junit.version>
+        <junit.version>6.1.0</junit.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugin-tools/maven-plugin-annotations -->
         <maven.plugin.version>3.15.2</maven.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.mockito/mockito-core -->
@@ -311,13 +311,6 @@
     </dependencyManagement>
 
     <dependencies>
-        <!-- region Override transitive dependencies -->
-        <dependency>
-            <groupId>org.codehaus.plexus</groupId>
-            <artifactId>plexus-utils</artifactId>
-            <version>3.6.1</version>
-        </dependency>
-        <!-- endregion -->
         <!-- region Dependencies -->
         <dependency>
             <groupId>org.apache.maven</groupId>
