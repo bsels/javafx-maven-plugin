@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.1.2 - 2026-07-04
+
+### Patch
+
+Bumped dependencies:
+
+- Bumped 'org.sonatype.central:central-publishing-maven-plugin' to **0.11.0**
+- Bumped 'tools.jackson:jackson-bom' to **3.2.0**
+- Bumped 'org.junit.jupiter:junit-jupiter-api' to **6.1.1**
+- Bumped 'org.codehaus.plexus:plexus-archiver' to **4.12.0**
+- Bumped 'io.github.bsels:semantic-version-maven-plugin' to **1.4.2**
+
 ## 2.1.1 - 2026-06-06
 
 ### Patch
