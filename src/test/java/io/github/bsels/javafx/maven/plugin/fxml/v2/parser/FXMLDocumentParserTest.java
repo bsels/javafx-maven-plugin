@@ -1858,6 +1858,17 @@ public class FXMLDocumentParserTest {
         }
 
         @Test
+        void readOnlyArrayPropertyThrowsException() throws MojoExecutionException {
+            // Prepare
+            ParsedFXML parsedFXML = readFXML("/examples/ReadOnlyArrayProperty.fxml");
+
+            // Act & Assert
+            assertThatThrownBy(() -> classUnderTest.parse(parsedFXML, "/examples", getRootPath()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Array properties must use setter methods or constructor parameters");
+        }
+
+        @Test
         void mapWithOnChange() throws MojoExecutionException {
             // Prepare
             ParsedFXML parsedFXML = readFXML("/examples/MapWithOnChange.fxml");
