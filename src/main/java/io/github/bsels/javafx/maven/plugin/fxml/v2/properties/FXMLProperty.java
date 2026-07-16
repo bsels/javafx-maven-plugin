@@ -4,8 +4,8 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 
 /// Base interface for FXML properties.
 public sealed interface FXMLProperty
-        permits FXMLArrayProperty, FXMLCollectionProperties, FXMLConstructorProperty, FXMLMapProperty,
-                FXMLObjectProperty, FXMLStaticObjectProperty {
+        permits FXMLArrayProperty, FXMLCollectionProperties, FXMLConstructorValueProperty,
+                FXMLMapProperty, FXMLObjectProperty, FXMLStaticObjectProperty {
     /// Returns the name of the property.
     ///
     /// @return The property name

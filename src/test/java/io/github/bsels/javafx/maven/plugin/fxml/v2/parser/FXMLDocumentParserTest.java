@@ -2,6 +2,7 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.parser;
 
 import io.github.bsels.javafx.maven.plugin.TestHelpers;
 import io.github.bsels.javafx.maven.plugin.examples.ConstantAndCopyBean;
+import io.github.bsels.javafx.maven.plugin.examples.ConstructorArrayBean;
 import io.github.bsels.javafx.maven.plugin.examples.MetaDataHolder;
 import io.github.bsels.javafx.maven.plugin.examples.Unsettable;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
@@ -15,6 +16,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIden
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
@@ -463,6 +465,46 @@ public class FXMLDocumentParserTest {
                                 .hasFieldOrPropertyWithValue("type", FXMLType.of(double[].class))
                                 .hasFieldOrPropertyWithValue("elementType", FXMLType.of(double.class));
                         assertThat(prop.value()).containsExactly(new FXMLLiteral("0.5"));
+                    });
+        }
+
+        @Test
+        void constructorArrayProperty() {
+            // Prepare
+            ParsedXMLStructure root = new ParsedXMLStructure(
+                    "ConstructorArrayBean",
+                    Map.of("values", "a,b,c"),
+                    List.of(),
+                    List.of(),
+                    Optional.empty()
+            );
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    Optional.empty(),
+                    List.of("io.github.bsels.javafx.maven.plugin.examples.ConstructorArrayBean"),
+                    root,
+                    "ConstructorArrayBeanTest"
+            );
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document.root())
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLConstructorArrayProperty.class)
+                    .extracting(FXMLConstructorArrayProperty.class::cast)
+                    .satisfies(prop -> {
+                        assertThat(prop)
+                                .hasFieldOrPropertyWithValue("name", "values")
+                                .hasFieldOrPropertyWithValue("type", FXMLType.of(String[].class))
+                                .hasFieldOrPropertyWithValue("elementType", FXMLType.of(String.class));
+                        assertThat(prop.value()).containsExactly(
+                                new FXMLLiteral("a,b,c")
+                        );
                     });
         }
 

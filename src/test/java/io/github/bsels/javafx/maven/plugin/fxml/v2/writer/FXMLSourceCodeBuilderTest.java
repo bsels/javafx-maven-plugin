@@ -1,6 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
 import io.github.bsels.javafx.maven.plugin.TestHelpers;
+import io.github.bsels.javafx.maven.plugin.examples.ConstructorArrayBean;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
@@ -17,6 +18,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifie
 import io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLDocumentParser;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
@@ -3141,6 +3143,32 @@ public class FXMLSourceCodeBuilderTest {
 
             // x is provided, y falls back to default (0.0 from @NamedArg or type default)
             assertThat(builder.toString()).contains("3.0");
+        }
+
+        /// Verifies that an [AbstractFXMLObjectAndDependencies] with an [FXMLConstructorArrayProperty]
+        /// produces an array initialization as a constructor argument.
+        @Test
+        void objectWithConstructorArrayPropertyProducesArrayArg() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLConstructorArrayProperty propValues = new FXMLConstructorArrayProperty(
+                    "values", FXMLType.of(String[].class), FXMLType.of(String.class),
+                    List.of(new FXMLLiteral("a"), new FXMLLiteral("b"))
+            );
+            FXMLObject obj = new FXMLObject(
+                    new FXMLExposedIdentifier("myBean"),
+                    new FXMLClassType(ConstructorArrayBean.class),
+                    Optional.empty(), List.of(propValues)
+            );
+            AbstractFXMLObjectAndDependencies construction = new AbstractFXMLObjectAndDependencies(
+                    obj, List.of(propValues), List.of()
+            );
+            StringBuilder builder = new StringBuilder();
+
+            invokePrepareArgumentsLists(builder, construction, context);
+
+            assertThat(builder.toString()).isEqualTo("new java.lang.String[] {\"a\", \"b\"}");
         }
 
         /// Verifies that an [FXMLCopyAndDependencies] appends the `$$`-prefixed source name to the builder.

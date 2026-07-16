@@ -14,6 +14,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIden
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
@@ -821,16 +822,23 @@ public final class FXMLDocumentParser {
         }
         // endregion
         if (rawType.isArray()) {
-            if (property.methodType() != ObjectProperty.MethodType.SETTER) {
-               throw new IllegalArgumentException("Array properties must use setter methods");
+            if (property.methodType() == ObjectProperty.MethodType.SETTER) {
+                return Optional.of(new FXMLArrayProperty(
+                        property.name(),
+                        property.methodName().orElseThrow(),
+                        property.type(),
+                        FXMLType.of(rawType.getComponentType()),
+                        values
+                ));
+            } else if (property.methodType() == ObjectProperty.MethodType.CONSTRUCTOR) {
+                return Optional.of(new FXMLConstructorArrayProperty(
+                        property.name(),
+                        property.type(),
+                        FXMLType.of(rawType.getComponentType()),
+                        values
+                ));
             }
-            return Optional.of(new FXMLArrayProperty(
-                    property.name(),
-                    property.methodName().orElseThrow(),
-                    property.type(),
-                    FXMLType.of(rawType.getComponentType()),
-                    values
-            ));
+            throw new IllegalArgumentException("Array properties must use setter methods or constructor parameters");
         }
         if (values.size() > 1) {
             log.debug("Multiple values found for property: %s".formatted(property.name()));
@@ -1002,6 +1010,8 @@ public final class FXMLDocumentParser {
                     value.forEach(value1 -> loadIncludeFXMLDocuments(value1, resourcePath, rootPath));
             case FXMLConstructorProperty(_, _, AbstractFXMLValue value) ->
                     loadIncludeFXMLDocuments(value, resourcePath, rootPath);
+            case FXMLConstructorArrayProperty(_, _, _, List<AbstractFXMLValue> value) ->
+                    value.forEach(v -> loadIncludeFXMLDocuments(v, resourcePath, rootPath));
             case FXMLMapProperty(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> value, _) -> value.values()
                     .forEach(value1 -> loadIncludeFXMLDocuments(value1, resourcePath, rootPath));
             case FXMLObjectProperty(_, _, _, AbstractFXMLValue value) ->

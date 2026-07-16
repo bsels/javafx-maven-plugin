@@ -10,7 +10,6 @@ import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.ValueSerializer;
 import tools.jackson.databind.module.SimpleModule;
 
-import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.Optional;
 

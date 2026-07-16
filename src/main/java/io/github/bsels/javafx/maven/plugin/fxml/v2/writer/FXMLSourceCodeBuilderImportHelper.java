@@ -8,6 +8,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMeth
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
@@ -360,6 +361,7 @@ final class FXMLSourceCodeBuilderImportHelper {
     /// This method extracts type references from different property types:
     /// - [FXMLCollectionProperties]: Analyzes the collection type, child values, and nested properties.
     /// - [FXMLConstructorProperty]: Analyzes the property type and its value.
+    /// - [FXMLConstructorArrayProperty]: Analyzes the property type and its array values.
     /// - [FXMLMapProperty]: Analyzes the map type and all values within the map.
     /// - [FXMLObjectProperty]: Analyzes the object type and its value.
     /// - [FXMLStaticObjectProperty]: Analyzes the property type, the static class owning the property, and the value.
@@ -382,6 +384,14 @@ final class FXMLSourceCodeBuilderImportHelper {
                     findFXMLTypeClassCounts(type),
                     findAbstractFXMLValueClassCount(value)
             );
+            case FXMLConstructorArrayProperty(_, FXMLType type, FXMLType elementType, List<AbstractFXMLValue> values) ->
+                    Stream.concat(
+                            Stream.concat(
+                                    findFXMLTypeClassCounts(type),
+                                    findFXMLTypeClassCounts(elementType)
+                            ),
+                            values.stream().flatMap(this::findAbstractFXMLValueClassCount)
+                    );
             case FXMLMapProperty(_, _, FXMLType type, _, _, Map<FXMLLiteral, AbstractFXMLValue> value, _) -> Stream.concat(
                     findFXMLTypeClassCounts(type),
                     value.values()
