@@ -1,5 +1,6 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
@@ -47,6 +48,8 @@ final class FXMLPropertyRecursionHelper {
                     .flatMap(value -> valueWalk.apply(value, context));
             case FXMLObjectProperty(_, _, _, AbstractFXMLValue value) -> valueWalk.apply(value, context);
             case FXMLStaticObjectProperty(_, _, _, _, AbstractFXMLValue value) -> valueWalk.apply(value, context);
+            case FXMLArrayProperty(_, _, _, _, List<AbstractFXMLValue> values) ->
+                    values.stream().flatMap(value -> valueWalk.apply(value, context));
         };
     }
 

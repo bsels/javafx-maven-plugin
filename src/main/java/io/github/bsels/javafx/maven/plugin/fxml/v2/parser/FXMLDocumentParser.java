@@ -12,6 +12,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
@@ -819,6 +820,18 @@ public final class FXMLDocumentParser {
             );
         }
         // endregion
+        if (rawType.isArray()) {
+            if (property.methodType() != ObjectProperty.MethodType.SETTER) {
+               throw new IllegalArgumentException("Array properties must use setter methods");
+            }
+            return Optional.of(new FXMLArrayProperty(
+                    property.name(),
+                    property.methodName().orElseThrow(),
+                    property.type(),
+                    FXMLType.of(rawType.getComponentType()),
+                    values
+            ));
+        }
         if (values.size() > 1) {
             log.debug("Multiple values found for property: %s".formatted(property.name()));
             throw new IllegalArgumentException("Multiple values found for property: %s".formatted(property.name()));
@@ -995,6 +1008,8 @@ public final class FXMLDocumentParser {
                     loadIncludeFXMLDocuments(value, resourcePath, rootPath);
             case FXMLStaticObjectProperty(_, _, _, _, AbstractFXMLValue value) ->
                     loadIncludeFXMLDocuments(value, resourcePath, rootPath);
+            case FXMLArrayProperty(_, _, _, _, List<AbstractFXMLValue> values) ->
+                    values.forEach(value -> loadIncludeFXMLDocuments(value, resourcePath, rootPath));
         }
     }
 }

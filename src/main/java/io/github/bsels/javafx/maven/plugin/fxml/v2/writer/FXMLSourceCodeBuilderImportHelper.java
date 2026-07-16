@@ -6,6 +6,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
@@ -397,6 +398,11 @@ final class FXMLSourceCodeBuilderImportHelper {
                                     findFXMLTypeClassCounts(clazz)
                             ),
                             findAbstractFXMLValueClassCount(value)
+                    );
+            case FXMLArrayProperty(_, _, _, FXMLType elementType, List<AbstractFXMLValue> values) ->
+                    Stream.concat(
+                            findFXMLTypeClassCounts(elementType),
+                            values.stream().flatMap(this::findAbstractFXMLValueClassCount)
                     );
         }).gather(CLASS_COUNT_MERGER);
     }

@@ -2,6 +2,7 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
@@ -11,7 +12,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
@@ -1021,6 +1022,26 @@ public final class FXMLSourceCodeBuilder {
                         .append(");\n");
                 addConstructorEpilogue(context, value);
             }
+            case FXMLArrayProperty(
+                    _, String setter, _, FXMLType elementType, List<AbstractFXMLValue> values
+            ) -> {
+                sourceCode.append(identifier)
+                        .append('.')
+                        .append(setter)
+                        .append("(new ")
+                        .append(typeHelper.typeToSourceCode(context, elementType))
+                        .append("[] {");
+                boolean first = true;
+                for (AbstractFXMLValue value : values) {
+                    if (!first) {
+                        sourceCode.append(", ");
+                    }
+                    sourceCode.append(typeHelper.encodeFXMLValue(context, value, elementType));
+                    addConstructorEpilogue(context, value);
+                    first = false;
+                }
+                sourceCode.append("});\n");
+            }
         }
     }
 
@@ -1259,7 +1280,7 @@ public final class FXMLSourceCodeBuilder {
     /// @param key      The key representing the element to be created.
     /// @param supplier A supplier that provides the stream of generated elements if the key is new.
     /// @return A stream containing the generated element(s) if the key was newly added to the set,
-    ///                                                                                                                                                                                                                                                                                 or an empty stream if the key was already present.
+    ///                                                                                                                                                                                                                                                                                         or an empty stream if the key was already present.
     private <K, T> Stream<T> singleCreation(Set<K> set, K key, Supplier<Stream<T>> supplier) {
         if (set.add(key)) {
             return supplier.get();
