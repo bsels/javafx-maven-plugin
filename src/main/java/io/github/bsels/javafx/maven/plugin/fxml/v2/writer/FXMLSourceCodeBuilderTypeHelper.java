@@ -12,6 +12,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdenti
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorValueProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
@@ -372,11 +373,11 @@ final class FXMLSourceCodeBuilderTypeHelper {
     /// Finds the best matching constructor for the given class and its property names.
     ///
     /// @param clazz      The [Class] to inspect. Must not be null.
-    /// @param properties The list of [FXMLProperty] to match. Must not be null.
+    /// @param properties The list of [FXMLConstructorValueProperty] to match. Must not be null.
     /// @return The [FXMLConstructor] with the lowest number of properties that satisfy the criteria.
     /// @throws NullPointerException     If any input is null.
     /// @throws IllegalArgumentException If no matching constructor is found.
-    public FXMLConstructor findMinimalConstructor(Class<?> clazz, List<? extends FXMLProperty> properties)
+    public FXMLConstructor findMinimalConstructor(Class<?> clazz, List<FXMLConstructorValueProperty> properties)
             throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         Objects.requireNonNull(properties, "`properties` must not be null");
@@ -395,13 +396,13 @@ final class FXMLSourceCodeBuilderTypeHelper {
     /// Finds the best matching factory method for the given [FXMLFactoryMethod] and property names.
     ///
     /// @param factoryMethod The [FXMLFactoryMethod] to inspect. Must not be null.
-    /// @param properties    The list of [FXMLProperty] to match. Must not be null.
+    /// @param properties    The list of [FXMLConstructorValueProperty] to match. Must not be null.
     /// @return The [FXMLConstructor] with the fewest properties satisfying the criteria.
     /// @throws NullPointerException     If any input is null.
     /// @throws IllegalArgumentException If no matching factory method is found.
     public FXMLConstructor findFactoryMethodConstructor(
             FXMLFactoryMethod factoryMethod,
-            List<? extends FXMLProperty> properties
+            List<FXMLConstructorValueProperty> properties
     ) throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(factoryMethod, "`factoryMethod` must not be null");
         Objects.requireNonNull(properties, "`properties` must not be null");
@@ -616,8 +617,10 @@ final class FXMLSourceCodeBuilderTypeHelper {
                 case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> true;
             };
             case FXMLArrayType(FXMLType componentType) -> switch (interfaceType) {
-                case FXMLArrayType(FXMLType interfaceComponentType) -> canMatchType(componentType, interfaceComponentType, predicate);
-                case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _, FXMLClassType _, FXMLGenericType _ -> false;
+                case FXMLArrayType(FXMLType interfaceComponentType) ->
+                        canMatchType(componentType, interfaceComponentType, predicate);
+                case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _, FXMLClassType _, FXMLGenericType _ ->
+                        false;
             };
             case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> true;
         };

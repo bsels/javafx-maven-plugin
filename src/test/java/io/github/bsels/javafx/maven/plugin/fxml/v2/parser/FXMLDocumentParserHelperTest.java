@@ -28,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Type;
 import java.lang.reflect.ParameterizedType;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -413,6 +414,20 @@ class FXMLDocumentParserHelperTest {
             assertThat(outerArray.componentType()).isInstanceOf(FXMLArrayType.class);
             FXMLArrayType innerArray = (FXMLArrayType) outerArray.componentType();
             assertThat(innerArray.componentType()).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void buildFXMLTypeFallback() {
+            Type customType = new Type() {
+                @Override
+                public String getTypeName() {
+                    return "CustomType";
+                }
+            };
+
+            assertThatThrownBy(() -> helper.buildFXMLType(customType, buildContext))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Unable to find class type for");
         }
     }
 
@@ -1452,6 +1467,16 @@ class FXMLDocumentParserHelperTest {
         }
 
         @Test
+        void shouldThrowExceptionForInvalidGenericStructure() {
+            assertThatThrownBy(() -> helper.constructGenericType(
+                    List.class,
+                    List.of("generic 0: !!!"),
+                    new BuildContext(List.of(), "/base/path")
+            )).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Invalid generic type string");
+        }
+
+        @Test
         void shouldThrowExceptionForMismatchingGenericCount() {
             assertThatThrownBy(() -> helper.constructGenericType(
                     List.class,
@@ -1469,6 +1494,29 @@ class FXMLDocumentParserHelperTest {
                     new BuildContext(List.of(), "/base/path")
             )).isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("Generic types are having non-sequential indices");
+        }
+
+        @Test
+        void shouldThrowExceptionForMalformedNestedGeneric() {
+            // This tests the orElseThrow() path in parseNestedGenerics
+            // We need a string that matches parseGenericString's NESTED_GENERICS call
+            // but fails the result().findFirst() in parseNestedGenerics.
+            // Using "Map<String, >" will have first="String, ", rawType=null? No.
+            // Map<String, >: first="String, ", rawType is empty -> doesn't match NESTED_GENERICS.
+            
+            // Try "List<List<String>, >"
+            // Outer List: matches. generics = "List<String>, "
+            // parseNestedGenerics("List<String>, ")
+            //   Loop 1: matches List<String>. first=null, rawType=List, generics=String. remaining="List<String>, " -> ""?
+            //   Wait, parseNestedGenerics uses results().
+            //   "List<String>, " -> Result 1: "List<String>". 
+            //   remaining becomes ", "
+            //   Loop 2: results() for ", " -> empty! -> orElseThrow()
+            assertThatThrownBy(() -> helper.constructGenericType(
+                    java.util.List.class,
+                    List.of("generic 0: java.util.List<java.util.List<java.lang.String>, >"),
+                    buildContext
+            )).isInstanceOf(java.util.NoSuchElementException.class);
         }
 
         @Test
