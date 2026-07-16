@@ -15,6 +15,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdent
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLDocumentParser;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
@@ -3562,7 +3563,26 @@ public class FXMLSourceCodeBuilderTest {
             assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString()).isEmpty();
         }
 
-        /// Verifies that a `FXMLInclude` with a controller produces the controller suffix assignment.
+        /// Verifies that a `FXMLObject` with a `FXMLArrayProperty` produces a setter call with an array.
+        @Test
+        void fxmlObjectWithArrayPropertyProducesSetterCallWithArray() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLLiteral val1 = new FXMLLiteral("0.1");
+            FXMLLiteral val2 = new FXMLLiteral("0.2");
+            FXMLArrayProperty arrayProp = new FXMLArrayProperty(
+                    "dividerPositions", "setDividerPositions", FXMLType.of(double[].class), FXMLType.of(double.class),
+                    List.of(val1, val2)
+            );
+            FXMLObject root = buildRoot(new FXMLExposedIdentifier("splitPane"), List.of(arrayProp));
+            FXMLDocument document = buildDocument(root, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString())
+                    .contains("splitPane.setDividerPositions(new double[] {0.1, 0.2});");
+        }
+
+        /// Verifies that a `FXMLObject` with a `FXMLInclude` with a controller produces the controller suffix assignment.
         @Test
         void fxmlIncludeWithControllerProducesControllerSuffixAssignment() throws Exception {
             SourceCodeGeneratorContext context = buildContext();
