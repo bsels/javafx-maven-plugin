@@ -363,6 +363,7 @@ final class FXMLSourceCodeBuilderImportHelper {
     /// - [FXMLMapProperty]: Analyzes the map type and all values within the map.
     /// - [FXMLObjectProperty]: Analyzes the object type and its value.
     /// - [FXMLStaticObjectProperty]: Analyzes the property type, the static class owning the property, and the value.
+    /// - [FXMLArrayProperty]: Analyzes the array element type and its values.
     ///
     /// All identified counts are merged using [CLASS_COUNT_MERGER].
     ///
