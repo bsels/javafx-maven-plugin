@@ -23,6 +23,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticObjectPr
 import io.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLFileScript;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLScript;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.scripts.FXMLSourceScript;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
@@ -661,9 +662,11 @@ public final class FXMLDocumentParser {
             return Optional.empty();
         }
         // endregion
-        // region: collection and objects
         AbstractFXMLValue parsedValue;
-        if (Collection.class.isAssignableFrom(rawType)) {
+        // region: array, collection and objects
+        if (property.type() instanceof FXMLArrayType(FXMLType componentType)) {
+            parsedValue = parseValueString(value, componentType, buildContext);
+        } else if (Collection.class.isAssignableFrom(rawType)) {
             if (property.methodType() == ObjectProperty.MethodType.GETTER) {
                 FXMLType collectionValueType = FXMLUtils.findCollectionValueTypeFromHierarchy(property.type());
                 parsedValue = parseValueString(value, collectionValueType, buildContext);
@@ -798,6 +801,27 @@ public final class FXMLDocumentParser {
             Map<String, String> attributes,
             List<AbstractFXMLValue> values
     ) {
+        // region: array
+        if (property.type() instanceof FXMLArrayType(FXMLType componentType)) {
+            if (property.methodType() == ObjectProperty.MethodType.SETTER) {
+                return Optional.of(new FXMLArrayProperty(
+                        property.name(),
+                        property.methodName().orElseThrow(),
+                        property.type(),
+                        componentType,
+                        values
+                ));
+            } else if (property.methodType() == ObjectProperty.MethodType.CONSTRUCTOR) {
+                return Optional.of(new FXMLConstructorArrayProperty(
+                        property.name(),
+                        property.type(),
+                        componentType,
+                        values
+                ));
+            }
+            throw new IllegalArgumentException("Array properties must use setter methods or constructor parameters");
+        }
+        // endregion
         Class<?> rawType = FXMLUtils.findRawType(property.type());
         if (values.isEmpty()) {
             log.debug("No values found for property: %s".formatted(property.name()));
@@ -821,25 +845,7 @@ public final class FXMLDocumentParser {
             );
         }
         // endregion
-        if (rawType.isArray()) {
-            if (property.methodType() == ObjectProperty.MethodType.SETTER) {
-                return Optional.of(new FXMLArrayProperty(
-                        property.name(),
-                        property.methodName().orElseThrow(),
-                        property.type(),
-                        FXMLType.of(rawType.getComponentType()),
-                        values
-                ));
-            } else if (property.methodType() == ObjectProperty.MethodType.CONSTRUCTOR) {
-                return Optional.of(new FXMLConstructorArrayProperty(
-                        property.name(),
-                        property.type(),
-                        FXMLType.of(rawType.getComponentType()),
-                        values
-                ));
-            }
-            throw new IllegalArgumentException("Array properties must use setter methods or constructor parameters");
-        }
+
         if (values.size() > 1) {
             log.debug("Multiple values found for property: %s".formatted(property.name()));
             throw new IllegalArgumentException("Multiple values found for property: %s".formatted(property.name()));
