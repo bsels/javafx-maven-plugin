@@ -13,6 +13,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
@@ -52,6 +53,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
+import javafx.scene.control.SplitPane;
 import javafx.scene.control.TableView;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -423,6 +425,45 @@ public class FXMLDocumentParserTest {
                                     .hasFieldOrPropertyWithValue("type", STRING_TYPE)
                                     .hasFieldOrPropertyWithValue("value", new FXMLLiteral("Click Me!"))
                     );
+        }
+
+        @Test
+        void splitPaneArrayProperty() {
+            // Prepare
+            ParsedXMLStructure root = new ParsedXMLStructure(
+                    "SplitPane",
+                    Map.of("dividerPositions", "0.5"),
+                    List.of(),
+                    List.of(),
+                    Optional.empty()
+            );
+            ParsedFXML parsedFXML = new ParsedFXML(
+                    Optional.empty(),
+                    List.of("javafx.scene.control.SplitPane"),
+                    root,
+                    "SplitPaneTest"
+            );
+
+            // Act
+            FXMLDocument document = classUnderTest.parse(parsedFXML, "/examples", getRootPath());
+
+            // Assert
+            assertThat(document.root())
+                    .isInstanceOf(FXMLObject.class)
+                    .extracting(FXMLObject.class::cast)
+                    .extracting(FXMLObject::properties, PROPERTIES_ASSERT_FACTORY)
+                    .hasSize(1)
+                    .first()
+                    .isInstanceOf(FXMLArrayProperty.class)
+                    .extracting(FXMLArrayProperty.class::cast)
+                    .satisfies(prop -> {
+                        assertThat(prop)
+                                .hasFieldOrPropertyWithValue("name", "dividerPositions")
+                                .hasFieldOrPropertyWithValue("setter", "setDividerPositions")
+                                .hasFieldOrPropertyWithValue("type", FXMLType.of(double[].class))
+                                .hasFieldOrPropertyWithValue("elementType", FXMLType.of(double.class));
+                        assertThat(prop.value()).containsExactly(new FXMLLiteral("0.5"));
+                    });
         }
 
         @ParameterizedTest
@@ -1858,7 +1899,7 @@ public class FXMLDocumentParserTest {
                                 .isInstanceOf(FXMLInclude.class)
                                 .asInstanceOf(InstanceOfAssertFactories.type(FXMLInclude.class))
                                 .satisfies(include -> {
-                                    assertThat(include.sourceFile()).isEqualTo("/examples/SubDocument.fxml");
+                                    assertThat(include).hasFieldOrPropertyWithValue("sourceFile", "/examples/SubDocument.fxml");
                                     assertThat(include.lazyLoadedDocument().get()).isNotNull();
                                 });
                     });
@@ -1876,7 +1917,7 @@ public class FXMLDocumentParserTest {
                             .isInstanceOf(FXMLInclude.class)
                             .asInstanceOf(InstanceOfAssertFactories.type(FXMLInclude.class))
                             .satisfies(include -> {
-                                assertThat(include.sourceFile()).isEqualTo("/examples/SubDocument.fxml");
+                                assertThat(include).hasFieldOrPropertyWithValue("sourceFile", "/examples/SubDocument.fxml");
                                 assertThat(include.lazyLoadedDocument().get()).isNotNull();
                             })
                     );

@@ -24,10 +24,11 @@ class FXMLPropertyTest {
         @Test
         void shouldCreateWithValidParams() {
             FXMLObjectProperty prop = new FXMLObjectProperty("name", "setProp", stringType, literalValue);
-            assertThat(prop.name()).isEqualTo("name");
-            assertThat(prop.setter()).isEqualTo("setProp");
-            assertThat(prop.type()).isEqualTo(stringType);
-            assertThat(prop.value()).isEqualTo(literalValue);
+            assertThat(prop)
+                    .hasFieldOrPropertyWithValue("name", "name")
+                    .hasFieldOrPropertyWithValue("setter", "setProp")
+                    .hasFieldOrPropertyWithValue("type", stringType)
+                    .hasFieldOrPropertyWithValue("value", literalValue);
         }
 
         @Test
@@ -296,9 +297,10 @@ class FXMLPropertyTest {
         @Test
         void shouldCreateWithValidParams() {
             FXMLConstructorProperty prop = new FXMLConstructorProperty("name", stringType, literalValue);
-            assertThat(prop.name()).isEqualTo("name");
-            assertThat(prop.type()).isEqualTo(stringType);
-            assertThat(prop.value()).isEqualTo(literalValue);
+            assertThat(prop)
+                    .hasFieldOrPropertyWithValue("name", "name")
+                    .hasFieldOrPropertyWithValue("type", stringType)
+                    .hasFieldOrPropertyWithValue("value", literalValue);
         }
 
         @Test
@@ -312,6 +314,54 @@ class FXMLPropertyTest {
             assertThatThrownBy(() -> new FXMLConstructorProperty("n", stringType, null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("`value` must not be null");
+        }
+    }
+
+    @Nested
+    class FXMLArrayPropertyTest {
+        @Test
+        void shouldCreateWithValidParams() {
+            FXMLArrayProperty prop = new FXMLArrayProperty(
+                    "name",
+                    "setter",
+                    FXMLType.of(double[].class),
+                    FXMLType.of(double.class),
+                    List.of(literalValue)
+            );
+            assertThat(prop)
+                    .hasFieldOrPropertyWithValue("name", "name")
+                    .hasFieldOrPropertyWithValue("setter", "setter")
+                    .hasFieldOrPropertyWithValue("type", FXMLType.of(double[].class))
+                    .hasFieldOrPropertyWithValue("elementType", FXMLType.of(double.class))
+                    .hasFieldOrPropertyWithValue("value", List.of(literalValue));
+        }
+
+        @Test
+        void shouldHandleNullValue() {
+            FXMLArrayProperty prop = new FXMLArrayProperty(
+                    "name",
+                    "setter",
+                    FXMLType.of(double[].class),
+                    FXMLType.of(double.class),
+                    null
+            );
+            assertThat(prop.value()).isEmpty();
+        }
+
+        @Test
+        void shouldThrowNpeForNull() {
+            assertThatThrownBy(() -> new FXMLArrayProperty(null, "s", stringType, stringType, List.of()))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`name` cannot be null");
+            assertThatThrownBy(() -> new FXMLArrayProperty("n", null, stringType, stringType, List.of()))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`setter` cannot be null");
+            assertThatThrownBy(() -> new FXMLArrayProperty("n", "s", null, stringType, List.of()))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`type` cannot be null");
+            assertThatThrownBy(() -> new FXMLArrayProperty("n", "s", stringType, null, List.of()))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`elementType` cannot be null");
         }
     }
 }
