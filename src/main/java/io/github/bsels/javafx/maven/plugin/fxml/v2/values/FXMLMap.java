@@ -2,6 +2,7 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.values;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
@@ -50,6 +51,7 @@ public record FXMLMap(
         boolean validCompiledType = switch (type) {
             case FXMLClassType(Class<?> clazz) -> Map.class.isAssignableFrom(clazz);
             case FXMLGenericType(Class<?> clazz, _) -> Map.class.isAssignableFrom(clazz);
+            case FXMLArrayType _ -> false; // Array types are always invalid
             case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ ->
                     true; // Uncompiled types are always valid
         };

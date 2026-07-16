@@ -9,6 +9,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdenti
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
@@ -368,17 +369,20 @@ class FXMLDocumentParserHelperTest {
                     .isEqualTo(FXMLType.wildcard());
         }
 
-        /// Verifies that a [GenericArrayType] falls back to the raw array class via the default branch.
+        /// Verifies that a [GenericArrayType] is correctly resolved to an [FXMLArrayType].
         @Test
-        void genericArrayTypeFallsBackToRawArrayClass() throws Exception {
+        void genericArrayTypeReturnsFXMLArrayType() throws Exception {
             class Holder {
                 List<String>[] field;
             }
             var genericArrayType = Holder.class.getDeclaredField("field").getGenericType();
-            // List<String>[] should return List[].class
+            // List<String>[] should return FXMLArrayType wrapping FXMLGenericType
             assertThat(helper.buildFXMLType(genericArrayType, buildContext))
-                    .isInstanceOf(FXMLClassType.class)
-                    .hasFieldOrPropertyWithValue("clazz", List[].class);
+                    .isInstanceOf(FXMLArrayType.class);
+            FXMLArrayType arrayType = (FXMLArrayType) helper.buildFXMLType(genericArrayType, buildContext);
+            assertThat(arrayType.componentType()).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType genericType = (FXMLGenericType) arrayType.componentType();
+            assertThat(genericType.type()).isEqualTo(List.class);
         }
     }
 

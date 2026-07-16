@@ -13,6 +13,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
@@ -363,6 +364,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
             case FXMLUncompiledClassType(String className) -> createBaseTypeSourceCode(context, className);
             case FXMLUncompiledGenericType(String className, List<FXMLType> generics) ->
                     createGenericTypeSourceCode(context, className, generics);
+            case FXMLArrayType(FXMLType componentType) -> typeToSourceCode(context, componentType) + "[]";
             case FXMLWildcardType _ -> "?";
         };
     }
@@ -600,6 +602,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
             case FXMLClassType(Class<?> typeClass) -> switch (interfaceType) {
                 case FXMLClassType(Class<?> interfaceClass) -> predicate.test(typeClass, interfaceClass);
                 case FXMLGenericType(Class<?> interfaceClass, _) -> predicate.test(typeClass, interfaceClass);
+                case FXMLArrayType _ -> false;
                 case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> true;
             };
             case FXMLGenericType(Class<?> typeClass, List<FXMLType> parameters) -> switch (interfaceType) {
@@ -609,7 +612,12 @@ final class FXMLSourceCodeBuilderTypeHelper {
                                 .mapToObj(i -> new FXMLTypePair(parameters.get(i), interfaceParameters.get(i)))
                                 .map(typePair -> canMatchType(typePair.type(), typePair.interfaceType(), predicate))
                                 .reduce(predicate.test(typeClass, interfaceClass), Boolean::logicalAnd);
+                case FXMLArrayType _ -> false;
                 case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> true;
+            };
+            case FXMLArrayType(FXMLType componentType) -> switch (interfaceType) {
+                case FXMLArrayType(FXMLType interfaceComponentType) -> canMatchType(componentType, interfaceComponentType, predicate);
+                case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _, FXMLClassType _, FXMLGenericType _ -> false;
             };
             case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> true;
         };

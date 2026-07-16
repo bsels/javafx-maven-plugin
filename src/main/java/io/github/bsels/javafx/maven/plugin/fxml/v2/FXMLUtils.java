@@ -1,5 +1,6 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
@@ -57,12 +58,12 @@ public final class FXMLUtils {
     /// @throws NullPointerException If `type` is null
     public static Class<?> findRawType(FXMLType type) throws NullPointerException {
         Objects.requireNonNull(type, "`type` must not be null");
-        return findTypeInformation(
-                type,
-                Object.class,
-                Function.identity(),
-                (clazz, _) -> clazz
-        );
+        return switch (type) {
+            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> Object.class;
+            case FXMLClassType(Class<?> clazz) -> clazz;
+            case FXMLGenericType(Class<?> clazz, _) -> clazz;
+            case FXMLArrayType(FXMLType componentType) -> findRawType(componentType).arrayType();
+        };
     }
 
     /// Traverses the [FXMLType] hierarchy to find the [Collection] interface and extract its element type.
@@ -538,6 +539,7 @@ public final class FXMLUtils {
             case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> defaultValue;
             case FXMLClassType(Class<?> clazz) -> simpleTypeResolver.apply(clazz);
             case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) -> genericTypeResolver.apply(clazz, generics);
+            case FXMLArrayType _ -> defaultValue;
         };
     }
 

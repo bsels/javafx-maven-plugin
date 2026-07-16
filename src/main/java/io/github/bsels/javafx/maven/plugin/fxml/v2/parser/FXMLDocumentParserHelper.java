@@ -12,6 +12,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
@@ -26,6 +27,7 @@ import org.apache.maven.plugin.logging.Log;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
@@ -68,8 +70,8 @@ final class FXMLDocumentParserHelper {
     /// Regular expression pattern for matching and parsing nested generic type definitions.
     /// This pattern is used recursively to decompose strings like `Map<String, List<Integer>>`.
     private static final Pattern NESTED_GENERICS = Pattern.compile("""
-            ^\\s*((?<first>((((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(<[\\s\\w<>,.]*>)?)\\s*),\
-            \\s*)?((?<rawType>(\\w+\\.)*\\w+)(<(?<generics>[\\s\\w<,>.]*)>)?);?$\
+            ^\\s*((?<first>((((\\w+\\.)*\\w+)(\\[])?(<[\\s\\w<>,.\\[\\]]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(\\[])?(<[\\s\\w<>,.\\[\\]]*>)?)\\s*),\
+            \\s*)?((?<rawType>(\\w+\\.)*\\w+)(?<array>\\[])?(<(?<generics>[\\s\\w<,>.\\[\\]]*)>)?);?$\
             """);
     /// Regular expression pattern for identifying FXML interfaces and their methods in a string.
     /// It matches the format `interface : <type> [; methods : <method_signatures>]`.
@@ -145,6 +147,8 @@ final class FXMLDocumentParserHelper {
                 )).toList();
                 yield FXMLType.of(rawClass, typeArgs);
             }
+            case GenericArrayType gat ->
+                    new FXMLArrayType(buildFXMLType(gat.getGenericComponentType(), buildContext));
             case TypeVariable<?> tv -> typeMapping.getOrDefault(tv.getName(), FXMLType.wildcard());
             case WildcardType wt ->
                     Arrays.stream(wt.getUpperBounds()).findFirst().filter(Predicate.not(Predicate.isEqual(Object.class)))
@@ -585,6 +589,8 @@ final class FXMLDocumentParserHelper {
                                 findMethodsOfInterface(clazz, genericTypes, buildContext);
                         case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ ->
                                 parseInterfaceMethodsFromComment(matchResult.group("methods"), buildContext);
+                        case FXMLArrayType _ ->
+                                throw new IllegalArgumentException("Array types are not allowed as interfaces");
                     };
                     return new FXMLInterface(interfaceType, interfaceMethods);
                 });
@@ -800,14 +806,20 @@ final class FXMLDocumentParserHelper {
             throw new IllegalArgumentException("Invalid generic type string: %s".formatted(genericString));
         }
         String rawType = matcher.group("rawType").strip();
+        String array = matcher.group("array");
         String nestedGenerics = matcher.group("generics");
         List<FXMLType> nestedTypeArgs = parseNestedGenerics(nestedGenerics, imports);
+        FXMLType type;
         try {
             Class<?> resolvedClass = Utils.findType(imports, rawType);
-            return FXMLType.of(resolvedClass, nestedTypeArgs);
+            type = FXMLType.of(resolvedClass, nestedTypeArgs);
         } catch (InternalClassNotFoundException _) {
-            return FXMLType.of(rawType, nestedTypeArgs);
+            type = FXMLType.of(rawType, nestedTypeArgs);
         }
+        if (array != null) {
+            return new FXMLArrayType(type);
+        }
+        return type;
     }
 
     /// Recursively parses nested generic type arguments from a string.
@@ -827,6 +839,7 @@ final class FXMLDocumentParserHelper {
         while (remaining != null) {
             MatchResult matcher = NESTED_GENERICS.matcher(remaining).results().findFirst().orElseThrow();
             String rawType = matcher.group("rawType").strip();
+            String array = matcher.group("array");
             String deeper = matcher.group("generics");
             List<FXMLType> deeperArgs = parseNestedGenerics(deeper, imports);
             FXMLType type;
@@ -835,6 +848,9 @@ final class FXMLDocumentParserHelper {
                 type = FXMLType.of(resolvedClass, deeperArgs);
             } catch (InternalClassNotFoundException _) {
                 type = FXMLType.of(rawType, deeperArgs);
+            }
+            if (array != null) {
+                type = new FXMLArrayType(type);
             }
             result.addFirst(type);
             remaining = matcher.group("first");
