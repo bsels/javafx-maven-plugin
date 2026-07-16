@@ -384,6 +384,36 @@ class FXMLDocumentParserHelperTest {
             FXMLGenericType genericType = (FXMLGenericType) arrayType.componentType();
             assertThat(genericType.type()).isEqualTo(List.class);
         }
+
+        @Test
+        void nestedGenericArrayTypeReturnsFXMLArrayType() throws Exception {
+            class Holder {
+                List<String[]> field;
+            }
+            var paramType = Holder.class.getDeclaredField("field").getGenericType();
+            FXMLType result = helper.buildFXMLType(paramType, buildContext);
+            assertThat(result).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType gt = (FXMLGenericType) result;
+            assertThat(gt.typeArguments().getFirst()).isInstanceOf(FXMLArrayType.class);
+            FXMLArrayType arrayType = (FXMLArrayType) gt.typeArguments().getFirst();
+            assertThat(arrayType.componentType()).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void multidimensionalGenericArrayTypeReturnsFXMLArrayType() throws Exception {
+            class Holder {
+                List<String[][]> field;
+            }
+            var paramType = Holder.class.getDeclaredField("field").getGenericType();
+            FXMLType result = helper.buildFXMLType(paramType, buildContext);
+            assertThat(result).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType gt = (FXMLGenericType) result;
+            assertThat(gt.typeArguments().getFirst()).isInstanceOf(FXMLArrayType.class);
+            FXMLArrayType outerArray = (FXMLArrayType) gt.typeArguments().getFirst();
+            assertThat(outerArray.componentType()).isInstanceOf(FXMLArrayType.class);
+            FXMLArrayType innerArray = (FXMLArrayType) outerArray.componentType();
+            assertThat(innerArray.componentType()).isEqualTo(FXMLType.of(String.class));
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -1379,6 +1409,37 @@ class FXMLDocumentParserHelperTest {
                             "E",
                             new FXMLGenericType(List.class, new FXMLUncompiledClassType("com.example.DoesNotExist"))
                     );
+        }
+
+        @Test
+        void shouldHandleNestedArrayGenerics() {
+            BuildContext buildContext = new BuildContext(List.of(), "/base/path");
+            FXMLType result = helper.constructGenericType(
+                    List.class,
+                    List.of("generic 0: java.util.List<java.lang.String[]>"),
+                    buildContext
+            );
+            assertThat(result).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType gt = (FXMLGenericType) result;
+            FXMLGenericType inner = (FXMLGenericType) gt.typeArguments().getFirst();
+            assertThat(inner.typeArguments().getFirst()).isInstanceOf(FXMLArrayType.class);
+            FXMLArrayType arrayType = (FXMLArrayType) inner.typeArguments().getFirst();
+            assertThat(arrayType.componentType()).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldHandleMultidimensionalArrayGenerics() {
+            BuildContext buildContext = new BuildContext(List.of(), "/base/path");
+            FXMLType result = helper.constructGenericType(
+                    List.class,
+                    List.of("generic 0: java.lang.String[][]"),
+                    buildContext
+            );
+            assertThat(result).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType gt = (FXMLGenericType) result;
+            assertThat(gt.typeArguments().getFirst()).isInstanceOf(FXMLArrayType.class);
+            FXMLArrayType outer = (FXMLArrayType) gt.typeArguments().getFirst();
+            assertThat(outer.componentType()).isInstanceOf(FXMLArrayType.class);
         }
 
         @Test

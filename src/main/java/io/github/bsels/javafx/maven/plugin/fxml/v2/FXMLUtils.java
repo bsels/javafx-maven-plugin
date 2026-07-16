@@ -536,10 +536,9 @@ public final class FXMLUtils {
             BiFunction<Class<?>, List<FXMLType>, T> genericTypeResolver
     ) {
         return switch (type) {
-            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> defaultValue;
+            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _,  FXMLArrayType _ -> defaultValue;
             case FXMLClassType(Class<?> clazz) -> simpleTypeResolver.apply(clazz);
             case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) -> genericTypeResolver.apply(clazz, generics);
-            case FXMLArrayType _ -> defaultValue;
         };
     }
 

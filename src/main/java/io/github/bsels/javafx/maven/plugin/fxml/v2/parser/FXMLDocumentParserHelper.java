@@ -70,8 +70,8 @@ final class FXMLDocumentParserHelper {
     /// Regular expression pattern for matching and parsing nested generic type definitions.
     /// This pattern is used recursively to decompose strings like `Map<String, List<Integer>>`.
     private static final Pattern NESTED_GENERICS = Pattern.compile("""
-            ^\\s*((?<first>((((\\w+\\.)*\\w+)(\\[])?(<[\\s\\w<>,.\\[\\]]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)(\\[])?(<[\\s\\w<>,.\\[\\]]*>)?)\\s*),\
-            \\s*)?((?<rawType>(\\w+\\.)*\\w+)(?<array>\\[])?(<(?<generics>[\\s\\w<,>.\\[\\]]*)>)?);?$\
+            ^\\s*((?<first>((((\\w+\\.)*\\w+)((\\[])*|(\\[\\])*)(<[\\s\\w<>,.\\[\\]]*>)?)\\s*,\\s*)*(((\\w+\\.)*\\w+)((\\[])*|(\\[\\])*)(<[\\s\\w<>,.\\[\\]]*>)?)\\s*),\
+            \\s*)?((?<rawType>(\\w+\\.)*\\w+)(?<array>((\\[])*|(\\[\\])*))(<(?<generics>[\\s\\w<,>.\\[\\]]*)>)?);?$\
             """);
     /// Regular expression pattern for identifying FXML interfaces and their methods in a string.
     /// It matches the format `interface : <type> [; methods : <method_signatures>]`.
@@ -816,8 +816,11 @@ final class FXMLDocumentParserHelper {
         } catch (InternalClassNotFoundException _) {
             type = FXMLType.of(rawType, nestedTypeArgs);
         }
-        if (array != null) {
-            return new FXMLArrayType(type);
+        if (array != null && !array.isEmpty()) {
+            int dimensions = array.length() / 2;
+            for (int i = 0; i < dimensions; i++) {
+                type = new FXMLArrayType(type);
+            }
         }
         return type;
     }
@@ -849,8 +852,11 @@ final class FXMLDocumentParserHelper {
             } catch (InternalClassNotFoundException _) {
                 type = FXMLType.of(rawType, deeperArgs);
             }
-            if (array != null) {
-                type = new FXMLArrayType(type);
+            if (array != null && !array.isEmpty()) {
+                int dimensions = array.length() / 2;
+                for (int i = 0; i < dimensions; i++) {
+                    type = new FXMLArrayType(type);
+                }
             }
             result.addFirst(type);
             remaining = matcher.group("first");
