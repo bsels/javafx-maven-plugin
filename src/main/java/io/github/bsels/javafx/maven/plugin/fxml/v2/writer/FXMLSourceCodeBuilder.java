@@ -770,7 +770,7 @@ public final class FXMLSourceCodeBuilder {
                                 FXMLUtils.findRawType(object.type()),
                                 properties
                         ));
-                Map<String, FXMLProperty> propertyMap = properties.stream()
+                Map<String, FXMLConstructorValueProperty> propertyMap = properties.stream()
                         .collect(Collectors.toMap(FXMLProperty::name, Function.identity()));
                 boolean first = true;
                 for (ConstructorProperty property : constructor.properties()) {
@@ -778,7 +778,7 @@ public final class FXMLSourceCodeBuilder {
                         builder.append(", ");
                     }
                     first = false;
-                    FXMLProperty fxmlProperty = propertyMap.get(property.name());
+                    FXMLConstructorValueProperty fxmlProperty = propertyMap.get(property.name());
                     if (fxmlProperty == null) {
                         builder.append(
                                 property.defaultValue()
@@ -792,7 +792,6 @@ public final class FXMLSourceCodeBuilder {
                             );
                             case FXMLConstructorArrayProperty(_, _, FXMLType elementType, List<AbstractFXMLValue> values) ->
                                     typeHelper.encodeFXMLArray(context, CONSTRUCTOR_VARIABLE_PREFIX, values, elementType);
-                            default -> throw new IllegalStateException("Unexpected property type: " + fxmlProperty.getClass());
                         });
                     }
                 }
@@ -825,7 +824,6 @@ public final class FXMLSourceCodeBuilder {
                             case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> findIdentifierForValue(value).stream();
                             case FXMLConstructorArrayProperty(_, _, _, List<AbstractFXMLValue> values) ->
                                     values.stream().flatMap(v -> findIdentifierForValue(v).stream());
-                            default -> Stream.empty();
                         })
                         .toList();
                 yield new AbstractFXMLObjectAndDependencies(fxmlObject, constructorProperties, dependencies);
@@ -1039,19 +1037,9 @@ public final class FXMLSourceCodeBuilder {
                 sourceCode.append(identifier)
                         .append('.')
                         .append(setter)
-                        .append("(new ")
-                        .append(typeHelper.typeToSourceCode(context, elementType))
-                        .append("[] {");
-                boolean first = true;
-                for (AbstractFXMLValue value : values) {
-                    if (!first) {
-                        sourceCode.append(", ");
-                    }
-                    sourceCode.append(typeHelper.encodeFXMLValue(context, value, elementType));
-                    addConstructorEpilogue(context, value);
-                    first = false;
-                }
-                sourceCode.append("});\n");
+                        .append("(")
+                        .append(typeHelper.encodeFXMLArray(context, identifier, values, elementType))
+                        .append(");\n");
             }
         }
     }
