@@ -816,7 +816,7 @@ final class FXMLDocumentParserHelper {
         } catch (InternalClassNotFoundException _) {
             type = FXMLType.of(rawType, nestedTypeArgs);
         }
-        if (array != null && !array.isEmpty()) {
+        if (!Utils.isEmpty(array)) {
             int dimensions = array.length() / 2;
             for (int i = 0; i < dimensions; i++) {
                 type = new FXMLArrayType(type);
@@ -852,7 +852,7 @@ final class FXMLDocumentParserHelper {
             } catch (InternalClassNotFoundException _) {
                 type = FXMLType.of(rawType, deeperArgs);
             }
-            if (array != null && !array.isEmpty()) {
+            if (!Utils.isEmpty(array)) {
                 int dimensions = array.length() / 2;
                 for (int i = 0; i < dimensions; i++) {
                     type = new FXMLArrayType(type);

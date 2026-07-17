@@ -1,0 +1,15 @@
+<?import io.github.bsels.javafx.maven.plugin.examples.ConstructorObjectArrayBean?>
+<?import io.github.bsels.javafx.maven.plugin.examples.SimpleBean?>
+<?import java.lang.String?>
+<ConstructorObjectArrayBean xmlns:fx="http://javafx.com/fxml">
+    <fx:define>
+        <SimpleBean fx:id="myDependency" name="dependency"/>
+    </fx:define>
+    <values>
+        <fx:reference source="myDependency"/>
+        <SimpleBean name="nested">
+            <name>overridden</name>
+        </SimpleBean>
+        <String fx:value="literal"/>
+    </values>
+</ConstructorObjectArrayBean>

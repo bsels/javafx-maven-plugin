@@ -1275,6 +1275,17 @@ class FXMLDocumentParserHelperTest {
             )).isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("does not match the number of type parameters");
         }
+
+        /// Verifies that an array type cannot be used as an interface.
+        @Test
+        void arrayTypeAsInterfaceThrowsException() {
+            BuildContext ctx = new BuildContext(List.of(String.class.getName()), "/");
+            assertThatThrownBy(() -> helper.parseInterfaces(
+                    List.of("interface : String[]"),
+                    ctx
+            )).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Array types are not allowed as interfaces");
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -510,6 +510,14 @@ public final class Utils {
         return builder.build();
     }
 
+    /// Checks if a given string is null or empty.
+    ///
+    /// @param string the string to check for emptiness
+    /// @return true if the string is null or has no characters, false otherwise
+    public static boolean isEmpty(String string) {
+        return string == null || string.isEmpty();
+    }
+
     /// Creates a [BiConsumer] that collects pattern matches into a list.
     /// It uses a [Matcher] to find all occurrences of the pattern and adds the first captured
     /// group of each match to the provided list.

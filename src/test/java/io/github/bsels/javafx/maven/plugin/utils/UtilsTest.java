@@ -4,6 +4,9 @@ import javafx.beans.NamedArg;
 import javafx.scene.Node;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.mockito.Mockito;
 
 import java.lang.reflect.GenericArrayType;
@@ -2428,4 +2431,31 @@ class UtilsTest {
         }
     }
 
+    @Nested
+    class IsEmptyTest {
+
+        @ParameterizedTest
+        @NullAndEmptySource
+        void shouldReturnTrueForEmptyOrNullString(String input) {
+            // When
+            boolean result = Utils.isEmpty(input);
+
+            // Then
+            assertThat(result).isTrue();
+        }
+
+        @ParameterizedTest
+        @CsvSource({
+                " ' ' , false",
+                "abc, false",
+                " a , false"
+        })
+        void shouldReturnFalseForNonEmptyString(String input, boolean expected) {
+            // When
+            boolean result = Utils.isEmpty(input);
+
+            // Then
+            assertThat(result).isEqualTo(expected);
+        }
+    }
 }

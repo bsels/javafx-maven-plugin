@@ -130,6 +130,22 @@ public class FXMLSourceCodeBuilderTest {
         /// Verifies that `ColorDefinitions.fxml` generates a class extending `Object` with four `Color` fields
         /// and constructor assignments using both direct and variable-based construction.
         @Test
+        void constructorArrayScenario() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/ConstructorArrayScenario.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("SimpleBean $$myDependency = new SimpleBean();")
+                    .contains("myDependency = $$myDependency;")
+                    .contains("myDependency.setName(\"dependency\");")
+                    .contains("SimpleBean $internalVariable$000 = new SimpleBean();")
+                    .contains("$internalVariable$000.setName(\"overridden\");")
+                    .contains("super(new Object[] {myDependency, $internalVariable$000, $internalVariable$001});");
+
+            int dependencyAssignment = sourceCode.indexOf("myDependency = $$myDependency;");
+            int constructorCall = sourceCode.indexOf("super(new Object[] {myDependency, $internalVariable$000, $internalVariable$001});");
+            assertThat(dependencyAssignment).isLessThan(constructorCall);
+        }
+
+        @Test
         void colorDefinitions() throws MojoExecutionException {
             String sourceCode = classUnderTest.generateSourceCode(parse("/examples/ColorDefinitions.fxml"), "com.example");
             assertThat(sourceCode)
