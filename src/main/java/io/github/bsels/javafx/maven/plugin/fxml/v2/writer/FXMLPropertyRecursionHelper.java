@@ -1,6 +1,8 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
@@ -17,8 +19,8 @@ import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
 /// Helper for recursively traversing and processing FXML property structures.
-/// Navigates through various types of FXML properties, including collections, maps, and object properties,
-/// and applies processing functions to their values.
+/// Navigates through various types of FXML properties, including collections, maps, array properties,
+/// and object properties, and applies processing functions to their values.
 final class FXMLPropertyRecursionHelper {
 
     /// Initializes a new [FXMLPropertyRecursionHelper] instance.
@@ -42,11 +44,15 @@ final class FXMLPropertyRecursionHelper {
             case FXMLCollectionProperties(_, _, _, _, List<AbstractFXMLValue> values, _) ->
                     values.stream().flatMap(value -> valueWalk.apply(value, context));
             case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> valueWalk.apply(value, context);
+            case FXMLConstructorArrayProperty(_, _, _, List<AbstractFXMLValue> values) ->
+                    values.stream().flatMap(value -> valueWalk.apply(value, context));
             case FXMLMapProperty(_, _, _, _, _, Map<FXMLLiteral, AbstractFXMLValue> values, _) -> values.values()
                     .stream()
                     .flatMap(value -> valueWalk.apply(value, context));
             case FXMLObjectProperty(_, _, _, AbstractFXMLValue value) -> valueWalk.apply(value, context);
             case FXMLStaticObjectProperty(_, _, _, _, AbstractFXMLValue value) -> valueWalk.apply(value, context);
+            case FXMLArrayProperty(_, _, _, _, List<AbstractFXMLValue> values) ->
+                    values.stream().flatMap(value -> valueWalk.apply(value, context));
         };
     }
 

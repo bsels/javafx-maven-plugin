@@ -6,12 +6,15 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLStaticObjectProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
@@ -359,9 +362,11 @@ final class FXMLSourceCodeBuilderImportHelper {
     /// This method extracts type references from different property types:
     /// - [FXMLCollectionProperties]: Analyzes the collection type, child values, and nested properties.
     /// - [FXMLConstructorProperty]: Analyzes the property type and its value.
+    /// - [FXMLConstructorArrayProperty]: Analyzes the property type and its array values.
     /// - [FXMLMapProperty]: Analyzes the map type and all values within the map.
     /// - [FXMLObjectProperty]: Analyzes the object type and its value.
     /// - [FXMLStaticObjectProperty]: Analyzes the property type, the static class owning the property, and the value.
+    /// - [FXMLArrayProperty]: Analyzes the array element type and its values.
     ///
     /// All identified counts are merged using [CLASS_COUNT_MERGER].
     ///
@@ -380,6 +385,14 @@ final class FXMLSourceCodeBuilderImportHelper {
                     findFXMLTypeClassCounts(type),
                     findAbstractFXMLValueClassCount(value)
             );
+            case FXMLConstructorArrayProperty(_, FXMLType type, FXMLType elementType, List<AbstractFXMLValue> values) ->
+                    Stream.concat(
+                            Stream.concat(
+                                    findFXMLTypeClassCounts(type),
+                                    findFXMLTypeClassCounts(elementType)
+                            ),
+                            values.stream().flatMap(this::findAbstractFXMLValueClassCount)
+                    );
             case FXMLMapProperty(_, _, FXMLType type, _, _, Map<FXMLLiteral, AbstractFXMLValue> value, _) -> Stream.concat(
                     findFXMLTypeClassCounts(type),
                     value.values()
@@ -397,6 +410,11 @@ final class FXMLSourceCodeBuilderImportHelper {
                                     findFXMLTypeClassCounts(clazz)
                             ),
                             findAbstractFXMLValueClassCount(value)
+                    );
+            case FXMLArrayProperty(_, _, _, FXMLType elementType, List<AbstractFXMLValue> values) ->
+                    Stream.concat(
+                            findFXMLTypeClassCounts(elementType),
+                            values.stream().flatMap(this::findAbstractFXMLValueClassCount)
                     );
         }).gather(CLASS_COUNT_MERGER);
     }
@@ -561,6 +579,7 @@ final class FXMLSourceCodeBuilderImportHelper {
                     typeArguments.stream()
                             .flatMap(this::findFXMLTypeClassCounts)
             );
+            case FXMLArrayType(FXMLType componentType) -> findFXMLTypeClassCounts(componentType);
             case FXMLWildcardType _ -> Stream.<ClassCount>empty();
         }).gather(CLASS_COUNT_MERGER);
     }

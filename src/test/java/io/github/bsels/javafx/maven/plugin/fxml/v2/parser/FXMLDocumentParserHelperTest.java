@@ -9,6 +9,7 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdenti
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Type;
 import java.lang.reflect.ParameterizedType;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -368,17 +370,64 @@ class FXMLDocumentParserHelperTest {
                     .isEqualTo(FXMLType.wildcard());
         }
 
-        /// Verifies that a [GenericArrayType] falls back to the raw array class via the default branch.
+        /// Verifies that a [GenericArrayType] is correctly resolved to an [FXMLArrayType].
         @Test
-        void genericArrayTypeFallsBackToRawArrayClass() throws Exception {
+        void genericArrayTypeReturnsFXMLArrayType() throws Exception {
             class Holder {
                 List<String>[] field;
             }
             var genericArrayType = Holder.class.getDeclaredField("field").getGenericType();
-            // List<String>[] should return List[].class
+            // List<String>[] should return FXMLArrayType wrapping FXMLGenericType
             assertThat(helper.buildFXMLType(genericArrayType, buildContext))
-                    .isInstanceOf(FXMLClassType.class)
-                    .hasFieldOrPropertyWithValue("clazz", List[].class);
+                    .isInstanceOf(FXMLArrayType.class);
+            FXMLArrayType arrayType = (FXMLArrayType) helper.buildFXMLType(genericArrayType, buildContext);
+            assertThat(arrayType.componentType()).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType genericType = (FXMLGenericType) arrayType.componentType();
+            assertThat(genericType.type()).isEqualTo(List.class);
+        }
+
+        @Test
+        void nestedGenericArrayTypeReturnsFXMLArrayType() throws Exception {
+            class Holder {
+                List<String[]> field;
+            }
+            var paramType = Holder.class.getDeclaredField("field").getGenericType();
+            FXMLType result = helper.buildFXMLType(paramType, buildContext);
+            assertThat(result).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType gt = (FXMLGenericType) result;
+            assertThat(gt.typeArguments().getFirst()).isInstanceOf(FXMLArrayType.class);
+            FXMLArrayType arrayType = (FXMLArrayType) gt.typeArguments().getFirst();
+            assertThat(arrayType.componentType()).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void multidimensionalGenericArrayTypeReturnsFXMLArrayType() throws Exception {
+            class Holder {
+                List<String[][]> field;
+            }
+            var paramType = Holder.class.getDeclaredField("field").getGenericType();
+            FXMLType result = helper.buildFXMLType(paramType, buildContext);
+            assertThat(result).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType gt = (FXMLGenericType) result;
+            assertThat(gt.typeArguments().getFirst()).isInstanceOf(FXMLArrayType.class);
+            FXMLArrayType outerArray = (FXMLArrayType) gt.typeArguments().getFirst();
+            assertThat(outerArray.componentType()).isInstanceOf(FXMLArrayType.class);
+            FXMLArrayType innerArray = (FXMLArrayType) outerArray.componentType();
+            assertThat(innerArray.componentType()).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void buildFXMLTypeFallback() {
+            Type customType = new Type() {
+                @Override
+                public String getTypeName() {
+                    return "CustomType";
+                }
+            };
+
+            assertThatThrownBy(() -> helper.buildFXMLType(customType, buildContext))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Unable to find class type for");
         }
     }
 
@@ -1226,6 +1275,17 @@ class FXMLDocumentParserHelperTest {
             )).isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("does not match the number of type parameters");
         }
+
+        /// Verifies that an array type cannot be used as an interface.
+        @Test
+        void arrayTypeAsInterfaceThrowsException() {
+            BuildContext ctx = new BuildContext(List.of(String.class.getName()), "/");
+            assertThatThrownBy(() -> helper.parseInterfaces(
+                    List.of("interface : String[]"),
+                    ctx
+            )).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Array types are not allowed as interfaces");
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -1378,12 +1438,53 @@ class FXMLDocumentParserHelperTest {
         }
 
         @Test
+        void shouldHandleNestedArrayGenerics() {
+            BuildContext buildContext = new BuildContext(List.of(), "/base/path");
+            FXMLType result = helper.constructGenericType(
+                    List.class,
+                    List.of("generic 0: java.util.List<java.lang.String[]>"),
+                    buildContext
+            );
+            assertThat(result).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType gt = (FXMLGenericType) result;
+            FXMLGenericType inner = (FXMLGenericType) gt.typeArguments().getFirst();
+            assertThat(inner.typeArguments().getFirst()).isInstanceOf(FXMLArrayType.class);
+            FXMLArrayType arrayType = (FXMLArrayType) inner.typeArguments().getFirst();
+            assertThat(arrayType.componentType()).isEqualTo(FXMLType.of(String.class));
+        }
+
+        @Test
+        void shouldHandleMultidimensionalArrayGenerics() {
+            BuildContext buildContext = new BuildContext(List.of(), "/base/path");
+            FXMLType result = helper.constructGenericType(
+                    List.class,
+                    List.of("generic 0: java.lang.String[][]"),
+                    buildContext
+            );
+            assertThat(result).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType gt = (FXMLGenericType) result;
+            assertThat(gt.typeArguments().getFirst()).isInstanceOf(FXMLArrayType.class);
+            FXMLArrayType outer = (FXMLArrayType) gt.typeArguments().getFirst();
+            assertThat(outer.componentType()).isInstanceOf(FXMLArrayType.class);
+        }
+
+        @Test
         void shouldThrowExceptionForInvalidGenericString() {
             assertThatThrownBy(() -> helper.constructGenericType(
                     List.class,
                     List.of("generic 0: invalid[String]"),
                     new BuildContext(List.of(), "/base/path")
             )).isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        void shouldThrowExceptionForInvalidGenericStructure() {
+            assertThatThrownBy(() -> helper.constructGenericType(
+                    List.class,
+                    List.of("generic 0: !!!"),
+                    new BuildContext(List.of(), "/base/path")
+            )).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Invalid generic type string");
         }
 
         @Test
@@ -1404,6 +1505,29 @@ class FXMLDocumentParserHelperTest {
                     new BuildContext(List.of(), "/base/path")
             )).isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("Generic types are having non-sequential indices");
+        }
+
+        @Test
+        void shouldThrowExceptionForMalformedNestedGeneric() {
+            // This tests the orElseThrow() path in parseNestedGenerics
+            // We need a string that matches parseGenericString's NESTED_GENERICS call
+            // but fails the result().findFirst() in parseNestedGenerics.
+            // Using "Map<String, >" will have first="String, ", rawType=null? No.
+            // Map<String, >: first="String, ", rawType is empty -> doesn't match NESTED_GENERICS.
+            
+            // Try "List<List<String>, >"
+            // Outer List: matches. generics = "List<String>, "
+            // parseNestedGenerics("List<String>, ")
+            //   Loop 1: matches List<String>. first=null, rawType=List, generics=String. remaining="List<String>, " -> ""?
+            //   Wait, parseNestedGenerics uses results().
+            //   "List<String>, " -> Result 1: "List<String>". 
+            //   remaining becomes ", "
+            //   Loop 2: results() for ", " -> empty! -> orElseThrow()
+            assertThatThrownBy(() -> helper.constructGenericType(
+                    java.util.List.class,
+                    List.of("generic 0: java.util.List<java.util.List<java.lang.String>, >"),
+                    buildContext
+            )).isInstanceOf(java.util.NoSuchElementException.class);
         }
 
         @Test

@@ -1,6 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
 import io.github.bsels.javafx.maven.plugin.TestHelpers;
+import io.github.bsels.javafx.maven.plugin.examples.ConstructorArrayBean;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
@@ -15,7 +16,9 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdent
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.parser.FXMLDocumentParser;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
@@ -126,6 +129,22 @@ public class FXMLSourceCodeBuilderTest {
 
         /// Verifies that `ColorDefinitions.fxml` generates a class extending `Object` with four `Color` fields
         /// and constructor assignments using both direct and variable-based construction.
+        @Test
+        void constructorArrayScenario() throws MojoExecutionException {
+            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/ConstructorArrayScenario.fxml"), "com.example");
+            assertThat(sourceCode)
+                    .contains("SimpleBean $$myDependency = new SimpleBean();")
+                    .contains("myDependency = $$myDependency;")
+                    .contains("myDependency.setName(\"dependency\");")
+                    .contains("SimpleBean $internalVariable$000 = new SimpleBean();")
+                    .contains("$internalVariable$000.setName(\"overridden\");")
+                    .contains("super(new Object[] {myDependency, $internalVariable$000, $internalVariable$001});");
+
+            int dependencyAssignment = sourceCode.indexOf("myDependency = $$myDependency;");
+            int constructorCall = sourceCode.indexOf("super(new Object[] {myDependency, $internalVariable$000, $internalVariable$001});");
+            assertThat(dependencyAssignment).isLessThan(constructorCall);
+        }
+
         @Test
         void colorDefinitions() throws MojoExecutionException {
             String sourceCode = classUnderTest.generateSourceCode(parse("/examples/ColorDefinitions.fxml"), "com.example");
@@ -3142,6 +3161,32 @@ public class FXMLSourceCodeBuilderTest {
             assertThat(builder.toString()).contains("3.0");
         }
 
+        /// Verifies that an [AbstractFXMLObjectAndDependencies] with an [FXMLConstructorArrayProperty]
+        /// produces an array initialization as a constructor argument.
+        @Test
+        void objectWithConstructorArrayPropertyProducesArrayArg() throws Exception {
+            SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
+                    new Imports(List.of(), Map.of()), "", Map.of(), null
+            );
+            FXMLConstructorArrayProperty propValues = new FXMLConstructorArrayProperty(
+                    "values", FXMLType.of(String[].class), FXMLType.of(String.class),
+                    List.of(new FXMLLiteral("a"), new FXMLLiteral("b"))
+            );
+            FXMLObject obj = new FXMLObject(
+                    new FXMLExposedIdentifier("myBean"),
+                    new FXMLClassType(ConstructorArrayBean.class),
+                    Optional.empty(), List.of(propValues)
+            );
+            AbstractFXMLObjectAndDependencies construction = new AbstractFXMLObjectAndDependencies(
+                    obj, List.of(propValues), List.of()
+            );
+            StringBuilder builder = new StringBuilder();
+
+            invokePrepareArgumentsLists(builder, construction, context);
+
+            assertThat(builder.toString()).isEqualTo("new java.lang.String[] {\"a\", \"b\"}");
+        }
+
         /// Verifies that an [FXMLCopyAndDependencies] appends the `$$`-prefixed source name to the builder.
         @Test
         void fxmlCopyAndDependenciesAppendsPrefixedSourceName() throws Exception {
@@ -3562,7 +3607,26 @@ public class FXMLSourceCodeBuilderTest {
             assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString()).isEmpty();
         }
 
-        /// Verifies that a `FXMLInclude` with a controller produces the controller suffix assignment.
+        /// Verifies that a `FXMLObject` with a `FXMLArrayProperty` produces a setter call with an array.
+        @Test
+        void fxmlObjectWithArrayPropertyProducesSetterCallWithArray() throws Exception {
+            SourceCodeGeneratorContext context = buildContext();
+            FXMLLiteral val1 = new FXMLLiteral("0.1");
+            FXMLLiteral val2 = new FXMLLiteral("0.2");
+            FXMLArrayProperty arrayProp = new FXMLArrayProperty(
+                    "dividerPositions", "setDividerPositions", FXMLType.of(double[].class), FXMLType.of(double.class),
+                    List.of(val1, val2)
+            );
+            FXMLObject root = buildRoot(new FXMLExposedIdentifier("splitPane"), List.of(arrayProp));
+            FXMLDocument document = buildDocument(root, List.of());
+
+            invokeAddConstructorEpilogue(context, document);
+
+            assertThat(context.sourceCode(SourcePart.CONSTRUCTOR_EPILOGUE).toString())
+                    .contains("splitPane.setDividerPositions(new double[] {0.1, 0.2});");
+        }
+
+        /// Verifies that a `FXMLObject` with a `FXMLInclude` with a controller produces the controller suffix assignment.
         @Test
         void fxmlIncludeWithControllerProducesControllerSuffixAssignment() throws Exception {
             SourceCodeGeneratorContext context = buildContext();

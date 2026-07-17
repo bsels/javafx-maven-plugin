@@ -1,7 +1,7 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorValueProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
 
 import java.util.List;
@@ -14,7 +14,7 @@ import java.util.Objects;
 /// @param dependencies          The identifiers this object depends on.
 record AbstractFXMLObjectAndDependencies(
         AbstractFXMLObject object,
-        List<FXMLConstructorProperty> constructorProperties,
+        List<FXMLConstructorValueProperty> constructorProperties,
         List<FXMLIdentifier> dependencies
 ) implements Constructions {
 

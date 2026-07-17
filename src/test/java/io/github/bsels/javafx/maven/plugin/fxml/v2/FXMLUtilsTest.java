@@ -212,6 +212,19 @@ class FXMLUtilsTest {
     class FindCollectionValueTypeFromHierarchyTest {
 
         @Test
+        void shouldReturnArrayOfStringsForArrayOfListStrings() {
+            // Given – List<String>[]
+            FXMLType componentType = FXMLType.of(List.class, List.of(FXMLType.of(String.class)));
+            FXMLType type = new io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType(componentType);
+
+            // When
+            FXMLType result = FXMLUtils.findCollectionValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(new io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType(FXMLType.of(String.class)));
+        }
+
+        @Test
         void shouldReturnObjectTypeForFXMLWildcardType() {
             // Given
             FXMLType type = FXMLType.wildcard();
@@ -359,6 +372,19 @@ class FXMLUtilsTest {
     class FindMapKeyTypeFromHierarchyTest {
 
         @Test
+        void shouldReturnArrayOfStringsForArrayOfMapStrings() {
+            // Given – Map<String, Integer>[]
+            FXMLType componentType = FXMLType.of(Map.class, List.of(FXMLType.of(String.class), FXMLType.of(Integer.class)));
+            FXMLType type = new io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType(componentType);
+
+            // When
+            FXMLType result = FXMLUtils.findMapKeyTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(new io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType(FXMLType.of(String.class)));
+        }
+
+        @Test
         void shouldReturnObjectTypeForFXMLWildcardType() {
             // Given
             FXMLType type = FXMLType.wildcard();
@@ -492,6 +518,19 @@ class FXMLUtilsTest {
 
     @Nested
     class FindMapValueTypeFromHierarchyTest {
+
+        @Test
+        void shouldReturnArrayOfIntegersForArrayOfMapStrings() {
+            // Given – Map<String, Integer>[]
+            FXMLType componentType = FXMLType.of(Map.class, List.of(FXMLType.of(String.class), FXMLType.of(Integer.class)));
+            FXMLType type = new io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType(componentType);
+
+            // When
+            FXMLType result = FXMLUtils.findMapValueTypeFromHierarchy(type);
+
+            // Then
+            assertThat(result).isEqualTo(new io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType(FXMLType.of(Integer.class)));
+        }
 
         @Test
         void shouldReturnObjectTypeForFXMLWildcardType() {

@@ -39,6 +39,8 @@ class FXMLValueTest {
             assertThat(obj.type()).isEqualTo(stringType);
             assertThat(obj.factoryMethod()).isEqualTo(noFactory);
             assertThat(obj.properties()).isEmpty();
+
+            assertThat(new FXMLObject(id, stringType, noFactory, null).properties()).isEmpty();
         }
 
         @Test
@@ -122,6 +124,17 @@ class FXMLValueTest {
             assertThat(new FXMLCollection(id, uncompiledGeneric, noFactory, List.of()).type()).isEqualTo(
                     uncompiledGeneric);
             assertThat(new FXMLCollection(id, wildcard, noFactory, List.of()).type()).isEqualTo(wildcard);
+            assertThat(new FXMLCollection(id, uncompiledClass, noFactory, null).values()).isEmpty();
+            assertThat(new FXMLCollection(id, uncompiledGeneric, noFactory, null).values()).isEmpty();
+            assertThat(new FXMLCollection(id, wildcard, noFactory, null).values()).isEmpty();
+        }
+
+        @Test
+        void shouldThrowIaeForArrayType() {
+            FXMLType arrayType = FXMLType.of(String[].class);
+            assertThatThrownBy(() -> new FXMLCollection(id, arrayType, noFactory, List.of()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("must be a Collection");
         }
     }
 
@@ -290,6 +303,53 @@ class FXMLValueTest {
                     Map.of()
             ).type()).isEqualTo(
                     wildcard);
+            assertThat(new FXMLMap(
+                    id,
+                    uncompiledClass,
+                    FXMLType.OBJECT,
+                    stringType,
+                    noFactory,
+                    null
+            ).entries()).isEmpty();
+            assertThat(new FXMLMap(
+                    id,
+                    uncompiledGeneric,
+                    FXMLType.OBJECT,
+                    stringType,
+                    noFactory,
+                    null
+            ).entries()).isEmpty();
+            assertThat(new FXMLMap(
+                    id,
+                    wildcard,
+                    FXMLType.OBJECT,
+                    stringType,
+                    noFactory,
+                    null
+            ).entries()).isEmpty();
+            assertThat(new FXMLMap(
+                    id,
+                    uncompiledGeneric,
+                    FXMLType.OBJECT,
+                    stringType,
+                    noFactory,
+                    Map.of()
+            ).type()).isEqualTo(uncompiledGeneric);
+        }
+
+        @Test
+        void shouldThrowIaeForArrayType() {
+            FXMLType arrayType = FXMLType.of(String[].class);
+            assertThatThrownBy(() -> new FXMLMap(
+                    id,
+                    arrayType,
+                    FXMLType.OBJECT,
+                    stringType,
+                    noFactory,
+                    Map.of()
+            ))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("must be a Map");
         }
     }
 

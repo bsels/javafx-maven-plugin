@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import io.github.bsels.javafx.maven.plugin.examples.ReadOnlyArrayBean?>
+<?import java.lang.String?>
+
+<ReadOnlyArrayBean xmlns:fx="http://javafx.com/fxml">
+    <values>
+        <String fx:value="one"/>
+        <String fx:value="two"/>
+    </values>
+</ReadOnlyArrayBean>

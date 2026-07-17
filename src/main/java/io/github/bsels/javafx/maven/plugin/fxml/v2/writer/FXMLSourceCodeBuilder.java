@@ -2,6 +2,7 @@ package io.github.bsels.javafx.maven.plugin.fxml.v2.writer;
 
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLDocument;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLLazyLoadedDocument;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLController;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerField;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.controller.FXMLControllerMethod;
@@ -11,9 +12,11 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLNamedRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.FXMLUtils;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLCollectionProperties;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorArrayProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorValueProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLMapProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLObjectProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
@@ -37,8 +40,6 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLReference;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLResource;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLTranslation;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLValue;
-import io.github.bsels.javafx.maven.plugin.utils.CheckAndCast;
-import io.github.bsels.javafx.maven.plugin.utils.Utils;
 import org.apache.maven.plugin.logging.Log;
 
 import javax.annotation.processing.Generated;
@@ -760,7 +761,7 @@ public final class FXMLSourceCodeBuilder {
         return switch (constructions) {
             case AbstractFXMLObjectAndDependencies(
                     AbstractFXMLObject object,
-                    List<FXMLConstructorProperty> properties,
+                    List<FXMLConstructorValueProperty> properties,
                     _
             ) -> {
                 FXMLConstructor constructor = object.factoryMethod()
@@ -769,25 +770,29 @@ public final class FXMLSourceCodeBuilder {
                                 FXMLUtils.findRawType(object.type()),
                                 properties
                         ));
-                Map<String, FXMLConstructorProperty> propertyMap = properties.stream()
-                        .collect(Collectors.toMap(FXMLConstructorProperty::name, Function.identity()));
+                Map<String, FXMLConstructorValueProperty> propertyMap = properties.stream()
+                        .collect(Collectors.toMap(FXMLProperty::name, Function.identity()));
                 boolean first = true;
                 for (ConstructorProperty property : constructor.properties()) {
                     if (!first) {
                         builder.append(", ");
                     }
                     first = false;
-                    FXMLConstructorProperty fxmlConstructorProperty = propertyMap.get(property.name());
-                    if (fxmlConstructorProperty == null) {
+                    FXMLConstructorValueProperty fxmlProperty = propertyMap.get(property.name());
+                    if (fxmlProperty == null) {
                         builder.append(
                                 property.defaultValue()
                                         .map(v -> typeHelper.encodeFXMLValue(context, v, property.type()))
                                         .orElseGet(() -> typeHelper.defaultTypeValue(property.type()))
                         );
                     } else {
-                        builder.append(typeHelper.encodeFXMLValue(
-                                context, CONSTRUCTOR_VARIABLE_PREFIX, fxmlConstructorProperty.value(), property.type()
-                        ));
+                        builder.append(switch (fxmlProperty) {
+                            case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> typeHelper.encodeFXMLValue(
+                                    context, CONSTRUCTOR_VARIABLE_PREFIX, value, property.type()
+                            );
+                            case FXMLConstructorArrayProperty(_, _, FXMLType elementType, List<AbstractFXMLValue> values) ->
+                                    typeHelper.encodeFXMLArray(context, CONSTRUCTOR_VARIABLE_PREFIX, values, elementType);
+                        });
                     }
                 }
                 yield builder;
@@ -809,14 +814,17 @@ public final class FXMLSourceCodeBuilder {
                     new AbstractFXMLObjectAndDependencies(fxmlCollection, List.of(), List.of());
             case FXMLMap fxmlMap -> new AbstractFXMLObjectAndDependencies(fxmlMap, List.of(), List.of());
             case FXMLObject fxmlObject -> {
-                List<FXMLConstructorProperty> constructorProperties = fxmlObject.properties()
+                List<FXMLConstructorValueProperty> constructorProperties = fxmlObject.properties()
                         .stream()
-                        .gather(CheckAndCast.of(FXMLConstructorProperty.class))
+                        .filter(p -> p instanceof FXMLConstructorValueProperty)
+                        .map(p -> (FXMLConstructorValueProperty) p)
                         .toList();
                 List<FXMLIdentifier> dependencies = constructorProperties.stream()
-                        .map(FXMLConstructorProperty::value)
-                        .map(this::findIdentifierForValue)
-                        .gather(Utils.optional())
+                        .flatMap(p -> switch (p) {
+                            case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> findIdentifierForValue(value).stream();
+                            case FXMLConstructorArrayProperty(_, _, _, List<AbstractFXMLValue> values) ->
+                                    values.stream().flatMap(v -> findIdentifierForValue(v).stream());
+                        })
                         .toList();
                 yield new AbstractFXMLObjectAndDependencies(fxmlObject, constructorProperties, dependencies);
             }
@@ -971,6 +979,8 @@ public final class FXMLSourceCodeBuilder {
                 value.forEach(v -> addConstructorEpilogue(context, v));
             }
             case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> addConstructorEpilogue(context, value);
+            case FXMLConstructorArrayProperty(_, _, _, List<AbstractFXMLValue> value) ->
+                    value.forEach(v -> addConstructorEpilogue(context, v));
             case FXMLMapProperty(
                     _,
                     String getter,
@@ -1020,6 +1030,16 @@ public final class FXMLSourceCodeBuilder {
                         .append(typeHelper.encodeFXMLValue(context, value, type))
                         .append(");\n");
                 addConstructorEpilogue(context, value);
+            }
+            case FXMLArrayProperty(
+                    _, String setter, _, FXMLType elementType, List<AbstractFXMLValue> values
+            ) -> {
+                sourceCode.append(identifier)
+                        .append('.')
+                        .append(setter)
+                        .append("(")
+                        .append(typeHelper.encodeFXMLArray(context, identifier, values, elementType))
+                        .append(");\n");
             }
         }
     }
@@ -1259,7 +1279,7 @@ public final class FXMLSourceCodeBuilder {
     /// @param key      The key representing the element to be created.
     /// @param supplier A supplier that provides the stream of generated elements if the key is new.
     /// @return A stream containing the generated element(s) if the key was newly added to the set,
-    ///                                                                                                                                                                                                                                                                                 or an empty stream if the key was already present.
+    ///                                                                                                                                                                                                                                                                                         or an empty stream if the key was already present.
     private <K, T> Stream<T> singleCreation(Set<K> set, K key, Supplier<Stream<T>> supplier) {
         if (set.add(key)) {
             return supplier.get();

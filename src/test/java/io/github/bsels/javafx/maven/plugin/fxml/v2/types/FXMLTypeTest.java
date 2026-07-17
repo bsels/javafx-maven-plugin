@@ -43,6 +43,18 @@ class FXMLTypeTest {
         }
 
         @Test
+        void ofClassAndGenericsShouldReturnFXMLArrayTypeIfArrayClassAndNotEmpty() {
+            FXMLType typeArgument = FXMLType.of(Integer.class);
+            FXMLType type = FXMLType.of(List[].class, List.of(typeArgument));
+            assertThat(type).isInstanceOf(FXMLArrayType.class);
+            FXMLArrayType arrayType = (FXMLArrayType) type;
+            assertThat(arrayType.componentType()).isInstanceOf(FXMLGenericType.class);
+            FXMLGenericType genericComponentType = (FXMLGenericType) arrayType.componentType();
+            assertThat(genericComponentType.type()).isEqualTo(List.class);
+            assertThat(genericComponentType.typeArguments()).containsExactly(typeArgument);
+        }
+
+        @Test
         void ofClassAndGenericsShouldThrowNpeIfNull() {
             assertThatThrownBy(() -> FXMLType.of((Class<?>) null, List.of()))
                     .isInstanceOf(NullPointerException.class)
@@ -84,6 +96,16 @@ class FXMLTypeTest {
             FXMLType type2 = FXMLType.wildcard();
             assertThat(type1).isSameAs(FXMLWildcardType.INSTANCE);
             assertThat(type1).isSameAs(type2);
+        }
+    }
+
+    @Nested
+    class FXMLArrayTypeTest {
+        @Test
+        void shouldThrowNpeForNull() {
+            assertThatThrownBy(() -> new FXMLArrayType(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("`componentType` must not be null");
         }
     }
 

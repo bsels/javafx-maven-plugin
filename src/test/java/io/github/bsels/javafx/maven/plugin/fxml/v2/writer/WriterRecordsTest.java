@@ -5,6 +5,8 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLRootIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorValueProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.AbstractFXMLObject;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.values.FXMLCopy;
@@ -157,8 +159,8 @@ class WriterRecordsTest {
         /// Verifies that a valid instance stores all fields correctly and copies lists defensively.
         @Test
         void validInstanceStoresFieldsAndCopiesLists() {
-            FXMLConstructorProperty prop = new FXMLConstructorProperty("x", STRING_TYPE, LITERAL);
-            List<FXMLConstructorProperty> mutableProps = new java.util.ArrayList<>(List.of(prop));
+            FXMLConstructorValueProperty prop = new FXMLConstructorProperty("x", STRING_TYPE, LITERAL);
+            List<FXMLConstructorValueProperty> mutableProps = new java.util.ArrayList<>(List.of(prop));
             AbstractFXMLObjectAndDependencies record =
                     new AbstractFXMLObjectAndDependencies(FXML_OBJECT, mutableProps, List.of(ROOT_IDENTIFIER));
 

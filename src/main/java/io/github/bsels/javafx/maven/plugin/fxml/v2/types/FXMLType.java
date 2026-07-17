@@ -5,7 +5,8 @@ import java.util.Objects;
 
 /// A type in FXML.
 public sealed interface FXMLType
-        permits FXMLClassType, FXMLGenericType, FXMLUncompiledClassType, FXMLUncompiledGenericType, FXMLWildcardType {
+        permits FXMLArrayType, FXMLClassType, FXMLGenericType, FXMLUncompiledClassType, FXMLUncompiledGenericType,
+                FXMLWildcardType {
 
     /// An [FXMLType] representing the `Object` class.
     FXMLType OBJECT = new FXMLClassType(Object.class);
@@ -17,7 +18,11 @@ public sealed interface FXMLType
     /// @throws NullPointerException If `clazz` is null
     static FXMLType of(Class<?> clazz) {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
-        return new FXMLClassType(clazz);
+        if (clazz.isArray()) {
+            return new FXMLArrayType(of(clazz.getComponentType()));
+        } else {
+            return new FXMLClassType(clazz);
+        }
     }
 
     /// Creates an [FXMLType] based on the specified class and generic arguments.
@@ -30,9 +35,12 @@ public sealed interface FXMLType
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         Objects.requireNonNull(genericTypes, "`genericTypes` must not be null");
         if (genericTypes.isEmpty()) {
-            return new FXMLClassType(clazz);
+            return FXMLType.of(clazz);
+        } else if (clazz.isArray()) {
+            return new FXMLArrayType(new FXMLGenericType(clazz.getComponentType(), genericTypes));
+        } else {
+            return new FXMLGenericType(clazz, genericTypes);
         }
-        return new FXMLGenericType(clazz, genericTypes);
     }
 
     /// Creates an [FXMLType] for an uncompiled class and its generic arguments.

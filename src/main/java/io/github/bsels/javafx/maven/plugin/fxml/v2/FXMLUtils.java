@@ -1,5 +1,6 @@
 package io.github.bsels.javafx.maven.plugin.fxml.v2;
 
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
@@ -61,7 +62,8 @@ public final class FXMLUtils {
                 type,
                 Object.class,
                 Function.identity(),
-                (clazz, _) -> clazz
+                (clazz, _) -> clazz,
+                componentType -> findRawType(componentType).arrayType()
         );
     }
 
@@ -291,7 +293,12 @@ public final class FXMLUtils {
                     resolveTypeMapping(clazz, mapping, new HashSet<>());
                     TypeVariable<?>[] typeParameters = targetInterface.getTypeParameters();
                     return mapping.getOrDefault(typeParameters[typeArgumentIndex].getName(), FXMLType.OBJECT);
-                }
+                },
+                componentType -> new FXMLArrayType(findFXMLGenericTypeFromHierarchy(
+                        componentType,
+                        targetInterface,
+                        typeArgumentIndex
+                ))
         );
     }
 
@@ -532,12 +539,14 @@ public final class FXMLUtils {
             FXMLType type,
             T defaultValue,
             Function<Class<?>, T> simpleTypeResolver,
-            BiFunction<Class<?>, List<FXMLType>, T> genericTypeResolver
+            BiFunction<Class<?>, List<FXMLType>, T> genericTypeResolver,
+            Function<FXMLType, T> arrayTypeResolver
     ) {
         return switch (type) {
             case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> defaultValue;
             case FXMLClassType(Class<?> clazz) -> simpleTypeResolver.apply(clazz);
             case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) -> genericTypeResolver.apply(clazz, generics);
+            case FXMLArrayType(FXMLType componentType) -> arrayTypeResolver.apply(componentType);
         };
     }
 

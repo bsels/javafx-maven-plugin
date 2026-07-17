@@ -12,8 +12,9 @@ import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLExposedIdenti
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLFactoryMethod;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLIdentifier;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.identifiers.FXMLInternalIdentifier;
-import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLConstructorValueProperty;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.properties.FXMLProperty;
+import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLArrayType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLClassType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLGenericType;
 import io.github.bsels.javafx.maven.plugin.fxml.v2.types.FXMLType;
@@ -364,6 +365,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
             case FXMLUncompiledClassType(String className) -> createBaseTypeSourceCode(context, className);
             case FXMLUncompiledGenericType(String className, List<FXMLType> generics) ->
                     createGenericTypeSourceCode(context, className, generics);
+            case FXMLArrayType(FXMLType componentType) -> typeToSourceCode(context, componentType) + "[]";
             case FXMLWildcardType _ -> "?";
         };
     }
@@ -371,16 +373,16 @@ final class FXMLSourceCodeBuilderTypeHelper {
     /// Finds the best matching constructor for the given class and its property names.
     ///
     /// @param clazz      The [Class] to inspect. Must not be null.
-    /// @param properties The list of [FXMLConstructorProperty] to match. Must not be null.
+    /// @param properties The list of [FXMLConstructorValueProperty] to match. Must not be null.
     /// @return The [FXMLConstructor] with the lowest number of properties that satisfy the criteria.
     /// @throws NullPointerException     If any input is null.
     /// @throws IllegalArgumentException If no matching constructor is found.
-    public FXMLConstructor findMinimalConstructor(Class<?> clazz, List<FXMLConstructorProperty> properties)
+    public FXMLConstructor findMinimalConstructor(Class<?> clazz, List<FXMLConstructorValueProperty> properties)
             throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(clazz, "`clazz` must not be null");
         Objects.requireNonNull(properties, "`properties` must not be null");
         List<String> names = properties.stream()
-                .map(FXMLConstructorProperty::name)
+                .map(FXMLProperty::name)
                 .toList();
         List<FXMLConstructor> constructors = getNamedParameterConstructors(clazz);
 
@@ -394,18 +396,18 @@ final class FXMLSourceCodeBuilderTypeHelper {
     /// Finds the best matching factory method for the given [FXMLFactoryMethod] and property names.
     ///
     /// @param factoryMethod The [FXMLFactoryMethod] to inspect. Must not be null.
-    /// @param properties    The list of [FXMLConstructorProperty] to match. Must not be null.
+    /// @param properties    The list of [FXMLConstructorValueProperty] to match. Must not be null.
     /// @return The [FXMLConstructor] with the fewest properties satisfying the criteria.
     /// @throws NullPointerException     If any input is null.
     /// @throws IllegalArgumentException If no matching factory method is found.
     public FXMLConstructor findFactoryMethodConstructor(
             FXMLFactoryMethod factoryMethod,
-            List<FXMLConstructorProperty> properties
+            List<FXMLConstructorValueProperty> properties
     ) throws NullPointerException, IllegalArgumentException {
         Objects.requireNonNull(factoryMethod, "`factoryMethod` must not be null");
         Objects.requireNonNull(properties, "`properties` must not be null");
         List<String> names = properties.stream()
-                .map(FXMLConstructorProperty::name)
+                .map(FXMLProperty::name)
                 .toList();
         return getNamedParameterConstructors(factoryMethod)
                 .stream()
@@ -413,6 +415,35 @@ final class FXMLSourceCodeBuilderTypeHelper {
                 .min(Comparator.comparing(FXMLConstructor::properties, Comparator.comparingInt(List::size)))
                 .orElseThrow(() -> new IllegalArgumentException("No matching factory method found for properties: %s".formatted(
                         properties)));
+    }
+
+    /// Encodes an array of FXML values as Java source code.
+    ///
+    /// @param context          The current [SourceCodeGeneratorContext].
+    /// @param identifierPrefix The prefix to use for identifiers.
+    /// @param values           The list of [AbstractFXMLValue]s to encode.
+    /// @param elementType      The type of the elements in the array.
+    /// @return The Java source code representing the array initialization.
+    public String encodeFXMLArray(
+            SourceCodeGeneratorContext context,
+            String identifierPrefix,
+            List<AbstractFXMLValue> values,
+            FXMLType elementType
+    ) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("new ")
+                .append(typeToSourceCode(context, elementType))
+                .append("[] {");
+        boolean first = true;
+        for (AbstractFXMLValue value : values) {
+            if (!first) {
+                builder.append(", ");
+            }
+            builder.append(encodeFXMLValue(context, identifierPrefix, value, elementType));
+            first = false;
+        }
+        builder.append("}");
+        return builder.toString();
     }
 
     /// Renders the source code for a specific [FXMLMethod].
@@ -572,6 +603,7 @@ final class FXMLSourceCodeBuilderTypeHelper {
             case FXMLClassType(Class<?> typeClass) -> switch (interfaceType) {
                 case FXMLClassType(Class<?> interfaceClass) -> predicate.test(typeClass, interfaceClass);
                 case FXMLGenericType(Class<?> interfaceClass, _) -> predicate.test(typeClass, interfaceClass);
+                case FXMLArrayType _ -> false;
                 case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> true;
             };
             case FXMLGenericType(Class<?> typeClass, List<FXMLType> parameters) -> switch (interfaceType) {
@@ -581,7 +613,14 @@ final class FXMLSourceCodeBuilderTypeHelper {
                                 .mapToObj(i -> new FXMLTypePair(parameters.get(i), interfaceParameters.get(i)))
                                 .map(typePair -> canMatchType(typePair.type(), typePair.interfaceType(), predicate))
                                 .reduce(predicate.test(typeClass, interfaceClass), Boolean::logicalAnd);
+                case FXMLArrayType _ -> false;
                 case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> true;
+            };
+            case FXMLArrayType(FXMLType componentType) -> switch (interfaceType) {
+                case FXMLArrayType(FXMLType interfaceComponentType) ->
+                        canMatchType(componentType, interfaceComponentType, predicate);
+                case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _, FXMLClassType _, FXMLGenericType _ ->
+                        false;
             };
             case FXMLUncompiledClassType _, FXMLUncompiledGenericType _, FXMLWildcardType _ -> true;
         };
