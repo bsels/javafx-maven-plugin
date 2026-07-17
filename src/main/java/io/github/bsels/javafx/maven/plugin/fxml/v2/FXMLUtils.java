@@ -58,12 +58,13 @@ public final class FXMLUtils {
     /// @throws NullPointerException If `type` is null
     public static Class<?> findRawType(FXMLType type) throws NullPointerException {
         Objects.requireNonNull(type, "`type` must not be null");
-        return switch (type) {
-            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> Object.class;
-            case FXMLClassType(Class<?> clazz) -> clazz;
-            case FXMLGenericType(Class<?> clazz, _) -> clazz;
-            case FXMLArrayType(FXMLType componentType) -> findRawType(componentType).arrayType();
-        };
+        return findTypeInformation(
+                type,
+                Object.class,
+                Function.identity(),
+                (clazz, _) -> clazz,
+                componentType -> findRawType(componentType).arrayType()
+        );
     }
 
     /// Traverses the [FXMLType] hierarchy to find the [Collection] interface and extract its element type.
@@ -292,7 +293,12 @@ public final class FXMLUtils {
                     resolveTypeMapping(clazz, mapping, new HashSet<>());
                     TypeVariable<?>[] typeParameters = targetInterface.getTypeParameters();
                     return mapping.getOrDefault(typeParameters[typeArgumentIndex].getName(), FXMLType.OBJECT);
-                }
+                },
+                componentType -> new FXMLArrayType(findFXMLGenericTypeFromHierarchy(
+                        componentType,
+                        targetInterface,
+                        typeArgumentIndex
+                ))
         );
     }
 
@@ -533,12 +539,14 @@ public final class FXMLUtils {
             FXMLType type,
             T defaultValue,
             Function<Class<?>, T> simpleTypeResolver,
-            BiFunction<Class<?>, List<FXMLType>, T> genericTypeResolver
+            BiFunction<Class<?>, List<FXMLType>, T> genericTypeResolver,
+            Function<FXMLType, T> arrayTypeResolver
     ) {
         return switch (type) {
-            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _,  FXMLArrayType _ -> defaultValue;
+            case FXMLWildcardType _, FXMLUncompiledClassType _, FXMLUncompiledGenericType _ -> defaultValue;
             case FXMLClassType(Class<?> clazz) -> simpleTypeResolver.apply(clazz);
             case FXMLGenericType(Class<?> clazz, List<FXMLType> generics) -> genericTypeResolver.apply(clazz, generics);
+            case FXMLArrayType(FXMLType componentType) -> arrayTypeResolver.apply(componentType);
         };
     }
 
