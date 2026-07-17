@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2.0 - 2026-07-17
+
+### Minor
+
+Support array types next to the object, map, and collection types.
+
+### Patch
+
+Bumped dependencies:
+
+- Bumped 'tools.jackson:jackson-bom' to **3.2.1**
+- Bumped 'org.junit.jupiter:junit-jupiter-api' to **6.1.2**
+- Bumped 'io.github.bsels:semantic-version-maven-plugin' to **1.5.0**
+
 ## 2.1.2 - 2026-07-04
 
 ### Patch
