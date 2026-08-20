@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.2.1 - 2026-08-20
+
+### Patch
+
+Dependencies:
+
+- Bumped 'io.github.bsels:semantic-version-maven-plugin' to **1.6.1**
+- Bumped 'tools.jackson:jackson-bom' to **3.2.2**
+- Bumped 'org.junit.jupiter:junit-jupiter-api' to **6.1.3**
+- Bumped 'org.codehaus.plexus:plexus-java' to **1.6.0**
+- Bumped 'org.codehaus.plexus:plexus-archiver' to **4.13.0**
+- Bumped 'org.openjfx:javafx-controls' to **25.0.4**
+
 ## 2.2.0 - 2026-07-17
 
 ### Minor
