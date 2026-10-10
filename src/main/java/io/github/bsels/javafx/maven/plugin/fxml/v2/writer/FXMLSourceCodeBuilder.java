@@ -47,7 +47,6 @@ import java.io.File;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -175,9 +174,14 @@ public final class FXMLSourceCodeBuilder {
     /// @param log                    The Maven plugin logger for diagnostic output.
     /// @param defaultResourceBundle  The name of the default resource bundle for translations.
     /// @param addGeneratedAnnotation Whether to include the standard `@Generated` annotation.
+    /// @param buildTime              The build time to be used for the generated source code.
     /// @throws NullPointerException If `log` or `defaultResourceBundle` is null.
-    public FXMLSourceCodeBuilder(Log log, String defaultResourceBundle, boolean addGeneratedAnnotation)
-            throws NullPointerException {
+    public FXMLSourceCodeBuilder(
+            Log log,
+            String defaultResourceBundle,
+            boolean addGeneratedAnnotation,
+            ZonedDateTime buildTime
+    ) throws NullPointerException {
         this.log = Objects.requireNonNull(log, "`log` must not be null");
         this.defaultResourceBundle = Objects.requireNonNull(
                 defaultResourceBundle,
@@ -187,7 +191,7 @@ public final class FXMLSourceCodeBuilder {
         this.typeHelper = new FXMLSourceCodeBuilderTypeHelper();
         this.propertyRecursionHelper = new FXMLPropertyRecursionHelper();
         this.addGeneratedAnnotation = addGeneratedAnnotation;
-        this.buildTime = ZonedDateTime.now(ZoneOffset.UTC);
+        this.buildTime = Objects.requireNonNull(buildTime, "`buildTime` must not be null");
     }
 
     /// Generates the Java source code for the specified [FXMLDocument] and package.
@@ -790,8 +794,9 @@ public final class FXMLSourceCodeBuilder {
                             case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> typeHelper.encodeFXMLValue(
                                     context, CONSTRUCTOR_VARIABLE_PREFIX, value, property.type()
                             );
-                            case FXMLConstructorArrayProperty(_, _, FXMLType elementType, List<AbstractFXMLValue> values) ->
-                                    typeHelper.encodeFXMLArray(context, CONSTRUCTOR_VARIABLE_PREFIX, values, elementType);
+                            case FXMLConstructorArrayProperty(
+                                    _, _, FXMLType elementType, List<AbstractFXMLValue> values
+                            ) -> typeHelper.encodeFXMLArray(context, CONSTRUCTOR_VARIABLE_PREFIX, values, elementType);
                         });
                     }
                 }
@@ -821,7 +826,8 @@ public final class FXMLSourceCodeBuilder {
                         .toList();
                 List<FXMLIdentifier> dependencies = constructorProperties.stream()
                         .flatMap(p -> switch (p) {
-                            case FXMLConstructorProperty(_, _, AbstractFXMLValue value) -> findIdentifierForValue(value).stream();
+                            case FXMLConstructorProperty(_, _, AbstractFXMLValue value) ->
+                                    findIdentifierForValue(value).stream();
                             case FXMLConstructorArrayProperty(_, _, _, List<AbstractFXMLValue> values) ->
                                     values.stream().flatMap(v -> findIdentifierForValue(v).stream());
                         })
@@ -1279,7 +1285,7 @@ public final class FXMLSourceCodeBuilder {
     /// @param key      The key representing the element to be created.
     /// @param supplier A supplier that provides the stream of generated elements if the key is new.
     /// @return A stream containing the generated element(s) if the key was newly added to the set,
-    ///                                                                                                                                                                                                                                                                                         or an empty stream if the key was already present.
+    ///                                                                                                                                                                                                                                                                                                                 or an empty stream if the key was already present.
     private <K, T> Stream<T> singleCreation(Set<K> set, K key, Supplier<Stream<T>> supplier) {
         if (set.add(key)) {
             return supplier.get();
