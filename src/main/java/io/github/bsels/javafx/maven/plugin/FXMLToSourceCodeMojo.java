@@ -352,15 +352,16 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         try {
             return Optional.of(ZonedDateTime.parse(outputTimestamp));
         } catch (DateTimeParseException _) {
-            try {
-                return Optional.of(LocalDate.parse(outputTimestamp, DateTimeFormatter.ISO_LOCAL_DATE)
-                        .atStartOfDay(ZoneOffset.UTC));
-            } catch (Exception ex) {
-                throw new IllegalArgumentException(
-                        "Invalid project.build.outputTimestamp format: %s".formatted(outputTimestamp),
-                        ex
-                );
-            }
+            // Not a pure ISO-8601 timestamp, proceed to local-date parsing
+        }
+        try {
+            return Optional.of(LocalDate.parse(outputTimestamp, DateTimeFormatter.ISO_LOCAL_DATE)
+                    .atStartOfDay(ZoneOffset.UTC));
+        } catch (Exception ex) {
+            throw new IllegalArgumentException(
+                    "Invalid project.build.outputTimestamp format: %s".formatted(outputTimestamp),
+                    ex
+            );
         }
     }
 }
