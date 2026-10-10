@@ -29,7 +29,8 @@ jobs:
         id: bumpVersion
         run: |
           ./mvnw --no-transfer-progress --batch-mode semantic-version:update \
-          -Dversioning.update.scripts=./update-readme.sh -Dversioning.git=COMMIT
+          -Dversioning.update.scripts=./update-readme.sh -Dversioning.git=COMMIT \
+          -Dversioning.handleProjectBuildTimestamp=UPSERT
           VERSION=$(./mvnw --no-transfer-progress --batch-mode help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
       - name: Create tag and push
