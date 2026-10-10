@@ -15,4 +15,5 @@ sections:
 {{#descriptions}}
 - {{description}}
 {{/descriptions}}
+
 {{/changes}}
