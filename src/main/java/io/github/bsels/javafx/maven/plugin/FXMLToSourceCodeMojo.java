@@ -32,6 +32,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -70,6 +76,9 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     /// Whether to add the `@Generated` annotation to generated files.
     @Parameter(property = "javafx.fxml.add.generated.annotation", defaultValue = "true", required = true)
     boolean addGeneratedAnnotation = true;
+    /// The project build output timestamp for reproducible builds.
+    @Parameter(defaultValue = "${project.build.outputTimestamp}", readonly = true)
+    String outputTimestamp;
 
     /// Initializes a new [FXMLToSourceCodeMojo] instance.
     ///
@@ -145,10 +154,13 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
         Log log = getLog();
         FXMLReader fxmlReader = new FXMLReader(log);
         FXMLDocumentParser fxmlDocumentParser = new FXMLDocumentParser(log, charset);
+        ZonedDateTime buildTime = parseOutputTimestamp(outputTimestamp)
+                .orElseGet(() -> ZonedDateTime.now(ZoneOffset.UTC));
         FXMLSourceCodeBuilder fxmlSourceCodeBuilder = new FXMLSourceCodeBuilder(
                 log,
                 resourceBundleObject,
-                addGeneratedAnnotation
+                addGeneratedAnnotation,
+                buildTime
         );
         project.addCompileSourceRoot(generatedSourceDirectory.toAbsolutePath().toString());
         for (FXMLDirectory fxmlDirectory : fxmlDirectories) {
@@ -313,6 +325,43 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
             return fxmlList;
         } catch (IOException e) {
             throw new MojoExecutionException("Unable to read FXML directory", e);
+        }
+    }
+
+    /// Parses a Maven output timestamp string into a [ZonedDateTime].
+    /// Supports both epoch seconds integers and ISO-8601 date-time strings.
+    ///
+    /// 1. Try parsing as epoch seconds (numeric string)
+    /// 2. Try parsing as ISO-8601 date-time
+    /// 3. Fallback for local-date (YYYY-MM-DD) if specified without time
+    ///
+    /// @param outputTimestamp The raw string value from `${project.build.outputTimestamp}`.
+    /// @return The parsed [ZonedDateTime] in an optional or empty if the input is null or blank
+    /// @throws IllegalArgumentException if the input is invalid
+    private Optional<ZonedDateTime> parseOutputTimestamp(String outputTimestamp) throws IllegalArgumentException {
+        if (outputTimestamp == null || outputTimestamp.isBlank()) {
+            return Optional.empty();
+        }
+        outputTimestamp = outputTimestamp.strip();
+        try {
+            long epochSeconds = Long.parseLong(outputTimestamp);
+            return Optional.of(Instant.ofEpochSecond(epochSeconds).atZone(ZoneOffset.UTC));
+        } catch (NumberFormatException _) {
+            // Not a pure number, proceed to ISO-8601 parsing
+        }
+        try {
+            return Optional.of(ZonedDateTime.parse(outputTimestamp));
+        } catch (DateTimeParseException _) {
+            // Not a pure ISO-8601 timestamp, proceed to local-date parsing
+        }
+        try {
+            return Optional.of(LocalDate.parse(outputTimestamp, DateTimeFormatter.ISO_LOCAL_DATE)
+                    .atStartOfDay(ZoneOffset.UTC));
+        } catch (Exception ex) {
+            throw new IllegalArgumentException(
+                    "Invalid project.build.outputTimestamp format: %s".formatted(outputTimestamp),
+                    ex
+            );
         }
     }
 }

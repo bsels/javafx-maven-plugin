@@ -53,10 +53,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Method;
@@ -95,10 +91,12 @@ public class FXMLSourceCodeBuilderTest {
                 .isNotNull()
                 .startsWith("FXMLReader[log=");
 
-        MockedStatic<ZonedDateTime> zonedDateTimeMock = Mockito.mockStatic(ZonedDateTime.class);
-        zonedDateTimeMock.when(() -> ZonedDateTime.now(ZoneOffset.UTC)).thenReturn(ZONED_DATE_TIME_NOW_MOCK);
-        classUnderTest = new FXMLSourceCodeBuilder(log, "org.example.Translations.RESOURCE_BUNDLE", true);
-        zonedDateTimeMock.close();
+        classUnderTest = new FXMLSourceCodeBuilder(
+                log,
+                "org.example.Translations.RESOURCE_BUNDLE",
+                true,
+                ZONED_DATE_TIME_NOW_MOCK
+        );
     }
 
     @AfterEach
@@ -131,7 +129,10 @@ public class FXMLSourceCodeBuilderTest {
         /// and constructor assignments using both direct and variable-based construction.
         @Test
         void constructorArrayScenario() throws MojoExecutionException {
-            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/ConstructorArrayScenario.fxml"), "com.example");
+            String sourceCode = classUnderTest.generateSourceCode(
+                    parse("/examples/ConstructorArrayScenario.fxml"),
+                    "com.example"
+            );
             assertThat(sourceCode)
                     .contains("SimpleBean $$myDependency = new SimpleBean();")
                     .contains("myDependency = $$myDependency;")
@@ -141,13 +142,17 @@ public class FXMLSourceCodeBuilderTest {
                     .contains("super(new Object[] {myDependency, $internalVariable$000, $internalVariable$001});");
 
             int dependencyAssignment = sourceCode.indexOf("myDependency = $$myDependency;");
-            int constructorCall = sourceCode.indexOf("super(new Object[] {myDependency, $internalVariable$000, $internalVariable$001});");
+            int constructorCall = sourceCode.indexOf(
+                    "super(new Object[] {myDependency, $internalVariable$000, $internalVariable$001});");
             assertThat(dependencyAssignment).isLessThan(constructorCall);
         }
 
         @Test
         void colorDefinitions() throws MojoExecutionException {
-            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/ColorDefinitions.fxml"), "com.example");
+            String sourceCode = classUnderTest.generateSourceCode(
+                    parse("/examples/ColorDefinitions.fxml"),
+                    "com.example"
+            );
             assertThat(sourceCode)
                     .contains("package com.example;")
                     .contains("import javafx.scene.paint.Color;")
@@ -186,7 +191,10 @@ public class FXMLSourceCodeBuilderTest {
         /// field and map entries for both a copy and a reference.
         @Test
         void mapWithReferences() throws MojoExecutionException {
-            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/MapWithReferences.fxml"), "com.example");
+            String sourceCode = classUnderTest.generateSourceCode(
+                    parse("/examples/MapWithReferences.fxml"),
+                    "com.example"
+            );
             assertThat(sourceCode)
                     .contains("package com.example;")
                     .contains("import java.util.HashMap;")
@@ -204,7 +212,10 @@ public class FXMLSourceCodeBuilderTest {
         /// with a `Label` child and static property calls using element syntax.
         @Test
         void gridPaneStaticPropertyElement() throws MojoExecutionException {
-            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/GridPaneStaticPropertyElement.fxml"), "com.example");
+            String sourceCode = classUnderTest.generateSourceCode(
+                    parse("/examples/GridPaneStaticPropertyElement.fxml"),
+                    "com.example"
+            );
             assertThat(sourceCode)
                     .contains("package com.example;")
                     .contains("import javafx.scene.layout.GridPane;")
@@ -221,7 +232,10 @@ public class FXMLSourceCodeBuilderTest {
         /// with a `Label` child and static property calls using attribute syntax.
         @Test
         void gridPaneStaticPropertyAttribute() throws MojoExecutionException {
-            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/GridPaneStaticPropertyAttribute.fxml"), "com.example");
+            String sourceCode = classUnderTest.generateSourceCode(
+                    parse("/examples/GridPaneStaticPropertyAttribute.fxml"),
+                    "com.example"
+            );
             assertThat(sourceCode)
                     .contains("package com.example;")
                     .contains("import javafx.scene.layout.GridPane;")
@@ -238,7 +252,8 @@ public class FXMLSourceCodeBuilderTest {
         /// with explicit `Integer` variables for row and column indices.
         @Test
         void gridPaneStaticPropertyElementExplicitValue() throws MojoExecutionException {
-            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/GridPaneStaticPropertyElementExplicitValue.fxml"), "com.example");
+            String sourceCode = classUnderTest.generateSourceCode(
+                    parse("/examples/GridPaneStaticPropertyElementExplicitValue.fxml"), "com.example");
             assertThat(sourceCode)
                     .contains("package com.example;")
                     .contains("import javafx.scene.layout.GridPane;")
@@ -255,7 +270,10 @@ public class FXMLSourceCodeBuilderTest {
         /// that sets a constant field value via `Double.NEGATIVE_INFINITY`.
         @Test
         void myButtonWithConstants() throws MojoExecutionException {
-            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/MyButtonWithConstants.fxml"), "com.example");
+            String sourceCode = classUnderTest.generateSourceCode(
+                    parse("/examples/MyButtonWithConstants.fxml"),
+                    "com.example"
+            );
             assertThat(sourceCode)
                     .contains("package com.example;")
                     .contains("import javafx.scene.control.Button;")
@@ -281,7 +299,10 @@ public class FXMLSourceCodeBuilderTest {
         /// and property assignments including `getProperties().put(...)`.
         @Test
         void nodeProperties() throws MojoExecutionException {
-            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/NodeProperties.fxml"), "com.example");
+            String sourceCode = classUnderTest.generateSourceCode(
+                    parse("/examples/NodeProperties.fxml"),
+                    "com.example"
+            );
             assertThat(sourceCode)
                     .contains("package com.example;")
                     .contains("import javafx.scene.layout.VBox;")
@@ -318,7 +339,10 @@ public class FXMLSourceCodeBuilderTest {
         /// with an abstract event handler method and a `setOnAction` call using a method reference.
         @Test
         void buttonWithNoControllerAction() throws MojoExecutionException {
-            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/ButtonWithNoControllerAction.fxml"), "com.example");
+            String sourceCode = classUnderTest.generateSourceCode(
+                    parse("/examples/ButtonWithNoControllerAction.fxml"),
+                    "com.example"
+            );
             assertThat(sourceCode)
                     .contains("package com.example;")
                     .contains("import javafx.scene.control.Button;")
@@ -333,7 +357,10 @@ public class FXMLSourceCodeBuilderTest {
         /// with a controller field, bind method, and `setOnAction` delegation.
         @Test
         void buttonWithControllerAction() throws MojoExecutionException {
-            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/ButtonWithControllerAction.fxml"), "com.example");
+            String sourceCode = classUnderTest.generateSourceCode(
+                    parse("/examples/ButtonWithControllerAction.fxml"),
+                    "com.example"
+            );
             assertThat(sourceCode)
                     .contains("package com.example;")
                     .contains("import javafx.scene.control.Button;")
@@ -350,7 +377,10 @@ public class FXMLSourceCodeBuilderTest {
         /// with exposed fields for the nested controller and its controller instance.
         @Test
         void fxIncludeNestedController() throws MojoExecutionException {
-            String sourceCode = classUnderTest.generateSourceCode(parse("/examples/FXIncludeNestedController.fxml"), "com.example");
+            String sourceCode = classUnderTest.generateSourceCode(
+                    parse("/examples/FXIncludeNestedController.fxml"),
+                    "com.example"
+            );
             assertThat(sourceCode)
                     .contains("package com.example;")
                     .contains("import javafx.scene.layout.VBox;")
@@ -465,7 +495,12 @@ public class FXMLSourceCodeBuilderTest {
         @Test
         void rootDocumentWithoutGeneratedAnnotationOmitsAnnotation() throws Exception {
             DefaultLog log = new DefaultLog(new ConsoleLogger());
-            FXMLSourceCodeBuilder builderWithoutAnnotation = new FXMLSourceCodeBuilder(log, "", false);
+            FXMLSourceCodeBuilder builderWithoutAnnotation = new FXMLSourceCodeBuilder(
+                    log,
+                    "",
+                    false,
+                    ZONED_DATE_TIME_NOW_MOCK
+            );
             SourceCodeGeneratorContext context = minimalContext();
             context.sourceCode(SourcePart.CLASS_DECLARATION).append("public class MyClass");
 
@@ -820,8 +855,10 @@ public class FXMLSourceCodeBuilderTest {
         private FXMLDocument documentWithoutController() {
             return new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -842,8 +879,10 @@ public class FXMLSourceCodeBuilderTest {
             );
             return new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.of(controller),
                     Optional.empty(),
@@ -917,8 +956,10 @@ public class FXMLSourceCodeBuilderTest {
             FXMLControllerMethod twoParam = new FXMLControllerMethod(
                     Visibility.PUBLIC, "initialize", false,
                     new FXMLClassType(void.class),
-                    List.of(new FXMLClassType(java.net.URL.class),
-                            new FXMLClassType(java.util.ResourceBundle.class))
+                    List.of(
+                            new FXMLClassType(java.net.URL.class),
+                            new FXMLClassType(java.util.ResourceBundle.class)
+                    )
             );
             FXMLDocument document = documentWithController(List.of(zeroParam, twoParam));
 
@@ -1029,9 +1070,9 @@ public class FXMLSourceCodeBuilderTest {
 
         /// Helper to invoke the private `addFields(SourceCodeGeneratorContext, FXMLDocument)` method via reflection.
         ///
-        /// @param instance  The [FXMLSourceCodeBuilder] instance to invoke the method on.
-        /// @param context   The [SourceCodeGeneratorContext] to pass.
-        /// @param document  The [FXMLDocument] to pass.
+        /// @param instance The [FXMLSourceCodeBuilder] instance to invoke the method on.
+        /// @param context  The [SourceCodeGeneratorContext] to pass.
+        /// @param document The [FXMLDocument] to pass.
         /// @throws Exception if reflection fails or the method throws.
         private void invokeAddFields(
                 FXMLSourceCodeBuilder instance,
@@ -1053,8 +1094,10 @@ public class FXMLSourceCodeBuilderTest {
         private FXMLDocument documentWithNoControllerAndInternalRoot() {
             return new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -1070,8 +1113,10 @@ public class FXMLSourceCodeBuilderTest {
         private FXMLDocument documentWithExposedRoot(String name) {
             return new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLExposedIdentifier(name), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLExposedIdentifier(name), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -1092,8 +1137,10 @@ public class FXMLSourceCodeBuilderTest {
             );
             return new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.of(controller),
                     Optional.empty(),
@@ -1152,12 +1199,16 @@ public class FXMLSourceCodeBuilderTest {
             SourceCodeGeneratorContext context = new SourceCodeGeneratorContext(
                     new Imports(List.of(), Map.of()), "", Map.of(), null
             );
-            FXMLObject aFieldObject = new FXMLObject(new FXMLExposedIdentifier("aField"),
-                    new FXMLClassType(Object.class), Optional.empty(), List.of());
+            FXMLObject aFieldObject = new FXMLObject(
+                    new FXMLExposedIdentifier("aField"),
+                    new FXMLClassType(Object.class), Optional.empty(), List.of()
+            );
             FXMLDocument document = new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLExposedIdentifier("zField"), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLExposedIdentifier("zField"), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -1205,8 +1256,10 @@ public class FXMLSourceCodeBuilderTest {
             );
             FXMLDocument document = new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            FXMLRootIdentifier.INSTANCE, new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -1227,8 +1280,10 @@ public class FXMLSourceCodeBuilderTest {
             );
             FXMLDocument document = new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLNamedRootIdentifier("myRoot"), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLNamedRootIdentifier("myRoot"), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -1285,8 +1340,10 @@ public class FXMLSourceCodeBuilderTest {
             );
             FXMLDocument document = new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -1311,8 +1368,10 @@ public class FXMLSourceCodeBuilderTest {
             );
             FXMLDocument includedDocument = new FXMLDocument(
                     "IncludedClass",
-                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            FXMLRootIdentifier.INSTANCE, new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.of(includedController),
                     Optional.empty(),
@@ -1323,8 +1382,10 @@ public class FXMLSourceCodeBuilderTest {
             lazyDoc.set(includedDocument);
             FXMLDocument document = new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -1354,8 +1415,10 @@ public class FXMLSourceCodeBuilderTest {
             );
             FXMLDocument includedDocument = new FXMLDocument(
                     "IncludedClass",
-                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            FXMLRootIdentifier.INSTANCE, new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -1366,8 +1429,10 @@ public class FXMLSourceCodeBuilderTest {
             lazyDoc.set(includedDocument);
             FXMLDocument document = new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -1471,8 +1536,10 @@ public class FXMLSourceCodeBuilderTest {
             );
             FXMLDocument document = new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -1497,8 +1564,10 @@ public class FXMLSourceCodeBuilderTest {
             );
             FXMLDocument document = new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -1524,8 +1593,10 @@ public class FXMLSourceCodeBuilderTest {
             );
             FXMLDocument document = new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -1560,8 +1631,10 @@ public class FXMLSourceCodeBuilderTest {
             );
             FXMLDocument document = new FXMLDocument(
                     "MyClass",
-                    new FXMLObject(new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(),
                     Optional.empty(),
                     Optional.empty(),
@@ -1723,8 +1796,10 @@ public class FXMLSourceCodeBuilderTest {
         private FXMLDocument documentWithInterfaces(List<FXMLInterface> interfaces) {
             return new FXMLDocument(
                     "MyView",
-                    new FXMLObject(new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            new FXMLInternalIdentifier(0), new FXMLClassType(Object.class),
+                            Optional.empty(), List.of()
+                    ),
                     interfaces,
                     Optional.empty(),
                     Optional.empty(),
@@ -2990,7 +3065,11 @@ public class FXMLSourceCodeBuilderTest {
         /// Verifies that [FXMLConstant] returns empty.
         @Test
         void fxmlConstantReturnsEmpty() throws Exception {
-            FXMLConstant constant = new FXMLConstant(new FXMLClassType(String.class), "MY_CONST", new FXMLClassType(String.class));
+            FXMLConstant constant = new FXMLConstant(
+                    new FXMLClassType(String.class),
+                    "MY_CONST",
+                    new FXMLClassType(String.class)
+            );
 
             Optional<Object> result = invokeFindIdentifierForValue(constant);
 
@@ -3247,11 +3326,11 @@ public class FXMLSourceCodeBuilderTest {
 
         /// Invokes the private `addPrologue` method via reflection.
         ///
-        /// @param context                  The source code generator context.
-        /// @param constructorDependencies  The set of identifiers that are constructor dependencies.
-        /// @param typeString               The type string for the identifier.
-        /// @param identifier               The FXML identifier to initialize.
-        /// @param sourceCodeConsumer       A consumer that appends additional source code logic.
+        /// @param context                 The source code generator context.
+        /// @param constructorDependencies The set of identifiers that are constructor dependencies.
+        /// @param typeString              The type string for the identifier.
+        /// @param identifier              The FXML identifier to initialize.
+        /// @param sourceCodeConsumer      A consumer that appends additional source code logic.
         /// @throws Exception If reflection fails or the method throws.
         private void invokeAddPrologue(
                 SourceCodeGeneratorContext context,
@@ -3296,7 +3375,13 @@ public class FXMLSourceCodeBuilderTest {
             );
             FXMLExposedIdentifier id = new FXMLExposedIdentifier("myLabel");
 
-            invokeAddPrologue(context, Set.of(), "javafx.scene.control.Label", id, sb -> sb.append("new javafx.scene.control.Label()"));
+            invokeAddPrologue(
+                    context,
+                    Set.of(),
+                    "javafx.scene.control.Label",
+                    id,
+                    sb -> sb.append("new javafx.scene.control.Label()")
+            );
 
             String result = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
             assertThat(result).isEqualTo("myLabel = new javafx.scene.control.Label();\n");
@@ -3311,7 +3396,13 @@ public class FXMLSourceCodeBuilderTest {
             );
             FXMLExposedIdentifier id = new FXMLExposedIdentifier("myButton");
 
-            invokeAddPrologue(context, Set.of(id), "javafx.scene.control.Button", id, sb -> sb.append("new javafx.scene.control.Button()"));
+            invokeAddPrologue(
+                    context,
+                    Set.of(id),
+                    "javafx.scene.control.Button",
+                    id,
+                    sb -> sb.append("new javafx.scene.control.Button()")
+            );
 
             String result = context.sourceCode(SourcePart.CONSTRUCTOR_PROLOGUE).toString();
             assertThat(result).contains("javafx.scene.control.Button $$myButton = new javafx.scene.control.Button();\n");
@@ -3981,8 +4072,10 @@ public class FXMLSourceCodeBuilderTest {
         /// @param identifier The identifier for the root object.
         /// @return A new [FXMLObject].
         private FXMLObject buildRoot(FXMLIdentifier identifier) {
-            return new FXMLObject(identifier, new FXMLClassType(javafx.scene.layout.Pane.class),
-                    Optional.empty(), List.of());
+            return new FXMLObject(
+                    identifier, new FXMLClassType(javafx.scene.layout.Pane.class),
+                    Optional.empty(), List.of()
+            );
         }
 
         /// Builds a [SourceCodeGeneratorContext] with the given package name.
@@ -4445,7 +4538,11 @@ public class FXMLSourceCodeBuilderTest {
             FXMLController controller = new FXMLController(
                     new FXMLClassType(Object.class), List.of(field), List.of()
             );
-            FXMLConstant constant = new FXMLConstant(new FXMLClassType(String.class), "EMPTY", new FXMLClassType(String.class));
+            FXMLConstant constant = new FXMLConstant(
+                    new FXMLClassType(String.class),
+                    "EMPTY",
+                    new FXMLClassType(String.class)
+            );
             FXMLDocument document = buildDocument(wrapValue(constant), List.of(), controller);
 
             invokeBindControllerFields(context, document);
@@ -4617,8 +4714,10 @@ public class FXMLSourceCodeBuilderTest {
             SourceCodeGeneratorContext context = buildContext();
             FXMLDocument includedDoc = new FXMLDocument(
                     "SubView",
-                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
             );
             FXMLLazyLoadedDocument lazy = buildLazy(includedDoc);
@@ -4633,8 +4732,10 @@ public class FXMLSourceCodeBuilderTest {
                     FXMLRootIdentifier.INSTANCE,
                     new FXMLClassType(javafx.scene.layout.Pane.class),
                     Optional.empty(),
-                    List.of(new FXMLObjectProperty("content", "getContent",
-                            FXMLType.of(javafx.scene.layout.Pane.class), include))
+                    List.of(new FXMLObjectProperty(
+                            "content", "getContent",
+                            FXMLType.of(javafx.scene.layout.Pane.class), include
+                    ))
             );
             FXMLDocument document = buildDocument(root);
 
@@ -4650,14 +4751,18 @@ public class FXMLSourceCodeBuilderTest {
             SourceCodeGeneratorContext context = buildContext();
             FXMLDocument includedDoc1 = new FXMLDocument(
                     "FirstView",
-                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
             );
             FXMLDocument includedDoc2 = new FXMLDocument(
                     "SecondView",
-                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
             );
             FXMLInclude include1 = new FXMLInclude(
@@ -4689,8 +4794,10 @@ public class FXMLSourceCodeBuilderTest {
             SourceCodeGeneratorContext context = buildContext();
             FXMLDocument includedDoc = new FXMLDocument(
                     "DefView",
-                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
             );
             FXMLLazyLoadedDocument lazy = buildLazy(includedDoc);
@@ -4715,8 +4822,10 @@ public class FXMLSourceCodeBuilderTest {
             SourceCodeGeneratorContext context = buildContext();
             FXMLDocument includedDoc = new FXMLDocument(
                     "CollectionChild",
-                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
             );
             FXMLLazyLoadedDocument lazy = buildLazy(includedDoc);
@@ -4747,8 +4856,10 @@ public class FXMLSourceCodeBuilderTest {
             SourceCodeGeneratorContext context = buildContext();
             FXMLDocument includedDoc = new FXMLDocument(
                     "MapEntry",
-                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
             );
             FXMLLazyLoadedDocument lazy = buildLazy(includedDoc);
@@ -4782,8 +4893,10 @@ public class FXMLSourceCodeBuilderTest {
             SourceCodeGeneratorContext context = buildContext();
             FXMLDocument includedDoc = new FXMLDocument(
                     "ResourceView",
-                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
             );
             FXMLLazyLoadedDocument lazy = buildLazy(includedDoc);
@@ -4798,8 +4911,10 @@ public class FXMLSourceCodeBuilderTest {
                     FXMLRootIdentifier.INSTANCE,
                     new FXMLClassType(javafx.scene.layout.Pane.class),
                     Optional.empty(),
-                    List.of(new FXMLObjectProperty("content", "getContent",
-                            FXMLType.of(javafx.scene.layout.Pane.class), include))
+                    List.of(new FXMLObjectProperty(
+                            "content", "getContent",
+                            FXMLType.of(javafx.scene.layout.Pane.class), include
+                    ))
             );
             FXMLDocument document = buildDocument(root);
 
@@ -4912,7 +5027,12 @@ public class FXMLSourceCodeBuilderTest {
         @Test
         void generatedAnnotationOmittedWhenDisabled() {
             DefaultLog log = new DefaultLog(new ConsoleLogger());
-            FXMLSourceCodeBuilder builder = new FXMLSourceCodeBuilder(log, "org.example.Bundle", false);
+            FXMLSourceCodeBuilder builder = new FXMLSourceCodeBuilder(
+                    log,
+                    "org.example.Bundle",
+                    false,
+                    ZONED_DATE_TIME_NOW_MOCK
+            );
             FXMLDocument document = buildDocument("MyView", buildRoot());
 
             String result = builder.generateSourceCode(document, "com.example");
@@ -4970,8 +5090,10 @@ public class FXMLSourceCodeBuilderTest {
         void documentWithIncludeProducesInnerClass() {
             FXMLDocument includedDoc = new FXMLDocument(
                     "SubView",
-                    new FXMLObject(FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
-                            Optional.empty(), List.of()),
+                    new FXMLObject(
+                            FXMLRootIdentifier.INSTANCE, new FXMLClassType(javafx.scene.layout.Pane.class),
+                            Optional.empty(), List.of()
+                    ),
                     List.of(), Optional.empty(), Optional.empty(), List.of(), List.of()
             );
             FXMLLazyLoadedDocument lazy = new FXMLLazyLoadedDocument();
@@ -4987,8 +5109,10 @@ public class FXMLSourceCodeBuilderTest {
                     FXMLRootIdentifier.INSTANCE,
                     new FXMLClassType(javafx.scene.layout.Pane.class),
                     Optional.empty(),
-                    List.of(new FXMLObjectProperty("content", "getContent",
-                            FXMLType.of(javafx.scene.layout.Pane.class), include))
+                    List.of(new FXMLObjectProperty(
+                            "content", "getContent",
+                            FXMLType.of(javafx.scene.layout.Pane.class), include
+                    ))
             );
             FXMLDocument document = buildDocument("MainView", root);
 

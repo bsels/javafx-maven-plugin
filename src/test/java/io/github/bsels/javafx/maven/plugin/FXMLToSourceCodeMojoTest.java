@@ -24,7 +24,12 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.UnaryOperator;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -637,6 +642,72 @@ class FXMLToSourceCodeMojoTest {
                     .hasFieldOrPropertyWithValue("defaultCharset", "UTF-8")
                     .hasFieldOrPropertyWithValue("addGeneratedAnnotation", true)
                     .hasFieldOrPropertyWithValue("includeSourceFilesInClassDiscovery", true);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // parseOutputTimestamp
+    // -------------------------------------------------------------------------
+
+    /// Tests for the output timestamp parsing logic inside [FXMLToSourceCodeMojo].
+    @Nested
+    class ParseOutputTimestampTest {
+
+        @SuppressWarnings("unchecked")
+        private Optional<ZonedDateTime> invokeParseOutputTimestamp(String timestamp) throws Exception {
+            var method = FXMLToSourceCodeMojo.class.getDeclaredMethod("parseOutputTimestamp", String.class);
+            method.setAccessible(true);
+            try {
+                return (Optional<ZonedDateTime>) method.invoke(mojo, timestamp);
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                if (e.getCause() instanceof RuntimeException re) {
+                    throw re;
+                }
+                throw new RuntimeException(e.getCause());
+            }
+        }
+
+        /// Verifies that a null output timestamp returns an empty optional.
+        @Test
+        void shouldReturnEmptyWhenTimestampIsNull() throws Exception {
+            Optional<ZonedDateTime> result = invokeParseOutputTimestamp(null);
+            assertThat(result).isEmpty();
+        }
+
+        /// Verifies that a blank output timestamp returns an empty optional.
+        @Test
+        void shouldReturnEmptyWhenTimestampIsBlank() throws Exception {
+            Optional<ZonedDateTime> result = invokeParseOutputTimestamp("   ");
+            assertThat(result).isEmpty();
+        }
+
+        /// Verifies that an epoch seconds string is correctly parsed as UTC ZonedDateTime.
+        @Test
+        void shouldParseEpochSecondsSuccessfully() throws Exception {
+            Optional<ZonedDateTime> result = invokeParseOutputTimestamp("1600000000");
+            assertThat(result).hasValue(Instant.ofEpochSecond(1600000000).atZone(ZoneOffset.UTC));
+        }
+
+        /// Verifies that an ISO-8601 date-time string is correctly parsed.
+        @Test
+        void shouldParseIsoDateTimeSuccessfully() throws Exception {
+            Optional<ZonedDateTime> result = invokeParseOutputTimestamp("2020-09-13T12:34:56Z");
+            assertThat(result).hasValue(ZonedDateTime.parse("2020-09-13T12:34:56Z"));
+        }
+
+        /// Verifies that a date-only string is correctly parsed as start of day in UTC.
+        @Test
+        void shouldParseDateOnlySuccessfully() throws Exception {
+            Optional<ZonedDateTime> result = invokeParseOutputTimestamp("2020-09-13");
+            assertThat(result).hasValue(LocalDate.parse("2020-09-13").atStartOfDay(ZoneOffset.UTC));
+        }
+
+        /// Verifies that an invalid timestamp format throws an [IllegalArgumentException].
+        @Test
+        void shouldThrowIllegalArgumentExceptionOnInvalidFormat() {
+            assertThatThrownBy(() -> invokeParseOutputTimestamp("invalid-timestamp-format"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Invalid project.build.outputTimestamp format");
         }
     }
 }
