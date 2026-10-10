@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.2.3 - 2026-10-10
+
+### Patch
+
+Bugfixes:
+
+- The `project.build.outputTimestamp` property was not taking into account in the generated annotation
+
+Dependencies:
+
+- Bumped 'org.apache.maven:maven-core' to **3.10.0**
+- Bumped 'tools.jackson:jackson-bom' to **3.2.3**
+- Bumped 'org.mockito:mockito-core' to **5.24.0**
+- Bumped 'io.github.bsels:semantic-version-maven-plugin' to **1.8.0**
+
 ## 2.2.2 - 2026-09-12
 
 ### Patch
