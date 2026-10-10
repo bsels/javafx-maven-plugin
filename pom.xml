@@ -68,7 +68,7 @@
         <!-- https://central.sonatype.com/artifact/org.sonatype.central/central-publishing-maven-plugin -->
         <central.publishing.maven.plugin.version>0.11.0</central.publishing.maven.plugin.version>
         <!-- https://central.sonatype.com/artifact/io.github.bsels/semantic-version-maven-plugin -->
-        <semantic.versioning.plugin>1.7.1</semantic.versioning.plugin>
+        <semantic.versioning.plugin>1.8.0</semantic.versioning.plugin>
         <!--endregion-->
         <!--region Dependency versions -->
         <!-- https://central.sonatype.com/artifact/org.assertj/assertj-core -->
