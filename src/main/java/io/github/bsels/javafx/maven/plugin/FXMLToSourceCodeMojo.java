@@ -338,7 +338,7 @@ public final class FXMLToSourceCodeMojo extends AbstractMojo {
     /// @param outputTimestamp The raw string value from `${project.build.outputTimestamp}`.
     /// @return The parsed [ZonedDateTime] in an optional or empty if the input is null or blank
     /// @throws IllegalArgumentException if the input is invalid
-    public Optional<ZonedDateTime> parseOutputTimestamp(String outputTimestamp) throws IllegalArgumentException {
+    private Optional<ZonedDateTime> parseOutputTimestamp(String outputTimestamp) throws IllegalArgumentException {
         if (outputTimestamp == null || outputTimestamp.isBlank()) {
             return Optional.empty();
         }

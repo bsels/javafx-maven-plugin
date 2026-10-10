@@ -306,4 +306,36 @@ class FXMLToSourceCodeMojoIT {
             assertThat(content).doesNotContain("package ");
         }
     }
+
+    /// Tests for the outputTimestamp configuration option and parsing during source generation.
+    @Nested
+    class OutputTimestampIntegrationTest {
+
+        /// Verifies that outputTimestamp (e.g. ISO-8601 date-time) is reflected in the generated @Generated date.
+        @Test
+        void withOutputTimestampSpecified() throws Exception {
+            mojo.addGeneratedAnnotation = true;
+            mojo.outputTimestamp = "2020-09-13T12:34:56Z";
+            Path fxmlDir = singleFxmlDir(outputDir.resolve("fxml"), "SimpleButton.fxml");
+            mojo.fxmlDirectories = List.of(fxmlDirectory(fxmlDir, "io.github.bsels.itest.fxml"));
+
+            mojo.execute();
+
+            Path generated = outputDir.resolve("io/github/bsels/itest/fxml/SimpleButton.java");
+            String content = Files.readString(generated);
+            assertThat(content).contains("date=\"2020-09-13T12:34:56Z\"");
+        }
+
+        /// Verifies that an invalid outputTimestamp throws an exception during mojo execution.
+        @Test
+        void withInvalidOutputTimestampThrowsException() throws Exception {
+            mojo.outputTimestamp = "not-a-valid-timestamp";
+            Path fxmlDir = singleFxmlDir(outputDir.resolve("fxml"), "SimpleButton.fxml");
+            mojo.fxmlDirectories = List.of(fxmlDirectory(fxmlDir, "io.github.bsels.itest.fxml"));
+
+            assertThatExceptionOfType(IllegalArgumentException.class)
+                    .isThrownBy(() -> mojo.execute())
+                    .withMessageContaining("Invalid project.build.outputTimestamp format");
+        }
+    }
 }
