@@ -42,21 +42,21 @@
         <java.version>25</java.version>
         <!--region Plugin versions -->
         <!-- https://central.sonatype.com/artifact/org.jacoco/jacoco-maven-plugin -->
-        <jacoco.version>0.8.15</jacoco.version>
+        <jacoco.version>0.8.16</jacoco.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven/maven-core -->
         <maven.plugin.api.version>3.10.0</maven.plugin.api.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-enforcer-plugin -->
-        <maven.enforcer.plugin.version>3.6.3</maven.enforcer.plugin.version>
+        <maven.enforcer.plugin.version>3.7.0</maven.enforcer.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-dependency-plugin -->
         <maven.dependency.plugin.version>3.11.0</maven.dependency.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-compiler-plugin -->
         <maven.compiler.plugin.version>3.16.0</maven.compiler.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-surefire-plugin -->
-        <maven.surefire.plugin.version>3.6.0</maven.surefire.plugin.version>
+        <maven.surefire.plugin.version>3.6.1</maven.surefire.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-failsafe-plugin -->
-        <maven.failsafe.plugin.version>3.6.0</maven.failsafe.plugin.version>
+        <maven.failsafe.plugin.version>3.6.1</maven.failsafe.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.codehaus.mojo/build-helper-maven-plugin -->
-        <build.helper.maven.plugin.version>3.6.2</build.helper.maven.plugin.version>
+        <build.helper.maven.plugin.version>3.8.0</build.helper.maven.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-plugin-plugin -->
         <maven.plugin.plugin.version>3.16.0</maven.plugin.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-gpg-plugin -->
@@ -66,15 +66,15 @@
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugins/maven-source-plugin -->
         <maven.source.plugin.version>3.4.0</maven.source.plugin.version>
         <!-- https://central.sonatype.com/artifact/org.sonatype.central/central-publishing-maven-plugin -->
-        <central.publishing.maven.plugin.version>0.11.0</central.publishing.maven.plugin.version>
+        <central.publishing.maven.plugin.version>0.12.0</central.publishing.maven.plugin.version>
         <!-- https://central.sonatype.com/artifact/io.github.bsels/semantic-version-maven-plugin -->
-        <semantic.versioning.plugin>1.8.0</semantic.versioning.plugin>
+        <semantic.versioning.plugin>1.8.2</semantic.versioning.plugin>
         <!--endregion-->
         <!--region Dependency versions -->
         <!-- https://central.sonatype.com/artifact/org.assertj/assertj-core -->
         <assertj.version>3.27.7</assertj.version>
         <!-- https://central.sonatype.com/artifact/tools.jackson/jackson-bom -->
-        <jackson.version>3.2.3</jackson.version>
+        <jackson.version>3.3.0</jackson.version>
         <!-- https://central.sonatype.com/artifact/org.junit.jupiter/junit-jupiter-api -->
         <junit.version>6.1.3</junit.version>
         <!-- https://central.sonatype.com/artifact/org.apache.maven.plugin-tools/maven-plugin-annotations -->
@@ -82,11 +82,11 @@
         <!-- https://central.sonatype.com/artifact/org.mockito/mockito-core -->
         <mockito.version>5.24.0</mockito.version>
         <!-- https://central.sonatype.com/artifact/org.codehaus.plexus/plexus-java -->
-        <plexus.java.version>1.6.0</plexus.java.version>
+        <plexus.java.version>1.7.0</plexus.java.version>
         <!-- https://central.sonatype.com/artifact/org.codehaus.plexus/plexus-archiver -->
-        <plexus.archiver.version>4.14.0</plexus.archiver.version>
+        <plexus.archiver.version>4.16.0</plexus.archiver.version>
         <!-- https://central.sonatype.com/artifact/org.openjfx/javafx-controls -->
-        <javafx.version>25.0.4</javafx.version>
+        <javafx.version>25.0.5</javafx.version>
         <!--endregion-->
         <!-- region Source code info -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
